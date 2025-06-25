@@ -1,0 +1,89 @@
+# Environment Configuration for NeuronMap
+# =======================================
+
+environment:
+  # Environment Type
+  environment: "development"  # development, testing, production
+  
+  # Logging Configuration
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  enable_debugging: true
+  log_to_file: true
+  log_file_path: "logs/neuronmap.log"
+  log_rotation: true
+  max_log_size_mb: 100
+  backup_count: 5
+  
+  # Performance Settings
+  max_workers: 4
+  timeout_seconds: 300
+  memory_limit_gb: 32
+  cpu_limit_percent: 80
+  
+  # System Monitoring
+  monitoring:
+    enable_system_monitoring: true
+    monitor_gpu_usage: true
+    monitor_memory_usage: true
+    monitor_cpu_usage: true
+    monitoring_interval_seconds: 10
+    alert_threshold_memory_percent: 90
+    alert_threshold_gpu_memory_percent: 95
+  
+  # Error Handling
+  error_handling:
+    enable_error_recovery: true
+    max_retry_attempts: 3
+    retry_delay_seconds: 5
+    enable_graceful_shutdown: true
+    error_reporting: true
+  
+  # Security Settings
+  security:
+    validate_inputs: true
+    sanitize_file_paths: true
+    max_file_size_mb: 1000
+    allowed_file_extensions: [".txt", ".json", ".yaml", ".csv", ".h5", ".hdf5"]
+    enable_model_verification: true
+  
+  # Cache Configuration
+  cache:
+    enable_caching: true
+    cache_directory: "cache"
+    max_cache_size_gb: 10
+    cache_ttl_hours: 24
+    auto_cleanup: true
+  
+  # Development Settings
+  development:
+    hot_reload: true
+    debug_mode: true
+    profile_performance: false
+    enable_experimental_features: false
+    verbose_output: true
+  
+  # Production Settings  
+  production:
+    optimize_for_speed: true
+    enable_compression: true
+    batch_processing: true
+    distributed_processing: false
+    health_check_interval_seconds: 60
+  
+  # API Configuration
+  api:
+    enable_api: false
+    host: "localhost"
+    port: 8000
+    cors_enabled: true
+    rate_limiting: true
+    max_requests_per_minute: 100
+    api_key_required: false
+  
+  # Database Configuration (for future use)
+  database:
+    enable_database: false
+    database_type: "sqlite"  # sqlite, postgresql, mysql
+    connection_string: "sqlite:///neuronmap.db"
+    connection_pool_size: 5
+    enable_migrations: true

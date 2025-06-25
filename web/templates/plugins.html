@@ -1,0 +1,689 @@
+{% extends "base.html" %}
+
+{% block title %}Plugin Management - NeuronMap{% endblock %}
+
+{% block extra_head %}
+<style>
+    .plugin-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .plugin-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+    
+    .plugin-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 15px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .plugin-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+    }
+    
+    .plugin-type {
+        background: rgba(255,255,255,0.2);
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    
+    .plugin-body {
+        padding: 20px;
+    }
+    
+    .plugin-description {
+        color: #666;
+        margin-bottom: 15px;
+        line-height: 1.5;
+    }
+    
+    .plugin-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        margin-bottom: 15px;
+        font-size: 14px;
+    }
+    
+    .plugin-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        color: #666;
+    }
+    
+    .plugin-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 15px 0;
+    }
+    
+    .plugin-tag {
+        background: #f0f0f0;
+        color: #666;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+    }
+    
+    .plugin-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    
+    .btn-plugin {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background-color 0.2s;
+    }
+    
+    .btn-info {
+        background: #17a2b8;
+        color: white;
+    }
+    
+    .btn-info:hover {
+        background: #138496;
+    }
+    
+    .btn-execute {
+        background: #28a745;
+        color: white;
+    }
+    
+    .btn-execute:hover {
+        background: #218838;
+    }
+    
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .btn-danger:hover {
+        background: #c82333;
+    }
+    
+    .plugin-filters {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .filter-group {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    
+    .filter-item {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .filter-item label {
+        font-weight: 600;
+        color: #333;
+        font-size: 14px;
+    }
+    
+    .filter-item select,
+    .filter-item input {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+    
+    .plugin-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .stat-card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        text-align: center;
+    }
+    
+    .stat-number {
+        font-size: 32px;
+        font-weight: 700;
+        color: #667eea;
+        margin-bottom: 5px;
+    }
+    
+    .stat-label {
+        color: #666;
+        font-size: 14px;
+        font-weight: 500;
+    }
+    
+    .load-plugin-form {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.5);
+    }
+    
+    .modal-content {
+        background-color: white;
+        margin: 10% auto;
+        padding: 20px;
+        border-radius: 8px;
+        width: 80%;
+        max-width: 600px;
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+    
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .close {
+        color: #aaa;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    
+    .close:hover {
+        color: #000;
+    }
+    
+    .dependencies-list {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin: 10px 0;
+    }
+    
+    .dependency-item {
+        display: inline-block;
+        background: #e9ecef;
+        padding: 4px 8px;
+        margin: 2px;
+        border-radius: 12px;
+        font-size: 12px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-puzzle-piece"></i> Plugin Management</h1>
+                <button class="btn btn-primary" onclick="loadPlugins()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+
+            <!-- Statistics -->
+            <div class="plugin-stats" id="pluginStats">
+                <div class="stat-card">
+                    <div class="stat-number" id="totalPlugins">0</div>
+                    <div class="stat-label">Total Plugins</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="analysisPlugins">0</div>
+                    <div class="stat-label">Analysis Plugins</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="visualizationPlugins">0</div>
+                    <div class="stat-label">Visualization Plugins</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="modelAdapterPlugins">0</div>
+                    <div class="stat-label">Model Adapters</div>
+                </div>
+            </div>
+
+            <!-- Load Plugin Form -->
+            <div class="load-plugin-form">
+                <h5><i class="fas fa-plus"></i> Load New Plugin</h5>
+                <div class="row">
+                    <div class="col-md-8">
+                        <input type="text" id="pluginPath" class="form-control" placeholder="Enter plugin file path..." />
+                    </div>
+                    <div class="col-md-4">
+                        <button class="btn btn-success w-100" onclick="loadNewPlugin()">
+                            <i class="fas fa-upload"></i> Load Plugin
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="plugin-filters">
+                <div class="filter-group">
+                    <div class="filter-item">
+                        <label>Filter by Type:</label>
+                        <select id="typeFilter" onchange="filterPlugins()">
+                            <option value="">All Types</option>
+                            <option value="analysis">Analysis</option>
+                            <option value="model_adapter">Model Adapter</option>
+                            <option value="visualization">Visualization</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label>Search:</label>
+                        <input type="text" id="searchFilter" placeholder="Search plugins..." oninput="filterPlugins()" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plugin Cards -->
+            <div id="pluginContainer">
+                <div class="text-center">
+                    <div class="spinner-border" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                    <p>Loading plugins...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Plugin Info Modal -->
+<div id="pluginInfoModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalPluginName">Plugin Information</h3>
+            <span class="close" onclick="closeModal()">&times;</span>
+        </div>
+        <div id="modalPluginInfo">
+            <!-- Plugin info will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<!-- Execute Plugin Modal -->
+<div id="executePluginModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Execute Plugin</h3>
+            <span class="close" onclick="closeExecuteModal()">&times;</span>
+        </div>
+        <div id="executePluginForm">
+            <!-- Execute form will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<script>
+let allPlugins = [];
+
+function loadPlugins() {
+    fetch('/api/plugins/list')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showAlert('Error loading plugins: ' + data.error, 'danger');
+                return;
+            }
+            
+            allPlugins = data.plugins || [];
+            updateStatistics(data);
+            displayPlugins(allPlugins);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Error loading plugins: ' + error.message, 'danger');
+        });
+}
+
+function updateStatistics(data) {
+    document.getElementById('totalPlugins').textContent = data.total_count || 0;
+    
+    const counts = {
+        analysis: 0,
+        visualization: 0,
+        model_adapter: 0
+    };
+    
+    (data.plugins || []).forEach(plugin => {
+        if (counts.hasOwnProperty(plugin.plugin_type)) {
+            counts[plugin.plugin_type]++;
+        }
+    });
+    
+    document.getElementById('analysisPlugins').textContent = counts.analysis;
+    document.getElementById('visualizationPlugins').textContent = counts.visualization;
+    document.getElementById('modelAdapterPlugins').textContent = counts.model_adapter;
+}
+
+function displayPlugins(plugins) {
+    const container = document.getElementById('pluginContainer');
+    
+    if (plugins.length === 0) {
+        container.innerHTML = `
+            <div class="text-center">
+                <i class="fas fa-puzzle-piece fa-3x text-muted mb-3"></i>
+                <h5>No plugins found</h5>
+                <p class="text-muted">Load some plugins to get started</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = plugins.map(plugin => `
+        <div class="plugin-card" data-type="${plugin.plugin_type}" data-name="${plugin.name.toLowerCase()}">
+            <div class="plugin-header">
+                <div>
+                    <h5 class="plugin-title">${plugin.name}</h5>
+                    <small>v${plugin.version} by ${plugin.author}</small>
+                </div>
+                <span class="plugin-type">${plugin.plugin_type}</span>
+            </div>
+            <div class="plugin-body">
+                <p class="plugin-description">${plugin.description}</p>
+                
+                <div class="plugin-meta">
+                    <div class="plugin-meta-item">
+                        <i class="fas fa-calendar"></i>
+                        Created: ${new Date(plugin.created_at).toLocaleDateString()}
+                    </div>
+                    <div class="plugin-meta-item">
+                        <i class="fas fa-sync"></i>
+                        Updated: ${new Date(plugin.updated_at).toLocaleDateString()}
+                    </div>
+                </div>
+                
+                <div class="plugin-tags">
+                    ${plugin.tags.map(tag => `<span class="plugin-tag">${tag}</span>`).join('')}
+                </div>
+                
+                <div class="plugin-actions">
+                    <button class="btn-plugin btn-info" onclick="showPluginInfo('${plugin.name}')">
+                        <i class="fas fa-info-circle"></i> Info
+                    </button>
+                    <button class="btn-plugin btn-execute" onclick="showExecuteModal('${plugin.name}')">
+                        <i class="fas fa-play"></i> Execute
+                    </button>
+                    <button class="btn-plugin btn-danger" onclick="unloadPlugin('${plugin.name}')">
+                        <i class="fas fa-trash"></i> Unload
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function filterPlugins() {
+    const typeFilter = document.getElementById('typeFilter').value.toLowerCase();
+    const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+    
+    const filteredPlugins = allPlugins.filter(plugin => {
+        const matchesType = !typeFilter || plugin.plugin_type === typeFilter;
+        const matchesSearch = !searchFilter || 
+            plugin.name.toLowerCase().includes(searchFilter) ||
+            plugin.description.toLowerCase().includes(searchFilter) ||
+            plugin.tags.some(tag => tag.toLowerCase().includes(searchFilter));
+        
+        return matchesType && matchesSearch;
+    });
+    
+    displayPlugins(filteredPlugins);
+}
+
+function showPluginInfo(pluginName) {
+    fetch(`/api/plugins/${encodeURIComponent(pluginName)}/info`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                showAlert('Error getting plugin info: ' + data.error, 'danger');
+                return;
+            }
+            
+            document.getElementById('modalPluginName').textContent = data.name;
+            document.getElementById('modalPluginInfo').innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Basic Information</h6>
+                        <p><strong>Version:</strong> ${data.version}</p>
+                        <p><strong>Author:</strong> ${data.author}</p>
+                        <p><strong>Type:</strong> ${data.plugin_type}</p>
+                        <p><strong>Status:</strong> <span class="badge badge-success">${data.status}</span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Metadata</h6>
+                        <p><strong>Created:</strong> ${new Date(data.created_at).toLocaleString()}</p>
+                        <p><strong>Updated:</strong> ${new Date(data.updated_at).toLocaleString()}</p>
+                    </div>
+                </div>
+                
+                <h6>Description</h6>
+                <p>${data.description}</p>
+                
+                <h6>Dependencies</h6>
+                <div class="dependencies-list">
+                    ${data.dependencies.map(dep => `<span class="dependency-item">${dep}</span>`).join('')}
+                </div>
+                
+                <h6>Available Methods</h6>
+                <div class="list-group">
+                    ${data.methods.map(method => `
+                        <div class="list-group-item">
+                            <strong>${method.name}</strong>
+                            <p class="mb-0 text-muted">${method.doc}</p>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <h6>Tags</h6>
+                <div>
+                    ${data.tags.map(tag => `<span class="badge badge-secondary mr-1">${tag}</span>`).join('')}
+                </div>
+            `;
+            
+            document.getElementById('pluginInfoModal').style.display = 'block';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('Error getting plugin info: ' + error.message, 'danger');
+        });
+}
+
+function showExecuteModal(pluginName) {
+    document.getElementById('executePluginForm').innerHTML = `
+        <h5>Execute Plugin: ${pluginName}</h5>
+        <p>Enter parameters for plugin execution (JSON format):</p>
+        <textarea id="pluginParams" class="form-control" rows="6" placeholder='{"parameter1": "value1", "parameter2": "value2"}'></textarea>
+        <div class="mt-3">
+            <button class="btn btn-success" onclick="executePlugin('${pluginName}')">
+                <i class="fas fa-play"></i> Execute
+            </button>
+            <button class="btn btn-secondary ml-2" onclick="closeExecuteModal()">Cancel</button>
+        </div>
+        <div id="executeResult" class="mt-3"></div>
+    `;
+    
+    document.getElementById('executePluginModal').style.display = 'block';
+}
+
+function executePlugin(pluginName) {
+    const paramsText = document.getElementById('pluginParams').value.trim();
+    let params = {};
+    
+    if (paramsText) {
+        try {
+            params = JSON.parse(paramsText);
+        } catch (e) {
+            showAlert('Invalid JSON format in parameters', 'danger');
+            return;
+        }
+    }
+    
+    fetch(`/api/plugins/${encodeURIComponent(pluginName)}/execute`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params)
+    })
+    .then(response => response.json())
+    .then(data => {
+        const resultDiv = document.getElementById('executeResult');
+        
+        if (data.error) {
+            resultDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6>Execution Failed</h6>
+                    <p>${data.error}</p>
+                </div>
+            `;
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <h6>Execution Successful</h6>
+                    <p>${data.message}</p>
+                    <details>
+                        <summary>Result Data</summary>
+                        <pre class="mt-2">${JSON.stringify(data.result, null, 2)}</pre>
+                    </details>
+                </div>
+            `;
+            showAlert('Plugin executed successfully', 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('executeResult').innerHTML = `
+            <div class="alert alert-danger">
+                <h6>Execution Error</h6>
+                <p>${error.message}</p>
+            </div>
+        `;
+    });
+}
+
+function loadNewPlugin() {
+    const pluginPath = document.getElementById('pluginPath').value.trim();
+    
+    if (!pluginPath) {
+        showAlert('Please enter a plugin file path', 'warning');
+        return;
+    }
+    
+    fetch('/api/plugins/load', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ plugin_path: pluginPath })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showAlert('Error loading plugin: ' + data.error, 'danger');
+        } else {
+            showAlert(data.message, 'success');
+            document.getElementById('pluginPath').value = '';
+            loadPlugins(); // Refresh the list
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Error loading plugin: ' + error.message, 'danger');
+    });
+}
+
+function unloadPlugin(pluginName) {
+    if (!confirm(`Are you sure you want to unload the plugin "${pluginName}"?`)) {
+        return;
+    }
+    
+    fetch(`/api/plugins/${encodeURIComponent(pluginName)}/unload`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            showAlert('Error unloading plugin: ' + data.error, 'danger');
+        } else {
+            showAlert(data.message, 'success');
+            loadPlugins(); // Refresh the list
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('Error unloading plugin: ' + error.message, 'danger');
+    });
+}
+
+function closeModal() {
+    document.getElementById('pluginInfoModal').style.display = 'none';
+}
+
+function closeExecuteModal() {
+    document.getElementById('executePluginModal').style.display = 'none';
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    const infoModal = document.getElementById('pluginInfoModal');
+    const executeModal = document.getElementById('executePluginModal');
+    
+    if (event.target === infoModal) {
+        infoModal.style.display = 'none';
+    }
+    if (event.target === executeModal) {
+        executeModal.style.display = 'none';
+    }
+}
+
+// Load plugins on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadPlugins();
+});
+</script>
+{% endblock %}

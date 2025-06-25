@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  # Development environment with Jupyter notebook
+  neuronmap-dev:
+    build:
+      context: .
+      target: development
+    container_name: neuronmap-dev
+    ports:
+      - "8888:8888"  # Jupyter notebook
+      - "6006:6006"  # TensorBoard (if needed)
+    volumes:
+      - .:/app
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - PYTHONPATH=/app
+      - JUPYTER_ENABLE_LAB=yes
+    command: jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+    networks:
+      - neuronmap-network
+
+  # Production environment
+  neuronmap-prod:
+    build:
+      context: .
+      target: production
+    container_name: neuronmap-prod
+    volumes:
+      - ./data:/home/neuronmap/data
+      - ./logs:/home/neuronmap/logs
+      - ./configs:/home/neuronmap/configs
+    environment:
+      - PYTHONPATH=/home/neuronmap
+    networks:
+      - neuronmap-network
+
+  # GPU-enabled environment
+  neuronmap-gpu:
+    build:
+      context: .
+      target: gpu
+    container_name: neuronmap-gpu
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - PYTHONPATH=/home/neuronmap
+    volumes:
+      - ./data:/home/neuronmap/data
+      - ./logs:/home/neuronmap/logs
+      - ./configs:/home/neuronmap/configs
+    networks:
+      - neuronmap-network
+
+  # Ollama service for question generation
+  ollama:
+    image: ollama/ollama:latest
+    container_name: neuronmap-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - neuronmap-network
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: neuronmap-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - neuronmap-network
+
+  # Monitoring with Prometheus (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: neuronmap-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - neuronmap-network
+
+  # Grafana for visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: neuronmap-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=neuronmap
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - neuronmap-network
+
+networks:
+  neuronmap-network:
+    driver: bridge
+
+volumes:
+  ollama-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:

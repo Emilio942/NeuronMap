@@ -1,0 +1,110 @@
+# Visualization Configuration for NeuronMap
+# =========================================
+
+visualization:
+  # Figure Settings
+  figure_width: 12
+  figure_height: 8
+  dpi: 300
+  color_scheme: "viridis"
+  interactive: true
+  export_format: "png"  # png, svg, pdf, html
+  
+  # Style Configuration
+  style:
+    theme: "modern"  # modern, classic, minimal
+    font_family: "Arial"
+    font_size: 12
+    title_font_size: 14
+    axis_label_font_size: 11
+    legend_font_size: 10
+    grid_alpha: 0.3
+    line_width: 2.0
+  
+  # Color Schemes
+  color_schemes:
+    categorical: "Set1"
+    sequential: "viridis"
+    diverging: "RdBu_r"
+    attention: "Blues"
+    heatmap: "coolwarm"
+  
+  # Plot-Specific Settings
+  plots:
+    # Heatmap Configuration
+    heatmap:
+      cmap: "viridis"
+      show_colorbar: true
+      annotate_cells: false
+      cell_text_size: 8
+      aspect_ratio: "auto"
+    
+    # Scatter Plot Configuration  
+    scatter:
+      point_size: 50
+      alpha: 0.7
+      show_legend: true
+      show_grid: true
+      add_trend_line: false
+    
+    # PCA Plot Configuration
+    pca:
+      explained_variance_threshold: 0.95
+      max_components: 10
+      biplot: false
+      loadings_arrow_scale: 1.0
+    
+    # t-SNE Configuration
+    tsne:
+      perplexity: 30
+      learning_rate: 200
+      n_iter: 1000
+      random_state: 42
+    
+    # UMAP Configuration
+    umap:
+      n_neighbors: 15
+      min_dist: 0.1
+      metric: "euclidean"
+      random_state: 42
+    
+    # Attention Visualization
+    attention:
+      head_view: true
+      model_view: true
+      neuron_view: false
+      show_token_labels: true
+      max_tokens_display: 50
+      attention_threshold: 0.1
+  
+  # Interactive Features
+  interactive_features:
+    enable_zoom: true
+    enable_pan: true
+    enable_select: true
+    enable_hover: true
+    enable_crossfilter: true
+    show_toolbar: true
+    
+  # Export Settings
+  export:
+    formats: ["png", "svg", "pdf", "html"]
+    resolution_dpi: 300
+    transparent_background: false
+    include_metadata: true
+    optimize_size: true
+  
+  # Dashboard Configuration
+  dashboard:
+    layout: "sidebar"  # sidebar, tabs, grid
+    theme: "light"  # light, dark, auto
+    auto_refresh: false
+    refresh_interval_seconds: 30
+    max_plots_per_page: 12
+    
+  # Animation Settings
+  animation:
+    enable_animations: true
+    transition_duration: 500  # milliseconds
+    easing: "ease-in-out"
+    fps: 30

@@ -1,0 +1,66 @@
+# Production Environment Configuration for NeuronMap
+# ================================================
+
+# Inherit from base environment.yaml and override specific settings
+environment:
+  # Production-specific settings
+  environment: "production"
+  
+  # Logging Configuration (optimized for production)
+  log_level: "WARNING"
+  enable_debugging: false
+  log_to_file: true
+  log_file_path: "logs/neuronmap_prod.log"
+  log_rotation: true
+  max_log_size_mb: 200
+  backup_count: 10
+  
+  # Performance Settings (optimized for production)
+  max_workers: 8
+  timeout_seconds: 600
+  memory_limit_gb: 64
+  cpu_limit_percent: 90
+  
+  # System Monitoring (balanced for production)
+  monitoring:
+    enable_system_monitoring: true
+    monitor_gpu_usage: true
+    monitor_memory_usage: true
+    monitor_cpu_usage: true
+    monitoring_interval_seconds: 30
+    alert_threshold_memory_percent: 95
+    alert_threshold_gpu_memory_percent: 98
+  
+  # Error Handling (strict for production)
+  error_handling:
+    enable_error_recovery: true
+    max_retry_attempts: 3
+    retry_delay_seconds: 10
+    enable_graceful_shutdown: true
+    error_reporting: true
+    fail_fast_on_validation_errors: true
+  
+  # Security Settings (strict for production)
+  security:
+    validate_inputs: true
+    sanitize_file_paths: true
+    max_file_size_mb: 2000
+    allowed_file_extensions: [".txt", ".json", ".yaml", ".csv", ".h5", ".hdf5"]
+    enable_model_verification: true
+  
+  # Cache Configuration (conservative caching for prod)
+  cache:
+    enable_caching: true
+    cache_directory: "cache/prod"
+    max_cache_size_gb: 20
+    cache_ttl_hours: 168  # 1 week
+    auto_cleanup: true
+  
+  # Production-specific features
+  production:
+    enable_metrics_collection: true
+    metrics_endpoint: "http://localhost:9090/metrics"
+    enable_health_checks: true
+    health_check_interval_seconds: 60
+    enable_auto_scaling: false
+    max_concurrent_requests: 100

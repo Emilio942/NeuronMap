@@ -1,0 +1,530 @@
+{% extends "base.html" %}
+
+{% block title %}Reports & Export - NeuronMap{% endblock %}
+
+{% block extra_head %}
+<style>
+    .report-card {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .report-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+    
+    .report-header {
+        background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        color: white;
+        padding: 15px 20px;
+    }
+    
+    .report-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+    }
+    
+    .report-body {
+        padding: 20px;
+    }
+    
+    .report-controls {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .format-option {
+        display: flex;
+        align-items: center;
+        padding: 10px;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .format-option:hover {
+        border-color: #007bff;
+        background-color: #f8f9fa;
+    }
+    
+    .format-option.selected {
+        border-color: #007bff;
+        background-color: #e3f2fd;
+    }
+    
+    .format-icon {
+        font-size: 24px;
+        margin-right: 15px;
+        width: 40px;
+        text-align: center;
+    }
+    
+    .format-info h6 {
+        margin: 0;
+        font-weight: 600;
+    }
+    
+    .format-info p {
+        margin: 0;
+        color: #666;
+        font-size: 14px;
+    }
+    
+    .export-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+    
+    .progress-container {
+        margin-top: 20px;
+        display: none;
+    }
+    
+    .result-container {
+        margin-top: 20px;
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-file-export"></i> Reports & Export</h1>
+                <button class="btn btn-outline-primary" onclick="loadRecentAnalyses()">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+
+            <!-- Report Generation Controls -->
+            <div class="report-controls">
+                <h5><i class="fas fa-cog"></i> Generate Report</h5>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <label for="analysisSelect" class="form-label">Select Analysis:</label>
+                        <select id="analysisSelect" class="form-select">
+                            <option value="">Loading analyses...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="reportType" class="form-label">Report Type:</label>
+                        <select id="reportType" class="form-select">
+                            <option value="comprehensive">Comprehensive Analysis</option>
+                            <option value="summary">Executive Summary</option>
+                            <option value="technical">Technical Details</option>
+                            <option value="comparative">Comparative Analysis</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <label class="form-label">Export Format:</label>
+                    <div class="export-options">
+                        <div class="format-option" data-format="pdf" onclick="selectFormat('pdf')">
+                            <div class="format-icon text-danger">
+                                <i class="fas fa-file-pdf"></i>
+                            </div>
+                            <div class="format-info">
+                                <h6>PDF Report</h6>
+                                <p>Professional formatted report with charts and tables</p>
+                            </div>
+                        </div>
+                        
+                        <div class="format-option" data-format="html" onclick="selectFormat('html')">
+                            <div class="format-icon text-primary">
+                                <i class="fas fa-file-code"></i>
+                            </div>
+                            <div class="format-info">
+                                <h6>HTML Report</h6>
+                                <p>Interactive web report with embedded visualizations</p>
+                            </div>
+                        </div>
+                        
+                        <div class="format-option" data-format="csv" onclick="selectFormat('csv')">
+                            <div class="format-icon text-success">
+                                <i class="fas fa-file-csv"></i>
+                            </div>
+                            <div class="format-info">
+                                <h6>CSV Data</h6>
+                                <p>Raw data export for further analysis</p>
+                            </div>
+                        </div>
+                        
+                        <div class="format-option" data-format="json" onclick="selectFormat('json')">
+                            <div class="format-icon text-warning">
+                                <i class="fas fa-file-code"></i>
+                            </div>
+                            <div class="format-info">
+                                <h6>JSON Data</h6>
+                                <p>Structured data format for programmatic use</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <button class="btn btn-success btn-lg" onclick="generateReport()" id="generateBtn">
+                        <i class="fas fa-file-export"></i> Generate Report
+                    </button>
+                </div>
+                
+                <!-- Progress Bar -->
+                <div class="progress-container">
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <p class="mt-2 text-center" id="progressText">Initializing...</p>
+                </div>
+                
+                <!-- Result -->
+                <div class="result-container">
+                    <div class="alert" role="alert" id="resultAlert">
+                        <!-- Result will be shown here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Reports -->
+            <div class="report-card">
+                <div class="report-header">
+                    <h5 class="report-title"><i class="fas fa-history"></i> Recent Reports</h5>
+                </div>
+                <div class="report-body">
+                    <div id="recentReports">
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p>Loading recent reports...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Export Options -->
+            <div class="report-card">
+                <div class="report-header">
+                    <h5 class="report-title"><i class="fas fa-download"></i> Quick Export</h5>
+                </div>
+                <div class="report-body">
+                    <p>Export specific data components directly:</p>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-primary w-100 mb-2" onclick="quickExport('activations')">
+                                <i class="fas fa-brain"></i><br>
+                                Activation Data
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-success w-100 mb-2" onclick="quickExport('visualizations')">
+                                <i class="fas fa-chart-bar"></i><br>
+                                Visualizations
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-info w-100 mb-2" onclick="quickExport('statistics')">
+                                <i class="fas fa-calculator"></i><br>
+                                Statistics
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-warning w-100 mb-2" onclick="quickExport('configurations')">
+                                <i class="fas fa-cog"></i><br>
+                                Configurations
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Templates -->
+            <div class="report-card">
+                <div class="report-header">
+                    <h5 class="report-title"><i class="fas fa-templates"></i> Report Templates</h5>
+                </div>
+                <div class="report-body">
+                    <p>Use predefined templates for common reporting scenarios:</p>
+                    <div class="list-group">
+                        <button class="list-group-item list-group-item-action" onclick="useTemplate('research_paper')">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Research Paper Template</h6>
+                                <small>Academic format</small>
+                            </div>
+                            <p class="mb-1">Structured format suitable for academic publications with detailed methodology and results.</p>
+                        </button>
+                        
+                        <button class="list-group-item list-group-item-action" onclick="useTemplate('technical_report')">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Technical Report Template</h6>
+                                <small>Engineering format</small>
+                            </div>
+                            <p class="mb-1">Comprehensive technical analysis with implementation details and performance metrics.</p>
+                        </button>
+                        
+                        <button class="list-group-item list-group-item-action" onclick="useTemplate('executive_summary')">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Executive Summary Template</h6>
+                                <small>Business format</small>
+                            </div>
+                            <p class="mb-1">High-level overview with key findings and recommendations for decision makers.</p>
+                        </button>
+                        
+                        <button class="list-group-item list-group-item-action" onclick="useTemplate('model_comparison')">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Model Comparison Template</h6>
+                                <small>Comparative format</small>
+                            </div>
+                            <p class="mb-1">Side-by-side analysis of multiple models with performance comparisons.</p>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedFormat = 'pdf';
+let currentAnalyses = [];
+
+function loadRecentAnalyses() {
+    // Load available analyses from results
+    fetch('/api/results')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Error loading analyses:', data.error);
+                return;
+            }
+            
+            currentAnalyses = data.results || [];
+            updateAnalysisSelect();
+            updateRecentReports();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+function updateAnalysisSelect() {
+    const select = document.getElementById('analysisSelect');
+    
+    if (currentAnalyses.length === 0) {
+        select.innerHTML = '<option value="">No analyses available</option>';
+        return;
+    }
+    
+    select.innerHTML = '<option value="">Select an analysis...</option>' +
+        currentAnalyses.map(analysis => 
+            `<option value="${analysis.id}">${analysis.model_name} - ${new Date(analysis.timestamp).toLocaleString()}</option>`
+        ).join('');
+}
+
+function updateRecentReports() {
+    const container = document.getElementById('recentReports');
+    
+    // This would be populated with actual recent reports from the backend
+    container.innerHTML = `
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">BERT Analysis Report</h6>
+                        <p class="card-text">Generated 2 hours ago</p>
+                        <a href="#" class="btn btn-sm btn-outline-primary">Download PDF</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">Multi-Model Comparison</h6>
+                        <p class="card-text">Generated yesterday</p>
+                        <a href="#" class="btn btn-sm btn-outline-primary">Download HTML</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">Statistical Analysis</h6>
+                        <p class="card-text">Generated 3 days ago</p>
+                        <a href="#" class="btn btn-sm btn-outline-primary">Download CSV</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function selectFormat(format) {
+    // Remove previous selection
+    document.querySelectorAll('.format-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    // Add selection to clicked option
+    document.querySelector(`[data-format="${format}"]`).classList.add('selected');
+    selectedFormat = format;
+}
+
+function generateReport() {
+    const analysisId = document.getElementById('analysisSelect').value;
+    const reportType = document.getElementById('reportType').value;
+    
+    if (!analysisId) {
+        showAlert('Please select an analysis', 'warning');
+        return;
+    }
+    
+    if (!selectedFormat) {
+        showAlert('Please select an export format', 'warning');
+        return;
+    }
+    
+    // Show progress
+    const progressContainer = document.querySelector('.progress-container');
+    const resultContainer = document.querySelector('.result-container');
+    const generateBtn = document.getElementById('generateBtn');
+    
+    progressContainer.style.display = 'block';
+    resultContainer.style.display = 'none';
+    generateBtn.disabled = true;
+    
+    // Simulate progress (in real implementation, this would be WebSocket updates)
+    let progress = 0;
+    const progressBar = document.querySelector('.progress-bar');
+    const progressText = document.getElementById('progressText');
+    
+    const progressInterval = setInterval(() => {
+        progress += Math.random() * 20;
+        if (progress > 95) progress = 95;
+        
+        progressBar.style.width = progress + '%';
+        
+        if (progress < 30) {
+            progressText.textContent = 'Loading analysis data...';
+        } else if (progress < 60) {
+            progressText.textContent = 'Generating visualizations...';
+        } else if (progress < 90) {
+            progressText.textContent = 'Formatting report...';
+        } else {
+            progressText.textContent = 'Finalizing export...';
+        }
+    }, 500);
+    
+    // Make actual request
+    fetch('/api/reports/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            analysis_id: analysisId,
+            report_type: reportType,
+            format: selectedFormat
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+        progressText.textContent = 'Complete!';
+        
+        setTimeout(() => {
+            progressContainer.style.display = 'none';
+            resultContainer.style.display = 'block';
+            generateBtn.disabled = false;
+            
+            const resultAlert = document.getElementById('resultAlert');
+            
+            if (data.error) {
+                resultAlert.className = 'alert alert-danger';
+                resultAlert.innerHTML = `
+                    <h6>Report Generation Failed</h6>
+                    <p>${data.error}</p>
+                `;
+            } else {
+                resultAlert.className = 'alert alert-success';
+                resultAlert.innerHTML = `
+                    <h6>Report Generated Successfully!</h6>
+                    <p>${data.message}</p>
+                    <a href="/api/reports/download/${data.report_id}" class="btn btn-success">
+                        <i class="fas fa-download"></i> Download Report
+                    </a>
+                `;
+                showAlert('Report generated successfully', 'success');
+            }
+        }, 1000);
+    })
+    .catch(error => {
+        clearInterval(progressInterval);
+        progressContainer.style.display = 'none';
+        resultContainer.style.display = 'block';
+        generateBtn.disabled = false;
+        
+        const resultAlert = document.getElementById('resultAlert');
+        resultAlert.className = 'alert alert-danger';
+        resultAlert.innerHTML = `
+            <h6>Generation Error</h6>
+            <p>${error.message}</p>
+        `;
+        
+        console.error('Error:', error);
+        showAlert('Error generating report: ' + error.message, 'danger');
+    });
+}
+
+function quickExport(dataType) {
+    showAlert(`Quick export for ${dataType} is not yet implemented`, 'info');
+    // TODO: Implement quick export functionality
+}
+
+function useTemplate(templateType) {
+    // Set appropriate report type based on template
+    const reportTypeSelect = document.getElementById('reportType');
+    
+    switch(templateType) {
+        case 'research_paper':
+            reportTypeSelect.value = 'comprehensive';
+            selectFormat('pdf');
+            break;
+        case 'technical_report':
+            reportTypeSelect.value = 'technical';
+            selectFormat('html');
+            break;
+        case 'executive_summary':
+            reportTypeSelect.value = 'summary';
+            selectFormat('pdf');
+            break;
+        case 'model_comparison':
+            reportTypeSelect.value = 'comparative';
+            selectFormat('html');
+            break;
+    }
+    
+    showAlert(`Template "${templateType}" applied`, 'success');
+}
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    selectFormat('pdf'); // Default selection
+    loadRecentAnalyses();
+});
+</script>
+{% endblock %}

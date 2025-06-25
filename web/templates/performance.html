@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-tachometer-alt me-2"></i>System Performance</h2>
+            <div>
+                <button class="btn btn-primary" onclick="refreshSystemData()">
+                    <i class="fas fa-sync-alt me-2"></i>Refresh
+                </button>
+                <button class="btn btn-outline-info" onclick="toggleAutoRefresh()">
+                    <i class="fas fa-clock me-2"></i><span id="auto-refresh-text">Enable Auto-refresh</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Health Overview -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-heartbeat me-2"></i>System Health
+                    <span class="badge ms-2" id="health-badge">
+                        <i class="fas fa-spinner fa-spin"></i> Checking...
+                    </span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="health-issues" class="mb-3">
+                    <div class="text-center text-muted">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Loading health status...
+                    </div>
+                </div>
+                <div id="health-recommendations" style="display: none;">
+                    <h6><i class="fas fa-lightbulb me-2"></i>Recommendations:</h6>
+                    <ul id="recommendations-list"></ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Metrics -->
+<div class="row mb-4">
+    <!-- CPU Usage -->
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-microchip fa-3x text-primary mb-3"></i>
+                <h5 class="card-title">CPU Usage</h5>
+                <div class="position-relative mb-3">
+                    <div class="progress progress-enhanced" style="height: 12px;">
+                        <div class="progress-bar bg-primary" id="cpu-progress" style="width: 0%"></div>
+                    </div>
+                    <span class="position-absolute top-50 start-50 translate-middle small fw-bold" id="cpu-percent">0%</span>
+                </div>
+                <small class="text-muted">
+                    <span id="cpu-cores">0</span> cores @ <span id="cpu-frequency">0</span> MHz
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Memory Usage -->
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-memory fa-3x text-success mb-3"></i>
+                <h5 class="card-title">Memory Usage</h5>
+                <div class="position-relative mb-3">
+                    <div class="progress progress-enhanced" style="height: 12px;">
+                        <div class="progress-bar bg-success" id="memory-progress" style="width: 0%"></div>
+                    </div>
+                    <span class="position-absolute top-50 start-50 translate-middle small fw-bold" id="memory-percent">0%</span>
+                </div>
+                <small class="text-muted">
+                    <span id="memory-used">0 GB</span> / <span id="memory-total">0 GB</span>
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Disk Usage -->
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-hdd fa-3x text-warning mb-3"></i>
+                <h5 class="card-title">Disk Usage</h5>
+                <div class="position-relative mb-3">
+                    <div class="progress progress-enhanced" style="height: 12px;">
+                        <div class="progress-bar bg-warning" id="disk-progress" style="width: 0%"></div>
+                    </div>
+                    <span class="position-absolute top-50 start-50 translate-middle small fw-bold" id="disk-percent">0%</span>
+                </div>
+                <small class="text-muted">
+                    <span id="disk-free">0 GB</span> free of <span id="disk-total">0 GB</span>
+                </small>
+            </div>
+        </div>
+    </div>
+
+    <!-- GPU Usage -->
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-chess-board fa-3x text-info mb-3"></i>
+                <h5 class="card-title">GPU Status</h5>
+                <div id="gpu-info">
+                    <div class="text-muted">
+                        <i class="fas fa-spinner fa-spin me-2"></i>Loading...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed GPU Information -->
+<div class="row mb-4" id="gpu-details-section" style="display: none;">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chess-board me-2"></i>GPU Details
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="gpu-devices-list">
+                    <!-- GPU devices will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Process Information -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cogs me-2"></i>Process Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-3">
+                        <h4 class="text-primary mb-1" id="process-pid">--</h4>
+                        <small class="text-muted">Process ID</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-success mb-1" id="process-cpu">--</h4>
+                        <small class="text-muted">CPU Usage</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-warning mb-1" id="process-memory">--</h4>
+                        <small class="text-muted">Memory Usage</small>
+                    </div>
+                    <div class="col-md-3">
+                        <h4 class="text-info mb-1" id="process-threads">--</h4>
+                        <small class="text-muted">Threads</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Performance History Chart (placeholder for future) -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line me-2"></i>Performance History
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="text-center text-muted py-5">
+                    <i class="fas fa-chart-line fa-3x mb-3"></i>
+                    <h5>Performance History Chart</h5>
+                    <p>Real-time performance monitoring and historical data visualization coming soon.</p>
+                    <small class="text-muted">This feature will show CPU, memory, and GPU usage over time.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Performance monitoring functionality
+let autoRefreshInterval = null;
+let isAutoRefreshing = false;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadSystemData();
+});
+
+async function loadSystemData() {
+    try {
+        // Load system status
+        const statusResponse = await fetch('/api/system/status');
+        const statusData = await statusResponse.json();
+        updateSystemMetrics(statusData);
+
+        // Load system health
+        const healthResponse = await fetch('/api/system/health');
+        const healthData = await healthResponse.json();
+        updateSystemHealth(healthData);
+
+    } catch (error) {
+        console.error('Error loading system data:', error);
+        showError('Failed to load system data: ' + error.message);
+    }
+}
+
+function updateSystemMetrics(data) {
+    // Update CPU
+    updateProgressBar('cpu-progress', data.cpu.percent);
+    document.getElementById('cpu-percent').textContent = data.cpu.percent.toFixed(1) + '%';
+    document.getElementById('cpu-cores').textContent = data.cpu.count;
+    document.getElementById('cpu-frequency').textContent = (data.cpu.frequency || 0).toFixed(0);
+
+    // Update Memory
+    updateProgressBar('memory-progress', data.memory.percent);
+    document.getElementById('memory-percent').textContent = data.memory.percent.toFixed(1) + '%';
+    document.getElementById('memory-used').textContent = formatBytes(data.memory.used);
+    document.getElementById('memory-total').textContent = formatBytes(data.memory.total);
+
+    // Update Disk
+    updateProgressBar('disk-progress', data.disk.percent);
+    document.getElementById('disk-percent').textContent = data.disk.percent.toFixed(1) + '%';
+    document.getElementById('disk-free').textContent = formatBytes(data.disk.free);
+    document.getElementById('disk-total').textContent = formatBytes(data.disk.total);
+
+    // Update GPU
+    updateGPUInfo(data.gpu);
+
+    // Update Process
+    if (data.process) {
+        document.getElementById('process-pid').textContent = data.process.pid || '--';
+        document.getElementById('process-cpu').textContent = (data.process.cpu_percent || 0).toFixed(1) + '%';
+        document.getElementById('process-memory').textContent = (data.process.memory_percent || 0).toFixed(1) + '%';
+        document.getElementById('process-threads').textContent = data.process.num_threads || '--';
+    }
+}
+
+function updateSystemHealth(data) {
+    const healthBadge = document.getElementById('health-badge');
+    const healthIssues = document.getElementById('health-issues');
+    const recommendationsSection = document.getElementById('health-recommendations');
+    const recommendationsList = document.getElementById('recommendations-list');
+
+    // Update health badge
+    let badgeClass = 'bg-success';
+    let badgeText = 'Healthy';
+    let badgeIcon = 'fas fa-check-circle';
+
+    if (data.overall_health === 'warning') {
+        badgeClass = 'bg-warning';
+        badgeText = 'Warning';
+        badgeIcon = 'fas fa-exclamation-triangle';
+    } else if (data.overall_health === 'critical') {
+        badgeClass = 'bg-danger';
+        badgeText = 'Critical';
+        badgeIcon = 'fas fa-exclamation-circle';
+    }
+
+    healthBadge.className = `badge ms-2 ${badgeClass}`;
+    healthBadge.innerHTML = `<i class="${badgeIcon} me-1"></i>${badgeText}`;
+
+    // Update issues
+    if (data.issues && data.issues.length > 0) {
+        healthIssues.innerHTML = data.issues.map(issue => `
+            <div class="alert alert-warning mb-2">
+                <i class="fas fa-exclamation-triangle me-2"></i>${issue}
+            </div>
+        `).join('');
+    } else {
+        healthIssues.innerHTML = `
+            <div class="alert alert-success mb-2">
+                <i class="fas fa-check-circle me-2"></i>All systems operating normally
+            </div>
+        `;
+    }
+
+    // Update recommendations
+    if (data.recommendations && data.recommendations.length > 0) {
+        recommendationsList.innerHTML = data.recommendations.map(rec => `<li>${rec}</li>`).join('');
+        recommendationsSection.style.display = 'block';
+    } else {
+        recommendationsSection.style.display = 'none';
+    }
+}
+
+function updateGPUInfo(gpuData) {
+    const gpuInfo = document.getElementById('gpu-info');
+    const gpuDetailsSection = document.getElementById('gpu-details-section');
+    const gpuDevicesList = document.getElementById('gpu-devices-list');
+
+    if (gpuData.available && gpuData.devices.length > 0) {
+        gpuInfo.innerHTML = `
+            <div class="text-success mb-2">
+                <i class="fas fa-check-circle me-1"></i>Available
+            </div>
+            <small class="text-muted">${gpuData.count} device(s) detected</small>
+        `;
+
+        // Show detailed GPU information
+        gpuDetailsSection.style.display = 'block';
+        gpuDevicesList.innerHTML = gpuData.devices.map(gpu => `
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h6 class="card-title">${gpu.name}</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-2">
+                                <small class="text-muted">Memory Usage</small>
+                                <div class="progress progress-enhanced mt-1">
+                                    <div class="progress-bar bg-info" style="width: ${gpu.memory_percent}%"></div>
+                                </div>
+                                <small class="text-muted">${formatBytes(gpu.memory_allocated)} / ${formatBytes(gpu.memory_total)} (${gpu.memory_percent.toFixed(1)}%)</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <small class="text-muted">Compute Capability: ${gpu.compute_capability}</small><br>
+                            <small class="text-muted">Device Index: ${gpu.index}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } else {
+        gpuInfo.innerHTML = `
+            <div class="text-muted">
+                <i class="fas fa-times-circle me-1"></i>Not Available
+            </div>
+            <small class="text-muted">No CUDA devices detected</small>
+        `;
+        gpuDetailsSection.style.display = 'none';
+    }
+}
+
+function updateProgressBar(elementId, percentage) {
+    const progressBar = document.getElementById(elementId);
+    if (progressBar) {
+        progressBar.style.width = percentage + '%';
+        
+        // Update color based on usage
+        progressBar.className = 'progress-bar';
+        if (percentage > 90) {
+            progressBar.classList.add('bg-danger');
+        } else if (percentage > 70) {
+            progressBar.classList.add('bg-warning');
+        } else if (percentage > 50) {
+            progressBar.classList.add('bg-info');
+        } else {
+            progressBar.classList.add('bg-success');
+        }
+    }
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function refreshSystemData() {
+    const refreshBtn = document.querySelector('button[onclick="refreshSystemData()"]');
+    const originalHtml = refreshBtn.innerHTML;
+    
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Refreshing...';
+    refreshBtn.disabled = true;
+    
+    loadSystemData().finally(() => {
+        refreshBtn.innerHTML = originalHtml;
+        refreshBtn.disabled = false;
+    });
+}
+
+function toggleAutoRefresh() {
+    const btn = document.querySelector('button[onclick="toggleAutoRefresh()"]');
+    const text = document.getElementById('auto-refresh-text');
+    
+    if (isAutoRefreshing) {
+        clearInterval(autoRefreshInterval);
+        isAutoRefreshing = false;
+        text.textContent = 'Enable Auto-refresh';
+        btn.className = 'btn btn-outline-info';
+    } else {
+        autoRefreshInterval = setInterval(loadSystemData, 5000); // Refresh every 5 seconds
+        isAutoRefreshing = true;
+        text.textContent = 'Disable Auto-refresh';
+        btn.className = 'btn btn-info';
+    }
+}
+
+function showError(message) {
+    // Use the global toast utility if available
+    if (window.utils && window.utils.showToast) {
+        window.utils.showToast(message, 'error');
+    } else {
+        alert('Error: ' + message);
+    }
+}
+</script>
+
+{% endblock %}

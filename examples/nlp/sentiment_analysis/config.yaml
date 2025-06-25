@@ -1,0 +1,74 @@
+# Sentiment Analysis Configuration
+
+model:
+  name: "bert-base-uncased"
+  type: "huggingface"
+  max_length: 128
+  batch_size: 16
+  device: "auto"  # auto-detect GPU/CPU
+  cache_dir: "./models"
+
+analysis:
+  layers: [0, 3, 6, 9, 11]  # BERT-base layers to analyze
+  extract_hidden_states: true
+  extract_attention: true
+  extract_embeddings: false
+  
+  # Sentiment-specific settings
+  sentiment_categories: ["positive", "negative", "neutral"]
+  discrimination_threshold: 0.1
+  attention_heads: "all"
+
+processing:
+  batch_size: 16
+  num_workers: 4
+  use_gpu: true
+  mixed_precision: false
+
+visualization:
+  # Plot settings
+  plot_attention: true
+  plot_activations: true
+  plot_layer_stats: true
+  plot_neurons: true
+  
+  # Output settings
+  save_format: "png"
+  dpi: 300
+  figsize: [12, 8]
+  style: "seaborn"
+  
+  # Dashboard settings
+  create_dashboard: true
+  interactive_plots: true
+
+output:
+  save_raw_data: true
+  save_statistics: true
+  save_visualizations: true
+  save_report: true
+  
+  # File formats
+  data_format: "pt"  # PyTorch format
+  stats_format: "json"
+  report_format: "markdown"
+
+logging:
+  level: "INFO"
+  save_logs: true
+  log_file: "sentiment_analysis.log"
+
+# Advanced analysis options
+advanced:
+  compute_neuron_importance: true
+  analyze_attention_patterns: true
+  compare_sentiments: true
+  statistical_tests: false
+  
+  # Neuron analysis
+  neuron_selection_method: "variance"
+  top_neurons_count: 50
+  
+  # Attention analysis
+  attention_aggregation: "mean"
+  head_importance: true

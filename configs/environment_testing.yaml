@@ -1,0 +1,66 @@
+# Testing Environment Configuration for NeuronMap
+# ==============================================
+
+# Inherit from base environment.yaml and override specific settings
+environment:
+  # Testing-specific settings
+  environment: "testing"
+  
+  # Logging Configuration (detailed for testing)
+  log_level: "INFO"
+  enable_debugging: true
+  log_to_file: true
+  log_file_path: "logs/neuronmap_test.log"
+  log_rotation: false
+  max_log_size_mb: 25
+  backup_count: 2
+  
+  # Performance Settings (fast for testing)
+  max_workers: 1
+  timeout_seconds: 60
+  memory_limit_gb: 8
+  cpu_limit_percent: 50
+  
+  # System Monitoring (minimal for testing)
+  monitoring:
+    enable_system_monitoring: false
+    monitor_gpu_usage: false
+    monitor_memory_usage: true
+    monitor_cpu_usage: false
+    monitoring_interval_seconds: 60
+    alert_threshold_memory_percent: 90
+    alert_threshold_gpu_memory_percent: 95
+  
+  # Error Handling (strict for testing)
+  error_handling:
+    enable_error_recovery: false
+    max_retry_attempts: 1
+    retry_delay_seconds: 1
+    enable_graceful_shutdown: false
+    error_reporting: true
+    fail_fast_on_validation_errors: true
+  
+  # Security Settings (permissive for testing)
+  security:
+    validate_inputs: true
+    sanitize_file_paths: false
+    max_file_size_mb: 100
+    allowed_file_extensions: [".txt", ".json", ".yaml", ".csv", ".h5", ".hdf5", ".py", ".md", ".tmp"]
+    enable_model_verification: false
+  
+  # Cache Configuration (disabled for testing)
+  cache:
+    enable_caching: false
+    cache_directory: "cache/test"
+    max_cache_size_gb: 1
+    cache_ttl_hours: 1
+    auto_cleanup: true
+  
+  # Testing-specific features
+  testing:
+    enable_test_mode: true
+    use_mock_models: true
+    enable_deterministic_behavior: true
+    random_seed: 42
+    enable_test_isolation: true
+    cleanup_after_tests: true

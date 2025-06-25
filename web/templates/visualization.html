@@ -1,0 +1,507 @@
+{% extends "base.html" %}
+
+{% block title %}Visualization - NeuronMap{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-chart-bar me-2"></i>Neural Network Visualization
+        </h2>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Control Panel -->
+    <div class="col-lg-3">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-sliders-h me-2"></i>Visualization Controls
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="visualizationForm">
+                    <!-- Data Source -->
+                    <div class="mb-3">
+                        <label for="dataSource" class="form-label">Data Source</label>
+                        <select class="form-select" id="dataSource" name="dataSource" required>
+                            <option value="">Select data source...</option>
+                            <option value="recent">Most Recent Analysis</option>
+                            <option value="upload">Upload CSV File</option>
+                            <option value="analysis_id">Specific Analysis ID</option>
+                        </select>
+                    </div>
+                    
+                    <!-- File Upload -->
+                    <div class="mb-3" id="uploadSection" style="display: none;">
+                        <label for="dataFile" class="form-label">Data File</label>
+                        <input type="file" class="form-control" id="dataFile" name="dataFile" accept=".csv,.json">
+                    </div>
+                    
+                    <!-- Analysis ID -->
+                    <div class="mb-3" id="analysisIdSection" style="display: none;">
+                        <label for="analysisId" class="form-label">Analysis ID</label>
+                        <input type="text" class="form-control" id="analysisId" name="analysisId" 
+                               placeholder="Enter analysis ID">
+                    </div>
+                    
+                    <!-- Visualization Type -->
+                    <div class="mb-3">
+                        <label for="visualizationType" class="form-label">Visualization Type</label>
+                        <select class="form-select" id="visualizationType" name="visualizationType" required>
+                            <option value="">Select type...</option>
+                            <option value="statistics">Statistical Plots</option>
+                            <option value="heatmap">Activation Heatmaps</option>
+                            <option value="pca">PCA Analysis</option>
+                            <option value="tsne">t-SNE Visualization</option>
+                            <option value="dashboard">Interactive Dashboard</option>
+                            <option value="comparison">Model Comparison</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Layer Selection -->
+                    <div class="mb-3">
+                        <label for="layerFilter" class="form-label">Layer Filter</label>
+                        <input type="text" class="form-control" id="layerFilter" name="layerFilter" 
+                               placeholder="e.g., transformer.h.0,transformer.h.11">
+                        <div class="form-text">Leave empty for all layers</div>
+                    </div>
+                    
+                    <!-- Options -->
+                    <div class="mb-3">
+                        <label class="form-label">Options</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="includeStatistics" name="includeStatistics" checked>
+                            <label class="form-check-label" for="includeStatistics">
+                                Include Statistics
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="highResolution" name="highResolution">
+                            <label class="form-check-label" for="highResolution">
+                                High Resolution
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="interactiveMode" name="interactiveMode" checked>
+                            <label class="form-check-label" for="interactiveMode">
+                                Interactive Mode
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Generate Button -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary" id="generateBtn">
+                            <i class="fas fa-magic me-2"></i>Generate Visualization
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Quick Actions -->
+                <div class="mt-3">
+                    <h6>Quick Actions</h6>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-info btn-sm" onclick="loadSampleData()">
+                            <i class="fas fa-download me-1"></i>Load Sample Data
+                        </button>
+                        <button type="button" class="btn btn-outline-warning btn-sm" onclick="previewData()">
+                            <i class="fas fa-eye me-1"></i>Preview Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Export Options -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-download me-2"></i>Export Options
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="exportVisualization('png')">
+                        <i class="fas fa-image me-1"></i>Export as PNG
+                    </button>
+                    <button type="button" class="btn btn-outline-success btn-sm" onclick="exportVisualization('pdf')">
+                        <i class="fas fa-file-pdf me-1"></i>Export as PDF
+                    </button>
+                    <button type="button" class="btn btn-outline-info btn-sm" onclick="exportVisualization('html')">
+                        <i class="fas fa-code me-1"></i>Export as HTML
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Visualization Area -->
+    <div class="col-lg-9">
+        <!-- Progress Card -->
+        <div class="card mb-3" id="visualizationProgress" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-spinner fa-spin me-2"></i>Generating Visualization
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-3">
+                    <div class="progress-bar" id="vizProgressBar" role="progressbar" style="width: 0%"></div>
+                </div>
+                <p id="vizProgressMessage">Initializing...</p>
+            </div>
+        </div>
+        
+        <!-- Visualization Container -->
+        <div class="card" id="visualizationContainer">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-area me-2"></i>Visualization Output
+                </h5>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleFullscreen()" title="Toggle Fullscreen">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="refreshVisualization()" title="Refresh">
+                        <i class="fas fa-sync"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="visualizationContent">
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-chart-area fa-3x mb-3"></i>
+                        <p>No visualization generated yet. Configure settings and click "Generate Visualization".</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Visualization Tabs -->
+        <div class="card mt-3" id="visualizationTabs" style="display: none;">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="vizTabs" role="tablist">
+                    <!-- Tabs will be dynamically generated -->
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content" id="vizTabContent">
+                    <!-- Tab content will be dynamically generated -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Preview Modal -->
+<div class="modal fade" id="dataPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-table me-2"></i>Data Preview
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="dataPreviewContent">
+                    <p class="text-muted">Loading data preview...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script>
+let currentVisualizationId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Data source change handler
+    document.getElementById('dataSource').addEventListener('change', function() {
+        const uploadSection = document.getElementById('uploadSection');
+        const analysisIdSection = document.getElementById('analysisIdSection');
+        
+        uploadSection.style.display = this.value === 'upload' ? 'block' : 'none';
+        analysisIdSection.style.display = this.value === 'analysis_id' ? 'block' : 'none';
+    });
+    
+    // Form submission
+    document.getElementById('visualizationForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        generateVisualization();
+    });
+    
+    // Check for analysis_id in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const analysisId = urlParams.get('analysis_id');
+    if (analysisId) {
+        document.getElementById('dataSource').value = 'analysis_id';
+        document.getElementById('analysisId').value = analysisId;
+        document.getElementById('analysisIdSection').style.display = 'block';
+    }
+});
+
+async function generateVisualization() {
+    const form = document.getElementById('visualizationForm');
+    const formData = new FormData(form);
+    
+    // Validate form
+    const dataSource = formData.get('dataSource');
+    const visualizationType = formData.get('visualizationType');
+    
+    if (!dataSource || !visualizationType) {
+        neuronMapUtils.showToast('Please select data source and visualization type', 'warning');
+        return;
+    }
+    
+    // Show progress
+    showVisualizationProgress();
+    
+    try {
+        const response = await fetch('/api/visualize', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            currentVisualizationId = result.visualization_id;
+            displayVisualization(result);
+        } else {
+            hideVisualizationProgress();
+            neuronMapUtils.showToast(result.error || 'Visualization failed', 'danger');
+        }
+    } catch (error) {
+        hideVisualizationProgress();
+        neuronMapUtils.showToast('Network error: ' + error.message, 'danger');
+    }
+}
+
+function showVisualizationProgress() {
+    document.getElementById('visualizationProgress').style.display = 'block';
+    document.getElementById('generateBtn').disabled = true;
+    
+    // Simulate progress
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += Math.random() * 20;
+        if (progress > 90) progress = 90;
+        
+        document.getElementById('vizProgressBar').style.width = progress + '%';
+        
+        if (progress > 30) {
+            document.getElementById('vizProgressMessage').textContent = 'Processing data...';
+        }
+        if (progress > 60) {
+            document.getElementById('vizProgressMessage').textContent = 'Generating plots...';
+        }
+        if (progress > 80) {
+            document.getElementById('vizProgressMessage').textContent = 'Finalizing...';
+        }
+    }, 200);
+    
+    // Store interval for cleanup
+    window.visualizationInterval = interval;
+}
+
+function hideVisualizationProgress() {
+    document.getElementById('visualizationProgress').style.display = 'none';
+    document.getElementById('generateBtn').disabled = false;
+    
+    if (window.visualizationInterval) {
+        clearInterval(window.visualizationInterval);
+        window.visualizationInterval = null;
+    }
+}
+
+function displayVisualization(result) {
+    hideVisualizationProgress();
+    
+    const container = document.getElementById('visualizationContent');
+    const tabsContainer = document.getElementById('visualizationTabs');
+    
+    if (result.plots && result.plots.length > 0) {
+        // Multiple plots - use tabs
+        if (result.plots.length > 1) {
+            displayMultiplePlots(result.plots);
+            tabsContainer.style.display = 'block';
+        } else {
+            // Single plot
+            displaySinglePlot(result.plots[0]);
+            tabsContainer.style.display = 'none';
+        }
+    } else if (result.dashboard_url) {
+        // Dashboard
+        container.innerHTML = `
+            <iframe src="${result.dashboard_url}" 
+                    style="width: 100%; height: 600px; border: none; border-radius: 8px;">
+            </iframe>
+        `;
+    } else {
+        container.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Visualization generated successfully but no display data available.
+            </div>
+        `;
+    }
+    
+    neuronMapUtils.showToast('Visualization generated successfully!', 'success');
+}
+
+function displaySinglePlot(plot) {
+    const container = document.getElementById('visualizationContent');
+    
+    if (plot.type === 'plotly') {
+        container.innerHTML = '<div id="plotlyDiv" style="width: 100%; height: 500px;"></div>';
+        Plotly.newPlot('plotlyDiv', plot.data, plot.layout, {responsive: true});
+    } else if (plot.type === 'image') {
+        container.innerHTML = `
+            <div class="text-center">
+                <img src="${plot.url}" class="img-fluid" alt="Visualization" style="max-height: 500px;">
+            </div>
+        `;
+    } else {
+        container.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Unsupported plot type: ${plot.type}
+            </div>
+        `;
+    }
+}
+
+function displayMultiplePlots(plots) {
+    const tabsNav = document.getElementById('vizTabs');
+    const tabsContent = document.getElementById('vizTabContent');
+    
+    // Clear existing tabs
+    tabsNav.innerHTML = '';
+    tabsContent.innerHTML = '';
+    
+    plots.forEach((plot, index) => {
+        const tabId = `viz-tab-${index}`;
+        const paneId = `viz-pane-${index}`;
+        const isActive = index === 0;
+        
+        // Create tab
+        const tab = document.createElement('li');
+        tab.className = 'nav-item';
+        tab.innerHTML = `
+            <button class="nav-link ${isActive ? 'active' : ''}" 
+                    id="${tabId}" 
+                    data-bs-toggle="tab" 
+                    data-bs-target="#${paneId}" 
+                    type="button" 
+                    role="tab">
+                ${plot.title || `Plot ${index + 1}`}
+            </button>
+        `;
+        tabsNav.appendChild(tab);
+        
+        // Create pane
+        const pane = document.createElement('div');
+        pane.className = `tab-pane fade ${isActive ? 'show active' : ''}`;
+        pane.id = paneId;
+        pane.setAttribute('role', 'tabpanel');
+        
+        if (plot.type === 'plotly') {
+            pane.innerHTML = `<div id="plotlyDiv-${index}" style="width: 100%; height: 500px;"></div>`;
+        } else if (plot.type === 'image') {
+            pane.innerHTML = `
+                <div class="text-center">
+                    <img src="${plot.url}" class="img-fluid" alt="Visualization" style="max-height: 500px;">
+                </div>
+            `;
+        }
+        
+        tabsContent.appendChild(pane);
+        
+        // Initialize Plotly for plotly plots
+        if (plot.type === 'plotly') {
+            setTimeout(() => {
+                Plotly.newPlot(`plotlyDiv-${index}`, plot.data, plot.layout, {responsive: true});
+            }, 100);
+        }
+    });
+}
+
+function loadSampleData() {
+    // Load sample visualization data
+    document.getElementById('dataSource').value = 'recent';
+    document.getElementById('visualizationType').value = 'statistics';
+    neuronMapUtils.showToast('Sample data configuration loaded', 'info');
+}
+
+function previewData() {
+    const modal = new bootstrap.Modal(document.getElementById('dataPreviewModal'));
+    modal.show();
+    
+    // Load data preview
+    setTimeout(() => {
+        document.getElementById('dataPreviewContent').innerHTML = `
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Layer</th>
+                            <th>Question</th>
+                            <th>Mean Activation</th>
+                            <th>Std Activation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>transformer.h.0</td>
+                            <td>What is the capital of France?</td>
+                            <td>0.245</td>
+                            <td>0.123</td>
+                        </tr>
+                        <tr>
+                            <td>transformer.h.1</td>
+                            <td>What is the capital of France?</td>
+                            <td>0.367</td>
+                            <td>0.189</td>
+                        </tr>
+                        <!-- More rows would be added here -->
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }, 500);
+}
+
+function exportVisualization(format) {
+    if (!currentVisualizationId) {
+        neuronMapUtils.showToast('No visualization to export', 'warning');
+        return;
+    }
+    
+    const url = `/api/export-visualization/${currentVisualizationId}?format=${format}`;
+    window.open(url, '_blank');
+}
+
+function toggleFullscreen() {
+    const container = document.getElementById('visualizationContainer');
+    if (container.requestFullscreen) {
+        container.requestFullscreen();
+    }
+}
+
+function refreshVisualization() {
+    if (currentVisualizationId) {
+        // Reload current visualization
+        generateVisualization();
+    }
+}
+</script>
+{% endblock %}

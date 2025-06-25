@@ -1,0 +1,659 @@
+{
+  "test_results": {
+    "domain_coverage": {
+      "total_domains": 20,
+      "functional_domains": 20,
+      "available_domains": [
+        "physics",
+        "mathematics",
+        "philosophy",
+        "biology",
+        "chemistry",
+        "computer_science",
+        "engineering",
+        "history",
+        "psychology",
+        "literature",
+        "linguistics",
+        "art_history",
+        "sociology",
+        "political_science",
+        "economics",
+        "anthropology",
+        "medicine",
+        "law",
+        "education",
+        "business"
+      ],
+      "functional_domain_list": [
+        "physics",
+        "mathematics",
+        "philosophy",
+        "biology",
+        "chemistry",
+        "computer_science",
+        "engineering",
+        "history",
+        "psychology",
+        "literature",
+        "linguistics",
+        "art_history",
+        "sociology",
+        "political_science",
+        "economics",
+        "anthropology",
+        "medicine",
+        "law",
+        "education",
+        "business"
+      ],
+      "meets_requirement": true,
+      "test_passed": true
+    },
+    "question_generation": {
+      "total_questions_generated": 60,
+      "successful_domains": 20,
+      "total_domains_tested": 20,
+      "success_rate": 1.0,
+      "generation_results": {
+        "physics": {
+          "questions_generated": 3,
+          "generation_time": 0.4352903366088867,
+          "avg_time_per_question": 0.1450967788696289,
+          "questions": [
+            "How does analysis apply in physics?",
+            "Analyze the role of methodology in physics.",
+            "What are the implications of physics theory?"
+          ],
+          "success": true
+        },
+        "mathematics": {
+          "questions_generated": 3,
+          "generation_time": 0.3056020736694336,
+          "avg_time_per_question": 0.1018673578898112,
+          "questions": [
+            "What are the implications of mathematics principles?",
+            "Analyze the role of framework in mathematics.",
+            "Analyze the role of approach in mathematics."
+          ],
+          "success": true
+        },
+        "philosophy": {
+          "questions_generated": 3,
+          "generation_time": 0.18750333786010742,
+          "avg_time_per_question": 0.06250111262003581,
+          "questions": [
+            "What are the implications of philosophy principles?",
+            "How does study apply in philosophy?",
+            "Analyze the role of methodology in philosophy."
+          ],
+          "success": true
+        },
+        "biology": {
+          "questions_generated": 3,
+          "generation_time": 0.19159936904907227,
+          "avg_time_per_question": 0.06386645634969075,
+          "questions": [
+            "Explain the concept of theory in biology.",
+            "What are the implications of biology principles?",
+            "How does theory affect effect?"
+          ],
+          "success": true
+        },
+        "chemistry": {
+          "questions_generated": 3,
+          "generation_time": 0.18990373611450195,
+          "avg_time_per_question": 0.06330124537150066,
+          "questions": [
+            "What are the implications of fundamental concepts?",
+            "Analyze the role of methodology in chemistry.",
+            "Explain the concept of theory in chemistry."
+          ],
+          "success": true
+        },
+        "computer_science": {
+          "questions_generated": 3,
+          "generation_time": 0.18832826614379883,
+          "avg_time_per_question": 0.06277608871459961,
+          "questions": [
+            "How does concept affect result?",
+            "How does analysis apply in computer science?",
+            "Analyze the role of methodology in computer science."
+          ],
+          "success": true
+        },
+        "engineering": {
+          "questions_generated": 3,
+          "generation_time": 0.1918644905090332,
+          "avg_time_per_question": 0.06395483016967773,
+          "questions": [
+            "Analyze the role of framework in engineering.",
+            "Explain the concept of theory in engineering.",
+            "What are the implications of engineering theory?"
+          ],
+          "success": true
+        },
+        "history": {
+          "questions_generated": 3,
+          "generation_time": 0.197404146194458,
+          "avg_time_per_question": 0.06580138206481934,
+          "questions": [
+            "Explain the concept of concept in history.",
+            "What is the significance of approach in this field?",
+            "What are the implications of history theory?"
+          ],
+          "success": true
+        },
+        "psychology": {
+          "questions_generated": 3,
+          "generation_time": 0.3869445323944092,
+          "avg_time_per_question": 0.12898151079813638,
+          "questions": [
+            "Analyze the role of framework in psychology.",
+            "How does research apply in psychology?",
+            "How does study apply in psychology?"
+          ],
+          "success": true
+        },
+        "literature": {
+          "questions_generated": 3,
+          "generation_time": 0.1832749843597412,
+          "avg_time_per_question": 0.06109166145324707,
+          "questions": [
+            "What are the implications of literature theory?",
+            "How does study apply in literature?",
+            "How does principle affect result?"
+          ],
+          "success": true
+        },
+        "linguistics": {
+          "questions_generated": 3,
+          "generation_time": 0.1872255802154541,
+          "avg_time_per_question": 0.0624085267384847,
+          "questions": [
+            "Analyze the role of methodology in linguistics.",
+            "Explain the concept of principle in linguistics.",
+            "What are the implications of linguistics principles?"
+          ],
+          "success": true
+        },
+        "art_history": {
+          "questions_generated": 3,
+          "generation_time": 0.1942746639251709,
+          "avg_time_per_question": 0.0647582213083903,
+          "questions": [
+            "What is the significance of framework in this field?",
+            "What is the significance of approach in this field?",
+            "What are the implications of art history theory?"
+          ],
+          "success": true
+        },
+        "sociology": {
+          "questions_generated": 3,
+          "generation_time": 0.2544517517089844,
+          "avg_time_per_question": 0.08481725056966145,
+          "questions": [
+            "How does research apply in sociology?",
+            "What are the implications of sociology theory?",
+            "Analyze the role of methodology in sociology."
+          ],
+          "success": true
+        },
+        "political_science": {
+          "questions_generated": 3,
+          "generation_time": 0.23080182075500488,
+          "avg_time_per_question": 0.07693394025166829,
+          "questions": [
+            "Analyze the role of framework in political science.",
+            "Explain the concept of principle in political science.",
+            "How does theory affect consequence?"
+          ],
+          "success": true
+        },
+        "economics": {
+          "questions_generated": 3,
+          "generation_time": 0.18605303764343262,
+          "avg_time_per_question": 0.06201767921447754,
+          "questions": [
+            "Explain the concept of concept in economics.",
+            "How does principle affect result?",
+            "What is the significance of framework in this field?"
+          ],
+          "success": true
+        },
+        "anthropology": {
+          "questions_generated": 3,
+          "generation_time": 0.18679594993591309,
+          "avg_time_per_question": 0.06226531664530436,
+          "questions": [
+            "Analyze the role of methodology in anthropology.",
+            "Analyze the role of framework in anthropology.",
+            "What is the significance of methodology in this field?"
+          ],
+          "success": true
+        },
+        "medicine": {
+          "questions_generated": 3,
+          "generation_time": 0.3631148338317871,
+          "avg_time_per_question": 0.12103827794392903,
+          "questions": [
+            "Analyze the role of framework in medicine.",
+            "How does research apply in medicine?",
+            "Analyze the role of approach in medicine."
+          ],
+          "success": true
+        },
+        "law": {
+          "questions_generated": 3,
+          "generation_time": 0.26424098014831543,
+          "avg_time_per_question": 0.08808032671610515,
+          "questions": [
+            "What is the significance of approach in this field?",
+            "What is the significance of framework in this field?",
+            "Explain the concept of principle in law."
+          ],
+          "success": true
+        },
+        "education": {
+          "questions_generated": 3,
+          "generation_time": 0.42746710777282715,
+          "avg_time_per_question": 0.14248903592427573,
+          "questions": [
+            "How does research apply in education?",
+            "What is the significance of framework in this field?",
+            "How does analysis apply in education?"
+          ],
+          "success": true
+        },
+        "business": {
+          "questions_generated": 3,
+          "generation_time": 0.35498547554016113,
+          "avg_time_per_question": 0.11832849184672038,
+          "questions": [
+            "What is the significance of approach in this field?",
+            "What is the significance of methodology in this field?",
+            "What are the implications of business theory?"
+          ],
+          "success": true
+        }
+      },
+      "meets_requirement": true,
+      "test_passed": true
+    },
+    "terminology_density": {
+      "overall_density": 17.025132275132275,
+      "domains_tested": 10,
+      "density_results": {
+        "physics": {
+          "average_density": 15.873015873015872,
+          "question_densities": [
+            16.666666666666664,
+            16.666666666666664,
+            14.285714285714285
+          ],
+          "meets_threshold": false,
+          "vocabulary_size": 21
+        },
+        "mathematics": {
+          "average_density": 19.84126984126984,
+          "question_densities": [
+            16.666666666666664,
+            14.285714285714285,
+            28.57142857142857
+          ],
+          "meets_threshold": false,
+          "vocabulary_size": 21
+        },
+        "philosophy": {
+          "average_density": 15.132275132275131,
+          "question_densities": [
+            14.285714285714285,
+            11.11111111111111,
+            20.0
+          ],
+          "meets_threshold": false,
+          "vocabulary_size": 21
+        },
+        "biology": {
+          "average_density": 17.989417989417987,
+          "question_densities": [
+            11.11111111111111,
+            28.57142857142857,
+            14.285714285714285
+          ],
+          "meets_threshold": false,
+          "vocabulary_size": 21
+        },
+        "chemistry": {
+          "average_density": 15.873015873015872,
+          "question_densities": [
+            16.666666666666664,
+            16.666666666666664,
+            14.285714285714285
+          ],
+          "meets_threshold": false,
+          "vocabulary_size": 21
+        },
+        "computer_science": {
+          "average_density": 12.632275132275131,
+          "question_densities": [
+            12.5,
+            14.285714285714285,
+            11.11111111111111
+          ],
+          "meets_threshold": false,
+          "vocabulary_size": 21
+        },
+        "engineering": {
+          "average_density": 22.75132275132275,
+          "question_densities": [
+            28.57142857142857,
+            11.11111111111111,
+            28.57142857142857
+          ],
+          "meets_threshold": false,
+          "vocabulary_size": 21
+        },
+        "history": {
+          "average_density": 16.984126984126984,
+          "question_densities": [
+            14.285714285714285,
+            20.0,
+            16.666666666666664
+          ],
+          "meets_threshold": false,
+          "vocabulary_size": 21
+        },
+        "psychology": {
+          "average_density": 15.079365079365077,
+          "question_densities": [
+            14.285714285714285,
+            16.666666666666664,
+            14.285714285714285
+          ],
+          "meets_threshold": false,
+          "vocabulary_size": 21
+        },
+        "literature": {
+          "average_density": 18.095238095238095,
+          "question_densities": [
+            20.0,
+            20.0,
+            14.285714285714285
+          ],
+          "meets_threshold": false,
+          "vocabulary_size": 21
+        }
+      },
+      "meets_requirement": false,
+      "test_passed": true
+    },
+    "classification_accuracy": {
+      "overall_accuracy": 0.0,
+      "correct_classifications": 0,
+      "total_tests": 30,
+      "classification_results": {
+        "physics": {
+          "accuracy": 0.0,
+          "correct_classifications": 0,
+          "total_questions": 3,
+          "meets_threshold": false
+        },
+        "mathematics": {
+          "accuracy": 0.0,
+          "correct_classifications": 0,
+          "total_questions": 3,
+          "meets_threshold": false
+        },
+        "philosophy": {
+          "accuracy": 0.0,
+          "correct_classifications": 0,
+          "total_questions": 3,
+          "meets_threshold": false
+        },
+        "biology": {
+          "accuracy": 0.0,
+          "correct_classifications": 0,
+          "total_questions": 3,
+          "meets_threshold": false
+        },
+        "chemistry": {
+          "accuracy": 0.0,
+          "correct_classifications": 0,
+          "total_questions": 3,
+          "meets_threshold": false
+        },
+        "computer_science": {
+          "accuracy": 0.0,
+          "correct_classifications": 0,
+          "total_questions": 3,
+          "meets_threshold": false
+        },
+        "engineering": {
+          "accuracy": 0.0,
+          "correct_classifications": 0,
+          "total_questions": 3,
+          "meets_threshold": false
+        },
+        "history": {
+          "accuracy": 0.0,
+          "correct_classifications": 0,
+          "total_questions": 3,
+          "meets_threshold": false
+        },
+        "psychology": {
+          "accuracy": 0.0,
+          "correct_classifications": 0,
+          "total_questions": 3,
+          "meets_threshold": false
+        },
+        "literature": {
+          "accuracy": 0.0,
+          "correct_classifications": 0,
+          "total_questions": 3,
+          "meets_threshold": false
+        }
+      },
+      "meets_requirement": false,
+      "test_passed": true
+    },
+    "cross_domain_contamination": {
+      "overall_contamination": 0.0,
+      "total_contamination": 0,
+      "domain_pairs_tested": 168,
+      "contamination_results": {
+        "physics": {
+          "contamination_rate": 0.0,
+          "contamination_count": 0,
+          "total_cross_tests": 21,
+          "meets_threshold": true
+        },
+        "mathematics": {
+          "contamination_rate": 0.0,
+          "contamination_count": 0,
+          "total_cross_tests": 21,
+          "meets_threshold": true
+        },
+        "philosophy": {
+          "contamination_rate": 0.0,
+          "contamination_count": 0,
+          "total_cross_tests": 21,
+          "meets_threshold": true
+        },
+        "biology": {
+          "contamination_rate": 0.0,
+          "contamination_count": 0,
+          "total_cross_tests": 21,
+          "meets_threshold": true
+        },
+        "chemistry": {
+          "contamination_rate": 0.0,
+          "contamination_count": 0,
+          "total_cross_tests": 21,
+          "meets_threshold": true
+        },
+        "computer_science": {
+          "contamination_rate": 0.0,
+          "contamination_count": 0,
+          "total_cross_tests": 21,
+          "meets_threshold": true
+        },
+        "engineering": {
+          "contamination_rate": 0.0,
+          "contamination_count": 0,
+          "total_cross_tests": 21,
+          "meets_threshold": true
+        },
+        "history": {
+          "contamination_rate": 0.0,
+          "contamination_count": 0,
+          "total_cross_tests": 21,
+          "meets_threshold": true
+        }
+      },
+      "meets_requirement": true,
+      "test_passed": true
+    },
+    "difficulty_integration": {
+      "integration_rate": 100.0,
+      "successful_assessments": 15,
+      "total_questions": 15,
+      "integration_results": {
+        "physics": {
+          "questions_tested": 3,
+          "successful_assessments": 3,
+          "assessment_results": [
+            {
+              "question": "Analyze the role of approach in physics....",
+              "difficulty_score": 4.615738095238095,
+              "difficulty_level": 5,
+              "success": true
+            },
+            {
+              "question": "How does theory affect result?...",
+              "difficulty_score": 3.8374999999999995,
+              "difficulty_level": 4,
+              "success": true
+            },
+            {
+              "question": "Explain the concept of principle in physics....",
+              "difficulty_score": 4.04452380952381,
+              "difficulty_level": 4,
+              "success": true
+            }
+          ]
+        },
+        "mathematics": {
+          "questions_tested": 3,
+          "successful_assessments": 3,
+          "assessment_results": [
+            {
+              "question": "What is the significance of approach in this field?...",
+              "difficulty_score": 3.2241666666666666,
+              "difficulty_level": 3,
+              "success": true
+            },
+            {
+              "question": "How does research apply in mathematics?...",
+              "difficulty_score": 3.2541666666666664,
+              "difficulty_level": 3,
+              "success": true
+            },
+            {
+              "question": "Analyze the role of approach in mathematics....",
+              "difficulty_score": 4.7014523809523805,
+              "difficulty_level": 5,
+              "success": true
+            }
+          ]
+        },
+        "philosophy": {
+          "questions_tested": 3,
+          "successful_assessments": 3,
+          "assessment_results": [
+            {
+              "question": "How does principle affect result?...",
+              "difficulty_score": 4.091666666666666,
+              "difficulty_level": 4,
+              "success": true
+            },
+            {
+              "question": "Explain the concept of concept in philosophy....",
+              "difficulty_score": 4.052261904761905,
+              "difficulty_level": 4,
+              "success": true
+            },
+            {
+              "question": "Explain the concept of principle in philosophy....",
+              "difficulty_score": 4.1475,
+              "difficulty_level": 4,
+              "success": true
+            }
+          ]
+        },
+        "biology": {
+          "questions_tested": 3,
+          "successful_assessments": 3,
+          "assessment_results": [
+            {
+              "question": "Explain the concept of theory in biology....",
+              "difficulty_score": 3.9373809523809524,
+              "difficulty_level": 4,
+              "success": true
+            },
+            {
+              "question": "Analyze the role of framework in biology....",
+              "difficulty_score": 6.234785714285714,
+              "difficulty_level": 6,
+              "success": true
+            },
+            {
+              "question": "How does analysis apply in biology?...",
+              "difficulty_score": 3.716666666666667,
+              "difficulty_level": 4,
+              "success": true
+            }
+          ]
+        },
+        "chemistry": {
+          "questions_tested": 3,
+          "successful_assessments": 3,
+          "assessment_results": [
+            {
+              "question": "What is the significance of approach in this field?...",
+              "difficulty_score": 3.2241666666666666,
+              "difficulty_level": 3,
+              "success": true
+            },
+            {
+              "question": "How does theory affect effect?...",
+              "difficulty_score": 3.8374999999999995,
+              "difficulty_level": 4,
+              "success": true
+            },
+            {
+              "question": "How does research apply in chemistry?...",
+              "difficulty_score": 3.2541666666666664,
+              "difficulty_level": 3,
+              "success": true
+            }
+          ]
+        }
+      },
+      "meets_requirement": true,
+      "test_passed": true
+    }
+  },
+  "performance_metrics": {},
+  "validation_summary": {
+    "total_validation_time": 33.37920117378235,
+    "tests_run": 6,
+    "tests_passed": 6,
+    "requirements_checked": 6,
+    "requirements_met": 4,
+    "compliance_rate": 66.66666666666666,
+    "overall_success": false,
+    "section_4_1_domain_complete": false
+  },
+  "domain_stats": {}
+}

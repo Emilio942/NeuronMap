@@ -1,0 +1,28 @@
+{
+  "experiment_id": "phase4_demo_20250619_200455",
+  "timestamp": "2025-06-19T20:04:55.498271",
+  "model_name": "demo_model",
+  "model_hash": "",
+  "data_hash": "",
+  "code_hash": "",
+  "hyperparameters": {
+    "learning_rate": 0.001,
+    "batch_size": 32,
+    "epochs": 10
+  },
+  "environment_info": {
+    "python_version": "3.12.7 | packaged by Anaconda, Inc. | (main, Oct  4 2024, 13:27:36) [GCC 11.2.0]",
+    "platform": "Linux-6.8.0-60-generic-x86_64-with-glibc2.39",
+    "torch_version": "2.6.0+cu124",
+    "cuda_available": "True"
+  },
+  "random_seeds": {
+    "numpy": 42,
+    "torch": 123
+  },
+  "results_summary": {
+    "accuracy": 0.87,
+    "bias_score": 0.15,
+    "effect_size": -0.2546013033438322
+  }
+}

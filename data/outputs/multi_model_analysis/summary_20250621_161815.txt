@@ -1,0 +1,25 @@
+Multi-Model Analysis Summary
+==================================================
+
+Analysis Date: 2025-06-21 16:18:15
+Models Analyzed: 2
+
+Model Performance:
+--------------------
+
+distilgpt2:
+  Success Rate: 100.00%
+  Analysis Time: 0.15s
+  Questions: 5
+  Layers: 1
+
+gpt2:
+  Success Rate: 100.00%
+  Analysis Time: 0.16s
+  Questions: 5
+  Layers: 1
+
+
+Model Similarity Analysis:
+------------------------------
+distilgpt2_vs_gpt2: 0.290

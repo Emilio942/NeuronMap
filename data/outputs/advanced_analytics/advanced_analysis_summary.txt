@@ -1,0 +1,28 @@
+Advanced Neural Network Analysis Report
+=============================================
+
+Analysis Overview:
+- Total layers analyzed: 12
+- Attention layers found: 0
+- Gradient layers analyzed: 5
+- Information bottlenecks detected: 12
+
+Cross-Layer Information Flow:
+- Average layer similarity: 0.0000
+- Maximum layer similarity: 0.0000
+
+Representational Geometry:
+- Participation ratios by layer:
+  * transformer.h.0.attn.c_attn: 1.1140
+  * transformer.h.0.mlp.c_proj: 1.0417
+  * transformer.h.1.attn.c_attn: 1.1045
+  * transformer.h.1.mlp.c_proj: 1.0005
+  * transformer.h.2.attn.c_attn: 1.1717
+  * transformer.h.2.mlp.c_proj: 1.0634
+  * transformer.h.3.attn.c_attn: 1.2045
+  * transformer.h.3.mlp.c_proj: 1.0859
+  * transformer.h.4.attn.c_attn: 1.2694
+  * transformer.h.4.mlp.c_proj: 1.0359
+  * transformer.h.5.attn.c_attn: 1.2883
+  * transformer.h.5.mlp.c_proj: 1.0486
+

@@ -1,0 +1,258 @@
+# Model Configuration for NeuronMap
+# ===================================
+
+models:
+  # Default model for testing/development
+  default:
+    name: "distilgpt2"
+    type: "gpt"
+    layers:
+      attention: "transformer.h.{layer}.attn.c_attn"
+      mlp: "transformer.h.{layer}.mlp.c_proj"
+      total_layers: 6
+    
+  # GPT-2 Family
+  gpt2_small:
+    name: "gpt2"
+    type: "gpt"
+    layers:
+      attention: "transformer.h.{layer}.attn.c_attn"
+      mlp: "transformer.h.{layer}.mlp.c_proj"
+      total_layers: 12
+      
+  gpt2_medium:
+    name: "gpt2-medium"
+    type: "gpt"
+    layers:
+      attention: "transformer.h.{layer}.attn.c_attn"
+      mlp: "transformer.h.{layer}.mlp.c_proj"
+      total_layers: 24
+      
+  gpt2_large:
+    name: "gpt2-large"
+    type: "gpt"
+    layers:
+      attention: "transformer.h.{layer}.attn.c_attn"
+      mlp: "transformer.h.{layer}.mlp.c_proj"
+      total_layers: 36
+  
+  # GPT-Neo/GPT-J Family
+  gpt_neo_125m:
+    name: "EleutherAI/gpt-neo-125M"
+    type: "gpt"
+    layers:
+      attention: "transformer.h.{layer}.attn.attention.out_proj"
+      mlp: "transformer.h.{layer}.mlp.c_proj"
+      total_layers: 12
+      
+  gpt_neo_1_3b:
+    name: "EleutherAI/gpt-neo-1.3B"
+    type: "gpt"
+    layers:
+      attention: "transformer.h.{layer}.attn.attention.out_proj"
+      mlp: "transformer.h.{layer}.mlp.c_proj"
+      total_layers: 24
+      
+  gpt_j_6b:
+    name: "EleutherAI/gpt-j-6B"
+    type: "gpt"
+    layers:
+      attention: "transformer.h.{layer}.attn.out_proj"
+      mlp: "transformer.h.{layer}.mlp.fc_out"
+      total_layers: 28
+
+  # BERT Family
+  bert_base:
+    name: "bert-base-uncased"
+    type: "bert"
+    layers:
+      attention: "encoder.layer.{layer}.attention.output.dense"
+      mlp: "encoder.layer.{layer}.output.dense"
+      total_layers: 12
+      
+  bert_large:
+    name: "bert-large-uncased"
+    type: "bert"
+    layers:
+      attention: "encoder.layer.{layer}.attention.output.dense"
+      mlp: "encoder.layer.{layer}.output.dense"
+      total_layers: 24
+      
+  roberta_base:
+    name: "roberta-base"
+    type: "bert"
+    layers:
+      attention: "encoder.layer.{layer}.attention.output.dense"
+      mlp: "encoder.layer.{layer}.output.dense"
+      total_layers: 12
+      
+  distilbert:
+    name: "distilbert-base-uncased"
+    type: "bert"
+    layers:
+      attention: "transformer.layer.{layer}.attention.out_lin"
+      mlp: "transformer.layer.{layer}.output_lin"
+      total_layers: 6
+
+  # T5 Family  
+  t5_small:
+    name: "t5-small"
+    type: "t5"
+    layers:
+      attention: "encoder.block.{layer}.layer.0.SelfAttention.o"
+      mlp: "encoder.block.{layer}.layer.1.DenseReluDense.wo"
+      total_layers: 6
+      
+  t5_base:
+    name: "t5-base"
+    type: "t5"
+    layers:
+      attention: "encoder.block.{layer}.layer.0.SelfAttention.o"
+      mlp: "encoder.block.{layer}.layer.1.DenseReluDense.wo"
+      total_layers: 12
+      
+  flan_t5_small:
+    name: "google/flan-t5-small"
+    type: "t5"
+    layers:
+      attention: "encoder.block.{layer}.layer.0.SelfAttention.o"
+      mlp: "encoder.block.{layer}.layer.1.DenseReluDense.wo"
+      total_layers: 6
+      
+  # Llama Family (requires special handling)
+  llama2_7b:
+    name: "meta-llama/Llama-2-7b-hf"
+    type: "llama"
+    layers:
+      attention: "model.layers.{layer}.self_attn.o_proj"
+      mlp: "model.layers.{layer}.mlp.down_proj"
+      total_layers: 32
+      
+  # Code-specific models
+  codegen_350m:
+    name: "Salesforce/codegen-350M-mono"
+    type: "gpt"
+    layers:
+      attention: "transformer.h.{layer}.attn.out_proj"
+      mlp: "transformer.h.{layer}.mlp.fc_out"
+      total_layers: 20
+      
+  code_t5_small:
+    name: "Salesforce/codet5-small"
+    type: "t5"
+    layers:
+      attention: "encoder.block.{layer}.layer.0.SelfAttention.o"
+      mlp: "encoder.block.{layer}.layer.1.DenseReluDense.wo"
+      total_layers: 6
+      
+  # Domain-specific models
+  scibert:
+    name: "allenai/scibert_scivocab_uncased"
+    type: "bert"
+    layers:
+      attention: "encoder.layer.{layer}.attention.output.dense"
+      mlp: "encoder.layer.{layer}.output.dense"
+      total_layers: 12
+      
+  biobert:
+    name: "dmis-lab/biobert-v1.1"
+    type: "bert"
+    layers:
+      attention: "encoder.layer.{layer}.attention.output.dense"
+      mlp: "encoder.layer.{layer}.output.dense"
+      total_layers: 12
+
+# Layer mapping templates for different architectures
+layer_patterns:
+  gpt:
+    attention_patterns:
+      - "transformer.h.{layer}.attn.c_attn"
+      - "transformer.h.{layer}.attn.c_proj"
+      - "transformer.h.{layer}.attn.attention.out_proj"  # GPT-Neo style
+      - "transformer.h.{layer}.attn.out_proj"  # GPT-J style
+    mlp_patterns:
+      - "transformer.h.{layer}.mlp.c_fc"
+      - "transformer.h.{layer}.mlp.c_proj"
+      - "transformer.h.{layer}.mlp.fc_out"  # GPT-J style
+      
+  bert:
+    attention_patterns:
+      - "encoder.layer.{layer}.attention.self.query"
+      - "encoder.layer.{layer}.attention.self.key"
+      - "encoder.layer.{layer}.attention.self.value"
+      - "encoder.layer.{layer}.attention.output.dense"
+      - "transformer.layer.{layer}.attention.out_lin"  # DistilBERT style
+    mlp_patterns:
+      - "encoder.layer.{layer}.intermediate.dense"
+      - "encoder.layer.{layer}.output.dense"
+      - "transformer.layer.{layer}.output_lin"  # DistilBERT style
+      
+  t5:
+    attention_patterns:
+      - "encoder.block.{layer}.layer.0.SelfAttention.q"
+      - "encoder.block.{layer}.layer.0.SelfAttention.k"
+      - "encoder.block.{layer}.layer.0.SelfAttention.v"
+      - "encoder.block.{layer}.layer.0.SelfAttention.o"
+    mlp_patterns:
+      - "encoder.block.{layer}.layer.1.DenseReluDense.wi"
+      - "encoder.block.{layer}.layer.1.DenseReluDense.wo"
+      
+  llama:
+    attention_patterns:
+      - "model.layers.{layer}.self_attn.q_proj"
+      - "model.layers.{layer}.self_attn.k_proj"
+      - "model.layers.{layer}.self_attn.v_proj"
+      - "model.layers.{layer}.self_attn.o_proj"
+    mlp_patterns:
+      - "model.layers.{layer}.mlp.gate_proj"
+      - "model.layers.{layer}.mlp.up_proj"
+      - "model.layers.{layer}.mlp.down_proj"
+      
+# Analysis configurations for different model types
+analysis_configs:
+  attention_analysis:
+    # Which layers typically contain attention mechanisms
+    primary_attention_layers: ["attention", "self_attn", "attn"]
+    # Attention head analysis configurations
+    head_analysis: true
+    attention_pattern_extraction: true
+    
+  mlp_analysis:
+    # Which layers are MLP/feedforward
+    primary_mlp_layers: ["mlp", "intermediate", "fc", "dense"]
+    # MLP-specific analysis
+    neuron_clustering: true
+    activation_statistics: true
+    
+  comparative_analysis:
+    # Cross-layer comparison settings
+    layer_similarity_metrics: ["cosine", "pearson", "rsa"]
+    dimensionality_reduction: ["pca", "tsne", "umap"]
+    
+# Model-specific extraction settings
+extraction_settings:
+  gpt:
+    preferred_dtype: "float16"
+    batch_size: 1
+    max_sequence_length: 1024
+    attention_mask: true
+    
+  bert:
+    preferred_dtype: "float16" 
+    batch_size: 8
+    max_sequence_length: 512
+    attention_mask: true
+    token_type_ids: false
+    
+  t5:
+    preferred_dtype: "float16"
+    batch_size: 4
+    max_sequence_length: 512
+    decoder_start_token: true
+    
+  llama:
+    preferred_dtype: "float16"
+    batch_size: 1
+    max_sequence_length: 2048
+    attention_mask: true
+    special_tokens: true

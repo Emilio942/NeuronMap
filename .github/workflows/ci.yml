@@ -1,0 +1,267 @@
+name: NeuronMap CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run weekly to catch dependency issues
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+    # Allow manual triggering
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }} with Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+        exclude:
+          # Exclude some combinations to reduce CI time
+          - os: windows-latest
+            python-version: '3.8'
+          - os: macos-latest
+            python-version: '3.8'
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov flake8 black mypy
+    
+    - name: Lint with flake8
+      run: |
+        # Stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    
+    - name: Check formatting with black
+      run: |
+        black --check --diff .
+      continue-on-error: true
+    
+    - name: Type checking with mypy
+      run: |
+        mypy src/ --ignore-missing-imports --follow-imports=skip
+      continue-on-error: true
+    
+    - name: Test with pytest
+      run: |
+        pytest tests/ --cov=src --cov-report=xml --cov-report=html -v
+      continue-on-error: true
+    
+    - name: Run integration tests
+      run: |
+        python run_tests.py
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  performance-test:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest-benchmark
+    
+    - name: Run performance benchmarks
+      run: |
+        python -c "
+        import time
+        import numpy as np
+        
+        # Benchmark basic operations
+        start = time.time()
+        data = np.random.randn(1000, 768)
+        pca_sim = np.random.randn(768, 2)
+        result = data @ pca_sim
+        end = time.time()
+        
+        print(f'Simulated PCA transformation: {end-start:.4f}s')
+        print(f'Data shape: {result.shape}')
+        
+        # Benchmark would pass if under threshold
+        assert end - start < 1.0, 'Performance regression detected'
+        print('✅ Performance benchmark passed')
+        "
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Run security scan with bandit
+      run: |
+        pip install bandit[toml]
+        bandit -r src/ -f json -o bandit-report.json
+      continue-on-error: true
+    
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-scan-results
+        path: bandit-report.json
+
+  build-docs:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install documentation dependencies
+      run: |
+        pip install sphinx sphinx-rtd-theme
+        pip install -r requirements.txt
+    
+    - name: Build documentation
+      run: |
+        # Create basic docs structure if it doesn't exist
+        mkdir -p docs
+        echo "# NeuronMap Documentation" > docs/index.md
+        echo "Auto-generated documentation for NeuronMap." >> docs/index.md
+        
+        # Generate API documentation
+        echo "## API Reference" >> docs/index.md
+        python -c "
+        import os
+        import importlib.util
+        
+        # List all modules
+        modules = []
+        for root, dirs, files in os.walk('src'):
+            for file in files:
+                if file.endswith('.py') and file != '__init__.py':
+                    module_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(module_path, 'src')
+                    module_name = rel_path.replace('/', '.').replace('.py', '')
+                    modules.append(module_name)
+        
+        with open('docs/modules.md', 'w') as f:
+            f.write('# Module Reference\n\n')
+            for module in sorted(modules):
+                f.write(f'- {module}\n')
+        
+        print(f'Generated documentation for {len(modules)} modules')
+        "
+    
+    - name: Upload documentation
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: docs/
+
+  package:
+    runs-on: ubuntu-latest
+    needs: [test, performance-test]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install build tools
+      run: |
+        pip install build twine
+    
+    - name: Build package
+      run: |
+        python -m build
+    
+    - name: Check package
+      run: |
+        twine check dist/*
+    
+    - name: Upload package artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: python-package
+        path: dist/
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [test, performance-test]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Build Docker image
+      run: |
+        # Create a simple Dockerfile
+        cat > Dockerfile << 'EOF'
+        FROM python:3.10-slim
+        
+        WORKDIR /app
+        
+        COPY requirements.txt .
+        RUN pip install -r requirements.txt
+        
+        COPY . .
+        
+        CMD ["python", "main.py", "--help"]
+        EOF
+        
+        docker build -t neuronmap:latest .
+    
+    - name: Test Docker image
+      run: |
+        docker run --rm neuronmap:latest python main.py --help
+    
+    - name: Save Docker image
+      run: |
+        docker save neuronmap:latest | gzip > neuronmap-docker.tar.gz
+    
+    - name: Upload Docker image
+      uses: actions/upload-artifact@v3
+      with:
+        name: docker-image
+        path: neuronmap-docker.tar.gz

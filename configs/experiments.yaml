@@ -1,0 +1,216 @@
+# Experiment Configuration for NeuronMap
+# =======================================
+
+# Default experiment settings
+default:
+  # Question Generation
+  question_generation:
+    ollama_host: "http://localhost:11434"
+    model_name: "deepseek-r1:32b"
+    num_questions: 100000
+    batch_size: 20
+    retry_delay: 10
+    max_retries: 5
+    output_file: "data/raw/generated_questions.jsonl"
+    
+    # Enhanced question generation features
+    difficulty_distribution:
+      beginner: 0.3
+      intermediate: 0.4
+      advanced: 0.2
+      expert: 0.1
+      
+    category_distribution:
+      factual: 0.3
+      reasoning: 0.25
+      analytical: 0.15
+      creative: 0.1
+      technical: 0.1
+      ethical: 0.05
+      mathematical: 0.05
+      
+    min_quality_score: 0.6
+    enable_metadata_enrichment: true
+    enable_difficulty_control: true
+    
+    # Quality control settings
+    quality_validation:
+      min_length: 10
+      max_length: 500
+      min_meaningful_words_ratio: 0.4
+      max_repetition_ratio: 0.6
+      require_question_mark: true
+      
+    # Domain-specific settings
+    domain_targeting:
+      enabled: false
+      target_domains: ["science", "technology", "history", "literature"]
+      domain_balance: "equal"  # equal, weighted, custom
+    
+  # Activation Extraction  
+  activation_extraction:
+    model_config: "default"  # Reference to models.yaml
+    target_layer: "transformer.h.5.mlp.c_proj"
+    device: "auto"  # auto, cuda, cpu
+    batch_size: 1
+    max_length: 512
+    output_file: "data/processed/activation_results.csv"
+    
+  # Visualization
+  visualization:
+    input_file: "data/processed/activation_results.csv"
+    output_dir: "data/outputs"
+    methods: ["pca", "tsne", "heatmap"]
+    pca:
+      n_components: 2
+    tsne:
+      n_components: 2
+      perplexity: 30
+      learning_rate: 200
+      n_iter: 1000
+    heatmap:
+      max_questions: 50
+      max_neurons: 100
+
+# Development configuration
+dev:
+  question_generation:
+    num_questions: 100  # Smaller for testing
+    batch_size: 5
+    
+  activation_extraction:
+    model_config: "default"
+    device: "cpu"  # Force CPU for development
+    
+# Production configuration  
+prod:
+  question_generation:
+    num_questions: 1000000
+    batch_size: 50
+    
+  activation_extraction:
+    device: "cuda"
+    batch_size: 8
+
+# Experiment-specific configurations
+experiments:
+  layer_comparison:
+    description: "Compare activations across different layers"
+    activation_extraction:
+      target_layers: 
+        - "transformer.h.2.mlp.c_proj"
+        - "transformer.h.4.mlp.c_proj" 
+        - "transformer.h.5.mlp.c_proj"
+        
+  model_comparison:
+    description: "Compare activations across different models"
+    models: ["gpt2_small", "bert_base"]
+    
+  enhanced_question_generation:
+    description: "Enhanced question generation with difficulty control and rich metadata"
+    question_generation:
+      ollama_host: "http://localhost:11434"
+      model_name: "deepseek-r1:32b"
+      num_questions: 1000
+      batch_size: 10
+      retry_delay: 10
+      max_retries: 5
+      output_file: "data/raw/enhanced_questions.json"
+      
+      # Balanced difficulty distribution
+      difficulty_distribution:
+        beginner: 0.25
+        intermediate: 0.35
+        advanced: 0.25
+        expert: 0.15
+        
+      # Diverse category distribution
+      category_distribution:
+        factual: 0.2
+        reasoning: 0.3
+        analytical: 0.2
+        creative: 0.1
+        technical: 0.1
+        ethical: 0.05
+        mathematical: 0.05
+        
+      min_quality_score: 0.7
+      enable_metadata_enrichment: true
+      enable_difficulty_control: true
+      
+      quality_validation:
+        min_length: 15
+        max_length: 300
+        min_meaningful_words_ratio: 0.5
+        max_repetition_ratio: 0.5
+        require_question_mark: true
+        
+      domain_targeting:
+        enabled: true
+        target_domains: ["science", "technology", "history", "literature", "philosophy", "mathematics"]
+        domain_balance: "weighted"
+        
+  difficulty_analysis:
+    description: "Analyze how question difficulty affects neural activations"
+    question_generation:
+      ollama_host: "http://localhost:11434"
+      model_name: "deepseek-r1:32b"
+      num_questions: 500
+      batch_size: 5
+      output_file: "data/raw/difficulty_analysis_questions.json"
+      
+      # Focus on specific difficulty levels for analysis
+      difficulty_distribution:
+        beginner: 0.5
+        expert: 0.5
+        
+      category_distribution:
+        reasoning: 0.6
+        analytical: 0.4
+        
+      min_quality_score: 0.8
+      enable_metadata_enrichment: true
+      enable_difficulty_control: true
+      
+    activation_extraction:
+      model_config: "default"
+      target_layers:
+        - "transformer.h.0.mlp.c_proj"   # Early layer
+        - "transformer.h.5.mlp.c_proj"   # Middle layer
+        - "transformer.h.11.mlp.c_proj"  # Late layer
+      device: "auto"
+      batch_size: 2
+      max_length: 512
+      output_file: "data/processed/difficulty_analysis_activations.h5"
+      
+    visualization:
+      input_file: "data/processed/difficulty_analysis_activations.h5"
+      output_dir: "data/outputs/difficulty_analysis"
+      methods: ["pca", "tsne", "heatmap", "difficulty_comparison"]
+      
+  category_analysis:
+    description: "Analyze how question categories affect neural representations"
+    question_generation:
+      ollama_host: "http://localhost:11434"
+      model_name: "deepseek-r1:32b"
+      num_questions: 800
+      batch_size: 8
+      output_file: "data/raw/category_analysis_questions.json"
+      
+      # Equal distribution across all categories
+      difficulty_distribution:
+        intermediate: 1.0
+        
+      category_distribution:
+        factual: 0.125
+        reasoning: 0.125
+        analytical: 0.125
+        creative: 0.125
+        technical: 0.125
+        ethical: 0.125
+        mathematical: 0.125
+        conceptual: 0.125
+        
+      min_quality_score: 0.7
+      enable_metadata_enrichment: true
+      enable_difficulty_control: true

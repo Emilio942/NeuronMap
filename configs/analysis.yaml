@@ -1,0 +1,57 @@
+# Analysis Configuration for NeuronMap
+# =====================================
+
+analysis:
+  # Processing Configuration
+  batch_size: 32
+  max_sequence_length: 512
+  device: "auto"  # auto, cuda, cpu, cuda:0, etc.
+  precision: "float32"  # float16, float32, float64
+  enable_gradient_checkpointing: false
+  cache_activations: true
+  
+  # Memory Management
+  memory_optimization:
+    use_memory_efficient_attention: true
+    max_memory_usage_gb: 16
+    offload_to_cpu: false
+    clear_cache_between_batches: true
+  
+  # Statistical Analysis
+  statistics:
+    compute_mean: true
+    compute_std: true
+    compute_skewness: true
+    compute_kurtosis: true
+    compute_percentiles: [5, 25, 50, 75, 95]
+    correlation_methods: ["pearson", "spearman"]
+  
+  # Clustering Analysis
+  clustering:
+    methods: ["kmeans", "hierarchical", "dbscan"]
+    n_clusters_range: [2, 3, 4, 5, 8, 10]
+    dimensionality_reduction: "pca"  # pca, tsne, umap
+    max_samples_for_clustering: 10000
+  
+  # Attention Analysis
+  attention:
+    analyze_attention_patterns: true
+    extract_attention_weights: true
+    compute_attention_entropy: true
+    head_importance_analysis: true
+    circuit_discovery: true
+  
+  # Performance Settings
+  performance:
+    num_workers: 4
+    timeout_seconds: 300
+    retry_attempts: 3
+    checkpoint_frequency: 100  # Save intermediate results every N samples
+  
+  # Output Settings
+  output:
+    save_raw_activations: true
+    save_statistics: true
+    save_visualizations: true
+    compression: "gzip"  # none, gzip, lz4
+    file_format: "hdf5"  # hdf5, npz, pickle

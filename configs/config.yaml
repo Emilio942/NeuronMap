@@ -1,0 +1,32 @@
+analysis:
+  aggregation_method: mean
+  clustering_method: null
+  dimensionality_reduction: null
+  normalization: true
+data:
+  data_dir: data
+  input_file: generated_questions.jsonl
+  output_file: activation_results.csv
+  outputs_dir: data/outputs
+  processed_dir: data/processed
+  raw_dir: data/raw
+experiment:
+  description: ''
+  logging_level: INFO
+  name: default_experiment
+  save_intermediate: true
+  seed: 42
+model:
+  batch_size: 1
+  device: auto
+  max_length: 512
+  name: distilgpt2
+  target_layers:
+  - transformer.h.5.mlp.c_proj
+visualization:
+  backend: matplotlib
+  dpi: 300
+  enabled: true
+  figure_height: 8
+  figure_width: 12
+  save_format: png

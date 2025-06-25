@@ -1,0 +1,409 @@
+{% extends "base.html" %}
+
+{% block title %}Advanced Analytics - NeuronMap{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">
+                        <i class="fas fa-brain me-2"></i>
+                        Advanced Neural Network Analytics
+                    </h4>
+                    <p class="card-text mt-2 mb-0">
+                        Comprehensive analysis including attention flow, gradient attribution, cross-layer information flow, and representational geometry.
+                    </p>
+                </div>
+                <div class="card-body">
+                    <form id="advancedAnalyticsForm">
+                        <div class="row">
+                            <!-- Model Selection -->
+                            <div class="col-md-6">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">
+                                            <i class="fas fa-robot me-2"></i>
+                                            Model Configuration
+                                        </h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label for="modelSelect" class="form-label">Select Model Architecture</label>
+                                            <select class="form-select" id="modelSelect" name="model" required>
+                                                <option value="">Loading models...</option>
+                                            </select>
+                                            <div class="form-text">Choose from 19+ preconfigured models across GPT, BERT, T5, and LLaMA architectures.</div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Model Information</label>
+                                            <div id="modelInfo" class="p-3 bg-light border rounded">
+                                                <small class="text-muted">Select a model to see details</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Questions Input -->
+                            <div class="col-md-6">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">
+                                            <i class="fas fa-question-circle me-2"></i>
+                                            Input Questions
+                                        </h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="mb-3">
+                                            <label for="questionsText" class="form-label">Questions (one per line)</label>
+                                            <textarea class="form-control" id="questionsText" name="questions" rows="8" required
+                                                placeholder="Enter your questions here, one per line. For example:
+What is machine learning?
+How do neural networks work?
+Explain artificial intelligence.
+What are the applications of deep learning?
+How does natural language processing work?"></textarea>
+                                            <div class="form-text">Minimum 1 question required. For best results, use 3-10 questions.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Analytics Configuration -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="card mb-4">
+                                    <div class="card-header">
+                                        <h5 class="mb-0">
+                                            <i class="fas fa-cogs me-2"></i>
+                                            Analytics Configuration
+                                        </h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="attentionFlow" checked>
+                                                    <label class="form-check-label" for="attentionFlow">
+                                                        <strong>Attention Flow Analysis</strong>
+                                                        <br><small class="text-muted">Cross-layer attention patterns and entropy</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="gradientAttribution" checked>
+                                                    <label class="form-check-label" for="gradientAttribution">
+                                                        <strong>Gradient Attribution</strong>
+                                                        <br><small class="text-muted">Neuron importance via gradients</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="crossLayerFlow" checked>
+                                                    <label class="form-check-label" for="crossLayerFlow">
+                                                        <strong>Cross-Layer Flow</strong>
+                                                        <br><small class="text-muted">Information bottlenecks and similarity</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" id="repGeometry" checked>
+                                                    <label class="form-check-label" for="repGeometry">
+                                                        <strong>Representational Geometry</strong>
+                                                        <br><small class="text-muted">Eigenvalue and participation analysis</small>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="d-grid gap-2">
+                                    <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                        <i class="fas fa-play me-2"></i>
+                                        Start Advanced Analytics
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Section (initially hidden) -->
+    <div class="row mt-4" id="progressSection" style="display: none;">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cog fa-spin me-2"></i>
+                        Analysis Progress
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="progress mb-3" style="height: 20px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             id="progressBar" role="progressbar" style="width: 0%">
+                            0%
+                        </div>
+                    </div>
+                    <p id="progressMessage" class="mb-0">Initializing...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Section (initially hidden) -->
+    <div class="row mt-4" id="resultsSection" style="display: none;">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-line me-2"></i>
+                        Analysis Results
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="resultsContent">
+                        <!-- Results will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Advanced Analytics JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('advancedAnalyticsForm');
+    const modelSelect = document.getElementById('modelSelect');
+    const modelInfo = document.getElementById('modelInfo');
+    const progressSection = document.getElementById('progressSection');
+    const progressBar = document.getElementById('progressBar');
+    const progressMessage = document.getElementById('progressMessage');
+    const resultsSection = document.getElementById('resultsSection');
+    const resultsContent = document.getElementById('resultsContent');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // Load available models
+    loadAvailableModels();
+
+    // Model selection change handler
+    modelSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        if (selectedOption.value) {
+            const modelType = selectedOption.dataset.type;
+            const totalLayers = selectedOption.dataset.layers;
+            
+            modelInfo.innerHTML = `
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Architecture:</strong><br>
+                        <span class="badge bg-secondary">${modelType.toUpperCase()}</span>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Total Layers:</strong><br>
+                        ${totalLayers}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Status:</strong><br>
+                        <span class="badge bg-success">Ready</span>
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    // Form submission
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        startAdvancedAnalytics();
+    });
+
+    function loadAvailableModels() {
+        fetch('/api/list-models')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    populateModelSelect(data.grouped_models);
+                } else {
+                    console.error('Failed to load models:', data.error);
+                    modelSelect.innerHTML = '<option value="">Failed to load models</option>';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading models:', error);
+                modelSelect.innerHTML = '<option value="">Error loading models</option>';
+            });
+    }
+
+    function populateModelSelect(groupedModels) {
+        modelSelect.innerHTML = '<option value="">Select a model...</option>';
+        
+        for (const [type, models] of Object.entries(groupedModels)) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = type.toUpperCase() + ' Models';
+            
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.name;
+                option.textContent = model.display_name;
+                option.dataset.type = model.type;
+                option.dataset.layers = model.total_layers;
+                optgroup.appendChild(option);
+            });
+            
+            modelSelect.appendChild(optgroup);
+        }
+    }
+
+    function startAdvancedAnalytics() {
+        const formData = new FormData(form);
+        const questions = formData.get('questions').split('\n').filter(q => q.trim());
+        
+        if (questions.length === 0) {
+            alert('Please enter at least one question.');
+            return;
+        }
+
+        // Show progress section
+        progressSection.style.display = 'block';
+        resultsSection.style.display = 'none';
+        submitBtn.disabled = true;
+        
+        // Reset progress
+        updateProgress(0, 'Starting advanced analytics...');
+
+        // Prepare request data
+        const requestData = {
+            model: formData.get('model'),
+            questions: questions
+        };
+
+        // Start analysis
+        fetch('/api/advanced-analytics', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                pollAnalysisStatus(data.analysis_id);
+            } else {
+                throw new Error(data.error || 'Unknown error');
+            }
+        })
+        .catch(error => {
+            console.error('Error starting analysis:', error);
+            updateProgress(0, 'Error: ' + error.message);
+            submitBtn.disabled = false;
+        });
+    }
+
+    function pollAnalysisStatus(analysisId) {
+        const pollInterval = setInterval(() => {
+            fetch(`/api/analysis-status/${analysisId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.job) {
+                        const job = data.job;
+                        updateProgress(job.progress, job.message);
+                        
+                        if (job.status === 'completed') {
+                            clearInterval(pollInterval);
+                            showResults(job.results);
+                            submitBtn.disabled = false;
+                        } else if (job.status === 'failed') {
+                            clearInterval(pollInterval);
+                            updateProgress(0, 'Error: ' + job.error);
+                            submitBtn.disabled = false;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error polling status:', error);
+                    clearInterval(pollInterval);
+                    submitBtn.disabled = false;
+                });
+        }, 1000);
+    }
+
+    function updateProgress(percent, message) {
+        progressBar.style.width = percent + '%';
+        progressBar.textContent = percent + '%';
+        progressMessage.textContent = message;
+    }
+
+    function showResults(results) {
+        resultsSection.style.display = 'block';
+        
+        resultsContent.innerHTML = `
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h3 class="text-primary">${results.layers_analyzed || 'N/A'}</h3>
+                            <p class="mb-0">Layers Analyzed</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h3 class="text-success">${results.summary?.analysis_completeness ? Object.keys(results.summary.analysis_completeness).length : 'N/A'}</h3>
+                            <p class="mb-0">Analysis Modules</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h3 class="text-info">${results.output_path ? '✓' : '✗'}</h3>
+                            <p class="mb-0">Results Saved</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="alert alert-success">
+                        <h5>Advanced Analytics Completed Successfully!</h5>
+                        <p class="mb-0">
+                            Results have been saved to: <code>${results.output_path || 'data/outputs/advanced_analytics'}</code>
+                        </p>
+                        <hr>
+                        <p class="mb-0">
+                            <strong>Generated Files:</strong>
+                        </p>
+                        <ul class="mb-0">
+                            <li>Advanced analysis results (JSON)</li>
+                            <li>Summary report (TXT)</li>
+                            <li>Cross-layer analysis data</li>
+                            <li>Representational geometry analysis</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+});
+</script>
+{% endblock %}

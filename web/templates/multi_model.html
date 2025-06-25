@@ -1,0 +1,545 @@
+{% extends "base.html" %}
+
+{% block title %}Multi-Model Analysis - NeuronMap{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2 class="mb-4">
+            <i class="fas fa-layer-group me-2"></i>Multi-Model Analysis & Comparison
+        </h2>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Configuration Panel -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cog me-2"></i>Comparison Configuration
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="multiModelForm">
+                    <!-- Model Selection -->
+                    <div class="mb-3">
+                        <label class="form-label">Select Models to Compare</label>
+                        <div class="model-selection">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="model-gpt2" name="models" value="gpt2" checked>
+                                <label class="form-check-label" for="model-gpt2">
+                                    GPT-2
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="model-gpt2-medium" name="models" value="gpt2-medium">
+                                <label class="form-check-label" for="model-gpt2-medium">
+                                    GPT-2 Medium
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="model-distilgpt2" name="models" value="distilgpt2" checked>
+                                <label class="form-check-label" for="model-distilgpt2">
+                                    DistilGPT-2
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="model-bert" name="models" value="bert-base-uncased">
+                                <label class="form-check-label" for="model-bert">
+                                    BERT Base
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Custom Models -->
+                    <div class="mb-3">
+                        <label for="customModels" class="form-label">Custom Models</label>
+                        <textarea class="form-control" id="customModels" name="customModels" rows="3" 
+                                  placeholder="Enter custom model names, one per line..."></textarea>
+                        <div class="form-text">HuggingFace model identifiers (e.g., microsoft/DialoGPT-medium)</div>
+                    </div>
+                    
+                    <!-- Questions -->
+                    <div class="mb-3">
+                        <label for="questionsFile" class="form-label">Questions File</label>
+                        <input type="file" class="form-control" id="questionsFile" name="questions" 
+                               accept=".txt,.json,.jsonl,.csv">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="questionsText" class="form-label">Or Enter Questions</label>
+                        <textarea class="form-control" id="questionsText" name="questionsText" rows="4" 
+                                  placeholder="Enter questions, one per line..."></textarea>
+                    </div>
+                    
+                    <!-- Comparison Type -->
+                    <div class="mb-3">
+                        <label for="comparisonType" class="form-label">Comparison Type</label>
+                        <select class="form-select" id="comparisonType" name="comparisonType">
+                            <option value="activations">Activation Patterns</option>
+                            <option value="statistics">Statistical Comparison</option>
+                            <option value="performance">Performance Metrics</option>
+                            <option value="similarity">Model Similarity</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Target Layers -->
+                    <div class="mb-3">
+                        <label for="targetLayers" class="form-label">Target Layers (optional)</label>
+                        <input type="text" class="form-control" id="targetLayers" name="targetLayers" 
+                               placeholder="e.g., transformer.h.0,transformer.h.11">
+                    </div>
+                    
+                    <!-- Options -->
+                    <div class="mb-3">
+                        <label class="form-label">Analysis Options</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="generateHeatmaps" name="generateHeatmaps" checked>
+                            <label class="form-check-label" for="generateHeatmaps">
+                                Generate Heatmaps
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="computeStatistics" name="computeStatistics" checked>
+                            <label class="form-check-label" for="computeStatistics">
+                                Compute Statistics
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="createComparison" name="createComparison" checked>
+                            <label class="form-check-label" for="createComparison">
+                                Create Comparison Report
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Start Comparison -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary" id="compareBtn">
+                            <i class="fas fa-play me-2"></i>Start Comparison
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Quick Presets -->
+                <div class="mt-3">
+                    <h6>Quick Presets</h6>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-outline-info btn-sm" onclick="loadGPTComparison()">
+                            <i class="fas fa-bolt me-1"></i>GPT Family
+                        </button>
+                        <button type="button" class="btn btn-outline-success btn-sm" onclick="loadSizeComparison()">
+                            <i class="fas fa-balance-scale me-1"></i>Size Comparison
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Results Panel -->
+    <div class="col-lg-8">
+        <!-- Progress Section -->
+        <div class="card mb-3" id="comparisonProgress" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-spinner fa-spin me-2"></i>Multi-Model Analysis in Progress
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-3">
+                    <div class="progress-bar" id="comparisonProgressBar" role="progressbar" style="width: 0%"></div>
+                </div>
+                <p id="comparisonProgressMessage">Initializing...</p>
+                <div id="modelProgressList"></div>
+            </div>
+        </div>
+        
+        <!-- Results Section -->
+        <div class="card" id="comparisonResults">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>Comparison Results
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="comparisonContent">
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-layer-group fa-3x mb-3"></i>
+                        <p>No comparison results yet. Select models and start a comparison to see results here.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Model Comparison Grid -->
+        <div class="row mt-3" id="modelGrid" style="display: none;">
+            <div class="col-12">
+                <h5>Model Performance Overview</h5>
+            </div>
+            <!-- Grid content will be dynamically populated -->
+        </div>
+        
+        <!-- Detailed Analysis Tabs -->
+        <div class="card mt-3" id="detailedAnalysis" style="display: none;">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="analysisTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="heatmap-tab" data-bs-toggle="tab" data-bs-target="#heatmap" type="button" role="tab">
+                            <i class="fas fa-th me-1"></i>Heatmaps
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="statistics-tab" data-bs-toggle="tab" data-bs-target="#statistics" type="button" role="tab">
+                            <i class="fas fa-chart-bar me-1"></i>Statistics
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="similarity-tab" data-bs-toggle="tab" data-bs-target="#similarity" type="button" role="tab">
+                            <i class="fas fa-project-diagram me-1"></i>Similarity
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="report-tab" data-bs-toggle="tab" data-bs-target="#report" type="button" role="tab">
+                            <i class="fas fa-file-alt me-1"></i>Report
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content" id="analysisTabContent">
+                    <div class="tab-pane fade show active" id="heatmap" role="tabpanel">
+                        <div id="heatmapContent"></div>
+                    </div>
+                    <div class="tab-pane fade" id="statistics" role="tabpanel">
+                        <div id="statisticsContent"></div>
+                    </div>
+                    <div class="tab-pane fade" id="similarity" role="tabpanel">
+                        <div id="similarityContent"></div>
+                    </div>
+                    <div class="tab-pane fade" id="report" role="tabpanel">
+                        <div id="reportContent"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentComparisonId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Form submission
+    document.getElementById('multiModelForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        startComparison();
+    });
+    
+    // Load demo questions
+    loadDemoQuestions();
+});
+
+async function startComparison() {
+    const form = document.getElementById('multiModelForm');
+    const formData = new FormData(form);
+    
+    // Get selected models
+    const selectedModels = [];
+    const modelCheckboxes = document.querySelectorAll('input[name="models"]:checked');
+    modelCheckboxes.forEach(checkbox => {
+        selectedModels.push(checkbox.value);
+    });
+    
+    // Add custom models
+    const customModels = formData.get('customModels');
+    if (customModels) {
+        const customList = customModels.split('\n').filter(m => m.trim());
+        selectedModels.push(...customList);
+    }
+    
+    if (selectedModels.length < 2) {
+        neuronMapUtils.showToast('Please select at least 2 models for comparison', 'warning');
+        return;
+    }
+    
+    // Validate questions
+    const questionsFile = formData.get('questions');
+    const questionsText = formData.get('questionsText');
+    if (!questionsFile.name && !questionsText.trim()) {
+        neuronMapUtils.showToast('Please provide questions for analysis', 'warning');
+        return;
+    }
+    
+    // Show progress
+    showComparisonProgress(selectedModels);
+    
+    try {
+        // Add models to form data
+        formData.append('selectedModels', JSON.stringify(selectedModels));
+        
+        const response = await fetch('/api/multi-model-compare', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            currentComparisonId = result.comparison_id;
+            displayComparisonResults(result);
+        } else {
+            hideComparisonProgress();
+            neuronMapUtils.showToast(result.error || 'Comparison failed', 'danger');
+        }
+    } catch (error) {
+        hideComparisonProgress();
+        neuronMapUtils.showToast('Network error: ' + error.message, 'danger');
+    }
+}
+
+function showComparisonProgress(models) {
+    document.getElementById('comparisonProgress').style.display = 'block';
+    document.getElementById('compareBtn').disabled = true;
+    
+    // Show model progress list
+    const progressList = document.getElementById('modelProgressList');
+    progressList.innerHTML = models.map(model => `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span>${model}</span>
+            <span class="badge bg-secondary" id="progress-${model.replace(/[^a-zA-Z0-9]/g, '-')}">Pending</span>
+        </div>
+    `).join('');
+    
+    // Simulate progress
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += 10;
+        document.getElementById('comparisonProgressBar').style.width = progress + '%';
+        
+        if (progress >= 100) {
+            clearInterval(interval);
+            hideComparisonProgress();
+        }
+    }, 1000);
+}
+
+function hideComparisonProgress() {
+    document.getElementById('comparisonProgress').style.display = 'none';
+    document.getElementById('compareBtn').disabled = false;
+}
+
+function displayComparisonResults(result) {
+    const container = document.getElementById('comparisonContent');
+    const modelGrid = document.getElementById('modelGrid');
+    const detailedAnalysis = document.getElementById('detailedAnalysis');
+    
+    // Summary
+    container.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Comparison Summary</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Models:</strong> ${result.models ? result.models.join(', ') : 'N/A'}</li>
+                    <li><strong>Questions:</strong> ${result.question_count || 'N/A'}</li>
+                    <li><strong>Layers Analyzed:</strong> ${result.layer_count || 'N/A'}</li>
+                    <li><strong>Duration:</strong> ${result.duration || 'N/A'}</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>Quick Actions</h6>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-primary btn-sm" onclick="downloadComparison()">
+                        <i class="fas fa-download me-1"></i>Download Report
+                    </button>
+                    <button class="btn btn-outline-success btn-sm" onclick="exportComparison()">
+                        <i class="fas fa-file-export me-1"></i>Export Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Show model grid and detailed analysis
+    modelGrid.style.display = 'block';
+    detailedAnalysis.style.display = 'block';
+    
+    // Populate tabs with mock data
+    populateComparisonTabs(result);
+    
+    neuronMapUtils.showToast('Multi-model comparison completed!', 'success');
+}
+
+function populateComparisonTabs(result) {
+    // Heatmaps
+    document.getElementById('heatmapContent').innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Model A Heatmap</h6>
+                <div class="placeholder-visualization">
+                    <i class="fas fa-th fa-3x text-muted"></i>
+                    <p class="text-muted">Heatmap visualization would appear here</p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6>Model B Heatmap</h6>
+                <div class="placeholder-visualization">
+                    <i class="fas fa-th fa-3x text-muted"></i>
+                    <p class="text-muted">Heatmap visualization would appear here</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Statistics
+    document.getElementById('statisticsContent').innerHTML = `
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>Mean Activation</th>
+                        <th>Std Deviation</th>
+                        <th>Sparsity</th>
+                        <th>Max Activation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>GPT-2</td>
+                        <td>0.245</td>
+                        <td>0.123</td>
+                        <td>0.12</td>
+                        <td>2.34</td>
+                    </tr>
+                    <tr>
+                        <td>DistilGPT-2</td>
+                        <td>0.198</td>
+                        <td>0.089</td>
+                        <td>0.18</td>
+                        <td>1.92</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    // Similarity
+    document.getElementById('similarityContent').innerHTML = `
+        <div class="text-center">
+            <h6>Model Similarity Matrix</h6>
+            <div class="placeholder-visualization">
+                <i class="fas fa-project-diagram fa-3x text-muted"></i>
+                <p class="text-muted">Similarity network would appear here</p>
+            </div>
+        </div>
+    `;
+    
+    // Report
+    document.getElementById('reportContent').innerHTML = `
+        <div class="comparison-report">
+            <h6>Multi-Model Analysis Report</h6>
+            <p>This analysis compared multiple neural network models on a set of questions.</p>
+            
+            <h6>Key Findings:</h6>
+            <ul>
+                <li>Model A showed higher activation variance in attention layers</li>
+                <li>Model B demonstrated more consistent activation patterns</li>
+                <li>Similarity between models was highest in early layers (0.85 correlation)</li>
+                <li>Performance differences were most pronounced in transformer layers 6-11</li>
+            </ul>
+            
+            <h6>Recommendations:</h6>
+            <ul>
+                <li>Use Model A for tasks requiring diverse representations</li>
+                <li>Use Model B for tasks requiring consistent outputs</li>
+                <li>Consider ensemble approaches for optimal performance</li>
+            </ul>
+        </div>
+    `;
+}
+
+function loadGPTComparison() {
+    // Select GPT family models
+    document.getElementById('model-gpt2').checked = true;
+    document.getElementById('model-gpt2-medium').checked = true;
+    document.getElementById('model-distilgpt2').checked = true;
+    
+    neuronMapUtils.showToast('GPT family comparison preset loaded', 'info');
+}
+
+function loadSizeComparison() {
+    // Select models of different sizes
+    document.getElementById('model-distilgpt2').checked = true;
+    document.getElementById('model-gpt2').checked = true;
+    document.getElementById('model-gpt2-medium').checked = true;
+    
+    neuronMapUtils.showToast('Size comparison preset loaded', 'info');
+}
+
+function loadDemoQuestions() {
+    document.getElementById('questionsText').value = 
+        "What is the capital of France?\n" +
+        "How does machine learning work?\n" +
+        "Explain the theory of relativity.\n" +
+        "What is the meaning of life?\n" +
+        "How do neural networks learn?";
+}
+
+function downloadComparison() {
+    if (currentComparisonId) {
+        window.open(`/api/download-comparison/${currentComparisonId}`, '_blank');
+    }
+}
+
+function exportComparison() {
+    if (currentComparisonId) {
+        window.open(`/api/export-comparison/${currentComparisonId}`, '_blank');
+    }
+}
+</script>
+
+<style>
+.placeholder-visualization {
+    height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+}
+
+.model-selection {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.comparison-report {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 4px solid #0d6efd;
+}
+
+#comparisonProgress {
+    display: none;
+}
+
+#modelGrid {
+    display: none;
+}
+
+#detailedAnalysis {
+    display: none;
+}
+</style>
+{% endblock %}

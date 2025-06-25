@@ -1,0 +1,312 @@
+"""Domain Specialists Implementation for Section 4.1"""
+
+import random
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import List, Dict, Optional, Any
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Import difficulty assessment
+try:
+    from .difficulty_analyzer import DifficultyAssessmentEngine
+except ImportError:
+    logger.warning("DifficultyAssessmentEngine not available")
+    DifficultyAssessmentEngine = None
+
+
+class DomainType(Enum):
+    """Supported domain types for question generation."""
+    PHYSICS = "physics"
+    MATHEMATICS = "mathematics" 
+    CHEMISTRY = "chemistry"
+    BIOLOGY = "biology"
+    COMPUTER_SCIENCE = "computer_science"
+    ENGINEERING = "engineering"
+    PHILOSOPHY = "philosophy"
+    HISTORY = "history"
+    LITERATURE = "literature"
+    LINGUISTICS = "linguistics"
+    ART_HISTORY = "art_history"
+    PSYCHOLOGY = "psychology"
+    SOCIOLOGY = "sociology"
+    POLITICAL_SCIENCE = "political_science"
+    ECONOMICS = "economics"
+    ANTHROPOLOGY = "anthropology"
+    MEDICINE = "medicine"
+    LAW = "law"
+    EDUCATION = "education"
+    BUSINESS = "business"
+
+
+class QuestionType(Enum):
+    """Types of domain-specific questions."""
+    CONCEPTUAL = "conceptual"
+    QUANTITATIVE = "quantitative"
+    EXPERIMENTAL = "experimental"
+    APPLICATION = "application"
+    ANALYTICAL = "analytical"
+    COMPARATIVE = "comparative"
+    HISTORICAL = "historical"
+    THEORETICAL = "theoretical"
+    PRACTICAL = "practical"
+    ETHICAL = "ethical"
+
+
+@dataclass
+class DomainVocabulary:
+    """Domain-specific vocabulary and terminology."""
+    core_terms: List[str] = field(default_factory=list)
+    technical_terms: List[str] = field(default_factory=list)
+    concepts: List[str] = field(default_factory=list)
+    methodologies: List[str] = field(default_factory=list)
+    key_figures: List[str] = field(default_factory=list)
+    subdisciplines: List[str] = field(default_factory=list)
+    
+    def get_all_terms(self) -> List[str]:
+        """Get all vocabulary terms."""
+        return (self.core_terms + self.technical_terms + self.concepts + 
+                self.methodologies + self.key_figures + self.subdisciplines)
+
+
+@dataclass
+class DomainQuestion:
+    """A domain-specific question with metadata."""
+    question: str
+    domain: DomainType
+    question_type: QuestionType
+    difficulty_level: str = "MEDIUM"
+    terminology_density: float = 0.0
+    concepts_covered: List[str] = field(default_factory=list)
+    source_content: str = ""
+
+
+@dataclass
+class DomainValidationResult:
+    """Result of domain-specific question validation."""
+    is_domain_specific: bool
+    confidence: float
+    domain_indicators: List[str] = field(default_factory=list)
+    terminology_density: float = 0.0
+    contamination_detected: bool = False
+    contaminating_domains: List[str] = field(default_factory=list)
+    quality_issues: List[str] = field(default_factory=list)
+
+
+class DomainSpecialist(ABC):
+    """Abstract base class for domain-specific question generation."""
+    
+    def __init__(self, domain: DomainType):
+        self.domain = domain
+        self.vocabulary = self._initialize_vocabulary()
+        self.question_patterns = self._initialize_question_patterns()
+        
+        # Initialize difficulty engine if available
+        if DifficultyAssessmentEngine:
+            try:
+                self.difficulty_engine = DifficultyAssessmentEngine()
+            except Exception as e:
+                logger.warning(f"Failed to initialize difficulty engine: {e}")
+                self.difficulty_engine = None
+        else:
+            self.difficulty_engine = None
+    
+    @abstractmethod
+    def _initialize_vocabulary(self) -> DomainVocabulary:
+        """Initialize domain-specific vocabulary."""
+        pass
+    
+    @abstractmethod
+    def _initialize_question_patterns(self) -> Dict[QuestionType, List[str]]:
+        """Initialize question patterns for this domain."""
+        pass
+    
+    @abstractmethod
+    def generate_domain_questions(self, source_text: str, count: int = 5,
+                                question_types: Optional[List[QuestionType]] = None) -> List[DomainQuestion]:
+        """Generate domain-specific questions."""
+        pass
+    
+    @abstractmethod
+    def validate_domain_specificity(self, question: str) -> DomainValidationResult:
+        """Validate if a question is domain-specific."""
+        pass
+    
+    def _generate_simple_questions(self, source_text: str, count: int = 5) -> List[DomainQuestion]:
+        """Generate simple domain questions using patterns."""
+        questions = []
+        available_types = list(self.question_patterns.keys())
+        
+        for i in range(min(count, 3)):
+            if available_types:
+                question_type = random.choice(available_types)
+                patterns = self.question_patterns.get(question_type, [])
+                
+                if patterns:
+                    pattern = random.choice(patterns)
+                    question_text = self._fill_simple_pattern(pattern)
+                    
+                    if question_text:
+                        difficulty_level = "MEDIUM"
+                        if self.difficulty_engine:
+                            try:
+                                difficulty_result = self.difficulty_engine.assess_difficulty(question_text)
+                                difficulty_level = difficulty_result.difficulty_level
+                            except Exception:
+                                pass
+                        
+                        terminology_density = self._calculate_terminology_density(question_text)
+                        
+                        question = DomainQuestion(
+                            question=question_text,
+                            domain=self.domain,
+                            question_type=question_type,
+                            difficulty_level=difficulty_level,
+                            terminology_density=terminology_density,
+                            concepts_covered=[f'{self.domain.value.lower()} analysis'],
+                            source_content=source_text[:100]
+                        )
+                        questions.append(question)
+        
+        return questions
+    
+    def _fill_simple_pattern(self, pattern: str) -> str:
+        """Fill a pattern with simple domain terms."""
+        replacements = {
+            '{concept}': random.choice(self.vocabulary.core_terms[:3] if self.vocabulary.core_terms else ['concept']),
+            '{method}': random.choice(self.vocabulary.methodologies[:3] if self.vocabulary.methodologies else ['method']),
+            '{term}': random.choice(self.vocabulary.technical_terms[:3] if self.vocabulary.technical_terms else ['term']),
+            '{principle}': random.choice(self.vocabulary.concepts[:3] if self.vocabulary.concepts else ['principle']),
+            '{context}': self.domain.value.lower().replace('_', ' '),
+            '{domain}': self.domain.value.lower().replace('_', ' '),
+            '{topic}': random.choice(self.vocabulary.subdisciplines[:3] if self.vocabulary.subdisciplines else ['topic']),
+            '{element}': random.choice(self.vocabulary.core_terms[:3] if self.vocabulary.core_terms else ['element']),
+            '{factor}': random.choice(self.vocabulary.technical_terms[:3] if self.vocabulary.technical_terms else ['factor']),
+            '{outcome}': random.choice(['result', 'effect', 'consequence']),
+            '{process}': random.choice(['procedure', 'approach', 'method']),
+            '{system}': random.choice(['framework', 'structure', 'system']),
+            '{aspect}': random.choice(['characteristic', 'feature', 'dimension'])
+        }
+        
+        result = pattern
+        for placeholder, replacement in replacements.items():
+            result = result.replace(placeholder, replacement)
+        
+        return result if result != pattern else None
+    
+    def _calculate_terminology_density(self, text: str) -> float:
+        """Calculate the density of domain-specific terminology."""
+        if not text:
+            return 0.0
+        
+        words = text.lower().split()
+        domain_terms = [term.lower() for term in self.vocabulary.get_all_terms()]
+        
+        term_matches = sum(1 for word in words if any(term in word for term in domain_terms))
+        return (term_matches / len(words)) if words else 0.0
+    
+    def _validate_simple_domain(self, question: str) -> DomainValidationResult:
+        """Simple domain validation."""
+        terminology_density = self._calculate_terminology_density(question)
+        is_domain_specific = terminology_density >= 0.1
+        
+        return DomainValidationResult(
+            is_domain_specific=is_domain_specific,
+            confidence=min(terminology_density * 2, 1.0),
+            domain_indicators=[f"{self.domain.value}_terms"],
+            terminology_density=terminology_density,
+            contamination_detected=False,
+            contaminating_domains=[],
+            quality_issues=[] if is_domain_specific else ["Low terminology density"]
+        )
+
+
+# Factory function to create domain specialists
+def create_domain_specialist(domain: DomainType) -> DomainSpecialist:
+    """Create a domain specialist for the given domain."""
+    class GenericSpecialist(DomainSpecialist):
+        def __init__(self, domain: DomainType):
+            super().__init__(domain)
+        
+        def _initialize_vocabulary(self) -> DomainVocabulary:
+            domain_name = self.domain.value.lower().replace('_', ' ')
+            return DomainVocabulary(
+                core_terms=['concept', 'principle', 'theory', 'method', 'analysis', 'study'],
+                technical_terms=['framework', 'methodology', 'approach', 'technique', 'process'],
+                concepts=[f'{domain_name} theory', f'{domain_name} principles', 'fundamental concepts'],
+                methodologies=['analysis', 'research', 'study', 'investigation'],
+                key_figures=['researcher', 'scholar', 'expert'],
+                subdisciplines=[f'applied {domain_name}', f'theoretical {domain_name}']
+            )
+        
+        def _initialize_question_patterns(self) -> Dict[QuestionType, List[str]]:
+            return {
+                QuestionType.CONCEPTUAL: [
+                    "Explain the concept of {concept} in {context}.",
+                    "How does {method} apply in {domain}?",
+                    "What is the significance of {term} in this field?"
+                ],
+                QuestionType.ANALYTICAL: [
+                    "Analyze the role of {factor} in {context}.",
+                    "How does {element} affect {outcome}?",
+                    "What are the implications of {principle}?"
+                ]
+            }
+        
+        def generate_domain_questions(self, source_text: str, count: int = 5,
+                                    question_types: Optional[List[QuestionType]] = None) -> List[DomainQuestion]:
+            return self._generate_simple_questions(source_text, count)
+        
+        def validate_domain_specificity(self, question: str) -> DomainValidationResult:
+            return self._validate_simple_domain(question)
+    
+    return GenericSpecialist(domain)
+
+
+# List of all available domains for validation
+AVAILABLE_DOMAINS = [
+    DomainType.PHYSICS,
+    DomainType.MATHEMATICS,
+    DomainType.PHILOSOPHY,
+    DomainType.BIOLOGY,
+    DomainType.CHEMISTRY,
+    DomainType.COMPUTER_SCIENCE,
+    DomainType.ENGINEERING,
+    DomainType.HISTORY,
+    DomainType.PSYCHOLOGY,
+    DomainType.LITERATURE,
+    DomainType.LINGUISTICS,
+    DomainType.ART_HISTORY,
+    DomainType.SOCIOLOGY,
+    DomainType.POLITICAL_SCIENCE,
+    DomainType.ECONOMICS,
+    DomainType.ANTHROPOLOGY,
+    DomainType.MEDICINE,
+    DomainType.LAW,
+    DomainType.EDUCATION,
+    DomainType.BUSINESS
+]
+
+def get_available_domains() -> List[DomainType]:
+    """Get list of all available domain types."""
+    return AVAILABLE_DOMAINS
+
+
+def is_domain_supported(domain: DomainType) -> bool:
+    """Check if a domain is supported."""
+    return domain in AVAILABLE_DOMAINS
+
+
+def generate_domain_specific_questions(domain: DomainType, source_text: str = "", 
+                                     count: int = 5) -> List[DomainQuestion]:
+    """Generate domain-specific questions using the appropriate specialist."""
+    specialist = create_domain_specialist(domain)
+    return specialist.generate_domain_questions(source_text, count)
+
+
+def validate_question_domain_specificity(question: str, domain: DomainType) -> DomainValidationResult:
+    """Validate if a question is domain-specific."""
+    specialist = create_domain_specialist(domain)
+    return specialist.validate_domain_specificity(question)

@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuronMap - Real-time Activation Viewer</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .status-item {
+            text-align: center;
+        }
+        
+        .status-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .status-label {
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .visualization-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .plot-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        
+        .info-panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        
+        .connection-status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .connected {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .disconnected {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .btn-primary {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .btn-danger {
+            background-color: #dc3545;
+            color: white;
+        }
+        
+        .btn:hover {
+            opacity: 0.8;
+        }
+        
+        select, input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .text-input {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .text-input textarea {
+            width: 100%;
+            height: 60px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            font-family: monospace;
+            resize: vertical;
+        }
+        
+        .performance-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .performance-stat {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        
+        .neuron-details {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .neuron-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .neuron-item:hover {
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧠 NeuronMap - Real-time Activation Viewer</h1>
+        <p>Live neural network activation monitoring and analysis</p>
+    </div>
+    
+    <div class="connection-status" id="connectionStatus">
+        <span id="statusText">Connecting...</span>
+    </div>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label>WebSocket URL:</label>
+            <input type="text" id="wsUrl" value="ws://localhost:8765" style="width: 200px;">
+            <button class="btn btn-primary" id="connectBtn" onclick="connectWebSocket()">Connect</button>
+            <button class="btn btn-danger" id="disconnectBtn" onclick="disconnectWebSocket()" disabled>Disconnect</button>
+        </div>
+        
+        <div class="control-group">
+            <label>Layer:</label>
+            <select id="layerSelect" onchange="changeLayer()">
+                <option value="0">Layer 0</option>
+                <option value="1">Layer 1</option>
+                <option value="2">Layer 2</option>
+                <option value="3">Layer 3</option>
+            </select>
+            
+            <label>Max Neurons:</label>
+            <select id="maxNeurons" onchange="updateMaxNeurons()">
+                <option value="100">100</option>
+                <option value="500" selected>500</option>
+                <option value="1000">1000</option>
+                <option value="5000">5000</option>
+            </select>
+        </div>
+        
+        <div class="status">
+            <div class="status-item">
+                <div class="status-value" id="fpsValue">0</div>
+                <div class="status-label">FPS</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="latencyValue">0</div>
+                <div class="status-label">Latency (ms)</div>
+            </div>
+            <div class="status-item">
+                <div class="status-value" id="neuronsValue">0</div>
+                <div class="status-label">Neurons</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="text-input">
+        <h3>Input Text</h3>
+        <textarea id="currentText" readonly placeholder="Current input text will appear here..."></textarea>
+    </div>
+    
+    <div class="visualization-container">
+        <div class="plot-container">
+            <h3>Live Activation Heatmap</h3>
+            <div id="activationPlot" style="height: 400px;"></div>
+        </div>
+        
+        <div class="info-panel">
+            <h3>Neuron Details</h3>
+            <div class="neuron-details" id="neuronDetails">
+                <p>Click on neurons in the plot to see details...</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="plot-container">
+        <h3>Activation Timeline</h3>
+        <div id="timelinePlot" style="height: 300px;"></div>
+    </div>
+    
+    <div class="plot-container">
+        <h3>Performance Statistics</h3>
+        <div class="performance-stats" id="performanceStats">
+            <!-- Performance stats will be populated here -->
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let ws = null;
+        let isConnected = false;
+        let activationBuffer = [];
+        let maxBufferSize = 1000;
+        let currentActivations = null;
+        let lastFrameTime = 0;
+        let performanceMetrics = {
+            fps: 0,
+            latency: 0,
+            neuronsCount: 0
+        };
+        
+        // WebSocket connection management
+        function connectWebSocket() {
+            const url = document.getElementById('wsUrl').value;
+            
+            try {
+                ws = new WebSocket(url);
+                
+                ws.onopen = function(event) {
+                    isConnected = true;
+                    updateConnectionStatus(true);
+                    document.getElementById('connectBtn').disabled = true;
+                    document.getElementById('disconnectBtn').disabled = false;
+                    console.log('Connected to real-time stream');
+                };
+                
+                ws.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    handleWebSocketMessage(data);
+                };
+                
+                ws.onclose = function(event) {
+                    isConnected = false;
+                    updateConnectionStatus(false);
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = true;
+                    console.log('Disconnected from stream');
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    updateConnectionStatus(false, 'Connection Error');
+                };
+                
+            } catch (error) {
+                console.error('Failed to connect:', error);
+                updateConnectionStatus(false, 'Failed to Connect');
+            }
+        }
+        
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+        
+        function updateConnectionStatus(connected, message = null) {
+            const statusElement = document.getElementById('connectionStatus');
+            const statusText = document.getElementById('statusText');
+            
+            if (connected) {
+                statusElement.className = 'connection-status connected';
+                statusText.textContent = 'Connected - Receiving live data';
+            } else {
+                statusElement.className = 'connection-status disconnected';
+                statusText.textContent = message || 'Disconnected';
+            }
+        }
+        
+        // Message handling
+        function handleWebSocketMessage(data) {
+            switch (data.type) {
+                case 'config':
+                    handleConfigMessage(data);
+                    break;
+                case 'activation_frame':
+                    handleActivationFrame(data);
+                    break;
+                case 'history_data':
+                    handleHistoryData(data);
+                    break;
+                default:
+                    console.log('Unknown message type:', data.type);
+            }
+        }
+        
+        function handleConfigMessage(data) {
+            console.log('Received configuration:', data);
+            // Update UI based on server configuration
+            if (data.max_neurons) {
+                const select = document.getElementById('maxNeurons');
+                if (!Array.from(select.options).some(option => option.value == data.max_neurons)) {
+                    const option = new Option(data.max_neurons, data.max_neurons);
+                    select.add(option);
+                }
+            }
+        }
+        
+        function handleActivationFrame(frame) {
+            // Update current text
+            document.getElementById('currentText').value = frame.input_text;
+            
+            // Process activation data
+            currentActivations = reconstructActivations(frame.activations);
+            
+            // Add to buffer
+            const frameData = {
+                timestamp: frame.timestamp,
+                activations: currentActivations,
+                frameId: frame.frame_id,
+                inputText: frame.input_text
+            };
+            
+            activationBuffer.push(frameData);
+            if (activationBuffer.length > maxBufferSize) {
+                activationBuffer.shift();
+            }
+            
+            // Update performance metrics
+            if (frame.performance_stats) {
+                updatePerformanceMetrics(frame.performance_stats);
+            }
+            
+            // Calculate client-side metrics
+            const now = Date.now();
+            if (lastFrameTime > 0) {
+                const clientFps = 1000 / (now - lastFrameTime);
+                performanceMetrics.fps = Math.round(clientFps * 10) / 10;
+            }
+            lastFrameTime = now;
+            
+            // Update visualizations
+            updateActivationPlot();
+            updateTimelinePlot();
+            updateStatusDisplay();
+            
+            // Send performance feedback to server
+            sendPerformanceFeedback();
+        }
+        
+        function handleHistoryData(data) {
+            console.log('Received history data:', data.frames.length, 'frames');
+            // Process historical data if needed
+        }
+        
+        // Activation data reconstruction
+        function reconstructActivations(activationData) {
+            if (activationData.type === 'full') {
+                return activationData.data;
+            } else if (activationData.type === 'delta') {
+                // Reconstruct from delta
+                if (currentActivations) {
+                    const reconstructed = [...currentActivations];
+                    for (let i = 0; i < activationData.indices.length; i++) {
+                        const idx = activationData.indices[i];
+                        reconstructed[idx] += activationData.values[i];
+                    }
+                    return reconstructed;
+                } else {
+                    console.warn('Received delta without base frame');
+                    return new Array(activationData.shape[0]).fill(0);
+                }
+            }
+            return [];
+        }
+        
+        // Visualization updates
+        function updateActivationPlot() {
+            if (!currentActivations || currentActivations.length === 0) return;
+            
+            const maxNeurons = parseInt(document.getElementById('maxNeurons').value);
+            const displayActivations = currentActivations.slice(0, maxNeurons);
+            
+            // Create heatmap data
+            const cols = Math.ceil(Math.sqrt(displayActivations.length));
+            const rows = Math.ceil(displayActivations.length / cols);
+            
+            const heatmapData = [];
+            for (let i = 0; i < rows; i++) {
+                const row = [];
+                for (let j = 0; j < cols; j++) {
+                    const idx = i * cols + j;
+                    row.push(idx < displayActivations.length ? displayActivations[idx] : 0);
+                }
+                heatmapData.push(row);
+            }
+            
+            const trace = {
+                z: heatmapData,
+                type: 'heatmap',
+                colorscale: 'Viridis',
+                showscale: true,
+                hovertemplate: 'Neuron: %{x},%{y}<br>Activation: %{z:.3f}<extra></extra>'
+            };
+            
+            const layout = {
+                title: 'Neural Activations',
+                xaxis: { title: 'Neuron Column' },
+                yaxis: { title: 'Neuron Row' },
+                margin: { t: 50, r: 50, b: 50, l: 50 }
+            };
+            
+            Plotly.newPlot('activationPlot', [trace], layout, {responsive: true});
+            
+            // Add click event for neuron details
+            document.getElementById('activationPlot').on('plotly_click', function(data) {
+                const point = data.points[0];
+                const neuronIdx = point.y * cols + point.x;
+                showNeuronDetails(neuronIdx, displayActivations[neuronIdx]);
+            });
+        }
+        
+        function updateTimelinePlot() {
+            if (activationBuffer.length === 0) return;
+            
+            // Get recent frames for timeline
+            const recentFrames = activationBuffer.slice(-50);
+            const timestamps = recentFrames.map(frame => new Date(frame.timestamp * 1000));
+            const avgActivations = recentFrames.map(frame => 
+                frame.activations.reduce((sum, val) => sum + val, 0) / frame.activations.length
+            );
+            const maxActivations = recentFrames.map(frame => Math.max(...frame.activations));
+            const minActivations = recentFrames.map(frame => Math.min(...frame.activations));
+            
+            const traces = [
+                {
+                    x: timestamps,
+                    y: avgActivations,
+                    name: 'Average',
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    line: { color: 'blue' }
+                },
+                {
+                    x: timestamps,
+                    y: maxActivations,
+                    name: 'Maximum',
+                    type: 'scatter',
+                    mode: 'lines',
+                    line: { color: 'red', dash: 'dot' }
+                },
+                {
+                    x: timestamps,
+                    y: minActivations,
+                    name: 'Minimum',
+                    type: 'scatter',
+                    mode: 'lines',
+                    line: { color: 'green', dash: 'dot' }
+                }
+            ];
+            
+            const layout = {
+                title: 'Activation Timeline',
+                xaxis: { title: 'Time' },
+                yaxis: { title: 'Activation Value' },
+                margin: { t: 50, r: 50, b: 50, l: 50 }
+            };
+            
+            Plotly.newPlot('timelinePlot', traces, layout, {responsive: true});
+        }
+        
+        function updateStatusDisplay() {
+            document.getElementById('fpsValue').textContent = performanceMetrics.fps;
+            document.getElementById('latencyValue').textContent = performanceMetrics.latency;
+            document.getElementById('neuronsValue').textContent = performanceMetrics.neuronsCount;
+        }
+        
+        function updatePerformanceMetrics(stats) {
+            performanceMetrics.latency = Math.round(stats.avg_processing_time * 1000);
+            performanceMetrics.neuronsCount = currentActivations ? currentActivations.length : 0;
+            
+            // Update performance stats display
+            const statsContainer = document.getElementById('performanceStats');
+            statsContainer.innerHTML = `
+                <div class="performance-stat">
+                    <div class="status-value">${stats.frames_processed}</div>
+                    <div class="status-label">Frames Processed</div>
+                </div>
+                <div class="performance-stat">
+                    <div class="status-value">${stats.current_fps.toFixed(1)}</div>
+                    <div class="status-label">Server FPS</div>
+                </div>
+                <div class="performance-stat">
+                    <div class="status-value">${stats.connected_clients}</div>
+                    <div class="status-label">Connected Clients</div>
+                </div>
+                <div class="performance-stat">
+                    <div class="status-value">${(stats.compression_ratio * 100).toFixed(1)}%</div>
+                    <div class="status-label">Compression</div>
+                </div>
+            `;
+        }
+        
+        // Control functions
+        function changeLayer() {
+            const layerIdx = document.getElementById('layerSelect').value;
+            if (ws && isConnected) {
+                ws.send(JSON.stringify({
+                    type: 'change_layer',
+                    layer_idx: parseInt(layerIdx)
+                }));
+            }
+        }
+        
+        function updateMaxNeurons() {
+            // This will take effect on the next frame
+            updateActivationPlot();
+        }
+        
+        function showNeuronDetails(neuronIdx, activation) {
+            const detailsContainer = document.getElementById('neuronDetails');
+            detailsContainer.innerHTML = `
+                <div class="neuron-item">
+                    <strong>Neuron Index:</strong> ${neuronIdx}
+                </div>
+                <div class="neuron-item">
+                    <strong>Current Activation:</strong> ${activation.toFixed(4)}
+                </div>
+                <div class="neuron-item">
+                    <strong>Activation Rank:</strong> ${getRank(activation)}
+                </div>
+                <div class="neuron-item">
+                    <strong>Recent History:</strong> ${getRecentHistory(neuronIdx)}
+                </div>
+            `;
+        }
+        
+        function getRank(activation) {
+            if (!currentActivations) return 'N/A';
+            const sorted = [...currentActivations].sort((a, b) => b - a);
+            return sorted.indexOf(activation) + 1;
+        }
+        
+        function getRecentHistory(neuronIdx) {
+            const recent = activationBuffer.slice(-10);
+            return recent.map(frame => 
+                frame.activations[neuronIdx] ? frame.activations[neuronIdx].toFixed(3) : '0'
+            ).join(', ');
+        }
+        
+        function sendPerformanceFeedback() {
+            if (ws && isConnected) {
+                ws.send(JSON.stringify({
+                    type: 'performance_update',
+                    performance: {
+                        achieved_fps: performanceMetrics.fps,
+                        network_latency: performanceMetrics.latency,
+                        client_timestamp: Date.now()
+                    }
+                }));
+            }
+        }
+        
+        // Initialize the interface
+        document.addEventListener('DOMContentLoaded', function() {
+            updateConnectionStatus(false, 'Ready to Connect');
+            
+            // Initialize empty plots
+            Plotly.newPlot('activationPlot', [], {
+                title: 'Neural Activations',
+                xaxis: { title: 'Neuron Column' },
+                yaxis: { title: 'Neuron Row' }
+            }, {responsive: true});
+            
+            Plotly.newPlot('timelinePlot', [], {
+                title: 'Activation Timeline',
+                xaxis: { title: 'Time' },
+                yaxis: { title: 'Activation Value' }
+            }, {responsive: true});
+        });
+    </script>
+</body>
+</html>

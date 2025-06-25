@@ -1,0 +1,9 @@
+{
+  "checkpoint_id": "427c045a-517c-4594-8999-23e543c5dbe0_20250625_032205",
+  "job_id": "427c045a-517c-4594-8999-23e543c5dbe0",
+  "timestamp": "2025-06-25T03:22:05.908423",
+  "progress": 60.0,
+  "completed_count": 30,
+  "failed_count": 0,
+  "pending_count": 20
+}

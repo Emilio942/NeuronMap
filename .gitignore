@@ -1,0 +1,93 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Large data files (>100MB)
+*.json.large
+*.backup
+*.json.backup
+data/outputs/**/*.json
+data/outputs/**/*.pkl
+data/outputs/**/*.csv
+data/outputs/**/*.h5
+data/outputs/**/*.hdf5
+data/outputs/**/*.parquet
+data/outputs/**/*.feather
+data/outputs/advanced_analytics/advanced_analysis_results.json.backup
+
+# Model files
+*.model
+*.pkl.large
+*.h5.large
+*.ckpt
+*.safetensors
+
+# Logs
+logs/*.log
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.pytest_cache/
+.hypothesis/
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+
+# Docker
+.dockerignore
+
+# Git LFS tracking (for future large files)
+# Use: git lfs track "*.large_extension"
