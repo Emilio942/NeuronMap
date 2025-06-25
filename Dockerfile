@@ -76,7 +76,7 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 CMD ["python", "-m", "src.main", "--help"]
 
 # GPU-enabled stage
-FROM nvidia/cuda:11.8-runtime-ubuntu20.04 as gpu
+FROM nvidia/cuda:12.9.1-runtime-ubuntu20.04 as gpu
 
 # Install Python and system dependencies
 RUN apt-get update && apt-get install -y \
