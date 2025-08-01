@@ -1,0 +1,111 @@
+{
+  "standalone_analysis": {
+    "device": "cuda",
+    "torch_available": true,
+    "total_layers": 3,
+    "timestamp": "2025-08-01T16:50:08.049668"
+  },
+  "model_info": {
+    "model_type": "TestNet",
+    "parameters": 316,
+    "device": "cuda"
+  },
+  "layer_analysis": {
+    "fc1": {
+      "groups_found": 5,
+      "groups_detail": [
+        {
+          "group_id": 0,
+          "size": 9,
+          "cohesion": -0.06322683520022737,
+          "mean_activation": 0.05838489904999733
+        },
+        {
+          "group_id": 1,
+          "size": 7,
+          "cohesion": -0.09790843310293418,
+          "mean_activation": 0.06674385070800781
+        },
+        {
+          "group_id": 2,
+          "size": 9,
+          "cohesion": -0.017458159126820676,
+          "mean_activation": -0.05381443351507187
+        },
+        {
+          "group_id": 3,
+          "size": 3,
+          "cohesion": 0.004661472478330347,
+          "mean_activation": -0.10566894710063934
+        },
+        {
+          "group_id": 4,
+          "size": 4,
+          "cohesion": 0.03388030654853814,
+          "mean_activation": 0.23313017189502716
+        }
+      ],
+      "activation_shape": [
+        80,
+        16
+      ]
+    },
+    "fc2": {
+      "groups_found": 2,
+      "groups_detail": [
+        {
+          "group_id": 0,
+          "size": 4,
+          "cohesion": 0.18342658111156349,
+          "mean_activation": -0.11487559974193573
+        },
+        {
+          "group_id": 1,
+          "size": 5,
+          "cohesion": -0.016507183159810153,
+          "mean_activation": -0.0034770453348755836
+        }
+      ],
+      "activation_shape": [
+        80,
+        8
+      ]
+    },
+    "fc3": {
+      "groups_found": 2,
+      "groups_detail": [
+        {
+          "group_id": 0,
+          "size": 2,
+          "cohesion": -0.32897386870085793,
+          "mean_activation": 0.02072925493121147
+        },
+        {
+          "group_id": 1,
+          "size": 3,
+          "cohesion": 0.7341869356942033,
+          "mean_activation": 0.27588075399398804
+        }
+      ],
+      "activation_shape": [
+        80,
+        4
+      ]
+    }
+  },
+  "learning_patterns": {
+    "total_events": 5,
+    "skill_distribution": {
+      "pattern_a": 1,
+      "pattern_b": 2,
+      "pattern_d": 2
+    },
+    "average_strength": 0.48144068121910094
+  },
+  "summary": {
+    "total_groups": 9,
+    "total_neurons_in_groups": 46,
+    "average_group_size": 5.111111111111111,
+    "analysis_complete": true
+  }
+}

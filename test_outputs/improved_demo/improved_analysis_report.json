@@ -1,0 +1,94 @@
+{
+  "improved_analysis": {
+    "timestamp": "2025-08-01T17:36:30.986546",
+    "model_info": {
+      "architecture": "test_model",
+      "parameters": 1460
+    },
+    "statistical_parameters": {
+      "min_samples_for_stats": 30,
+      "bootstrap_iterations": 1000,
+      "noise_test_iterations": 10,
+      "significance_level": 0.05
+    }
+  },
+  "layer_analysis": {
+    "0": {
+      "total_groups": 1,
+      "significant_groups": 1,
+      "stable_groups": 1,
+      "groups": [
+        {
+          "group_id": 1,
+          "neuron_indices": [
+            0,
+            3,
+            4,
+            7,
+            9,
+            10,
+            15,
+            23,
+            2,
+            20,
+            24,
+            26,
+            5,
+            11,
+            16,
+            17,
+            18,
+            13,
+            27,
+            1,
+            12,
+            22,
+            6,
+            14,
+            19,
+            28,
+            25,
+            29,
+            21,
+            8
+          ],
+          "size": 30,
+          "cohesion_score": 0.002897407626733184,
+          "p_value": 0.0,
+          "is_significant": "True",
+          "confidence_interval": [
+            -0.004077776591293513,
+            0.010056582302786407
+          ],
+          "stability_score": 0.7943795988280472,
+          "is_stable": true
+        }
+      ]
+    },
+    "2": {
+      "total_groups": 0,
+      "significant_groups": 0,
+      "stable_groups": 0,
+      "groups": []
+    }
+  },
+  "statistical_summary": {
+    "total_groups_found": 1,
+    "significant_groups": 1,
+    "stable_groups": 1,
+    "significance_rate": 1.0,
+    "stability_rate": 1.0,
+    "mean_p_value": 0.0,
+    "mean_cohesion": 0.002897407626733184,
+    "mean_stability": 0.7943795988280472,
+    "bonferroni_correction_applied": true
+  },
+  "validation_results": {
+    "random_baseline_test": {
+      "groups_found_in_random_data": 0,
+      "sample_size": 150,
+      "neuron_count": 30,
+      "passes_validation": true
+    }
+  }
+}

@@ -1,0 +1,135 @@
+{
+  "activation_extraction": {
+    "simple_linear": {
+      "success": true,
+      "layers_extracted": 3,
+      "extraction_time": 0.17049932479858398,
+      "shapes": {
+        "fc1": [
+          96,
+          20
+        ],
+        "fc2": [
+          96,
+          15
+        ],
+        "fc3": [
+          96,
+          5
+        ]
+      }
+    },
+    "conv_net": {
+      "success": true,
+      "layers_extracted": 3,
+      "extraction_time": 0.0678858757019043,
+      "shapes": {
+        "conv1": [
+          96,
+          512
+        ],
+        "fc1": [
+          96,
+          32
+        ],
+        "fc2": [
+          96,
+          10
+        ]
+      }
+    },
+    "deep_net": {
+      "success": true,
+      "layers_extracted": 3,
+      "extraction_time": 0.0013904571533203125,
+      "shapes": {
+        "network.0": [
+          96,
+          100
+        ],
+        "network.3": [
+          96,
+          80
+        ],
+        "network.6": [
+          96,
+          60
+        ]
+      }
+    }
+  },
+  "group_identification": {
+    "0.3": {
+      "num_groups": 2,
+      "total_neurons_grouped": 20,
+      "avg_group_size": 10.0,
+      "avg_cohesion": 0.9648795851199512,
+      "identification_time": 0.000518798828125
+    },
+    "0.5": {
+      "num_groups": 2,
+      "total_neurons_grouped": 20,
+      "avg_group_size": 10.0,
+      "avg_cohesion": 0.9648795851199512,
+      "identification_time": 0.0002684593200683594
+    },
+    "0.7": {
+      "num_groups": 2,
+      "total_neurons_grouped": 20,
+      "avg_group_size": 10.0,
+      "avg_cohesion": 0.9648795851199512,
+      "identification_time": 0.0002186298370361328
+    },
+    "0.9": {
+      "num_groups": 2,
+      "total_neurons_grouped": 20,
+      "avg_group_size": 10.0,
+      "avg_cohesion": 0.9648795851199512,
+      "identification_time": 0.0002181529998779297
+    }
+  },
+  "visualization_generation": {
+    "total_plots": 3,
+    "successful_plots": 3,
+    "visualization_time": 0.6226859092712402,
+    "plot_paths": [
+      "test_outputs/visualization/groups_per_layer.png",
+      "test_outputs/visualization/group_cohesion.png",
+      "test_outputs/visualization/activation_heatmap_fc1.png"
+    ]
+  },
+  "report_creation": {
+    "success": true,
+    "file_size": 1651,
+    "report_time": 0.00021219253540039062,
+    "sections_present": 3,
+    "total_sections": 3
+  },
+  "performance_metrics": {
+    "small": {
+      "total_time": 0.0005631446838378906,
+      "extract_time": 0.0004744529724121094,
+      "group_time": 4.76837158203125e-07,
+      "total_groups": 0,
+      "memory_bytes": 0,
+      "samples_per_second": 88787.12955122777
+    },
+    "medium": {
+      "total_time": 0.0019605159759521484,
+      "extract_time": 0.0018854141235351562,
+      "group_time": 9.5367431640625e-07,
+      "total_groups": 0,
+      "memory_bytes": 0,
+      "samples_per_second": 102013.96084154202
+    },
+    "large": {
+      "total_time": 0.002614259719848633,
+      "extract_time": 0.0025148391723632812,
+      "group_time": 4.76837158203125e-07,
+      "total_groups": 0,
+      "memory_bytes": 0,
+      "samples_per_second": 191258.73233014136
+    }
+  },
+  "errors": []
+}

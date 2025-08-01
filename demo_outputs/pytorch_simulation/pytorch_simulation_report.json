@@ -1,0 +1,212 @@
+{
+  "simulation_info": {
+    "type": "PyTorch Neuron Group Simulation",
+    "purpose": "Demonstrate PyTorch integration concepts",
+    "timestamp": "2025-08-01T16:32:57.462718"
+  },
+  "layer_analysis": {
+    "fc1": {
+      "total_groups": 4,
+      "total_neurons_in_groups": 48,
+      "average_group_size": 12.0,
+      "average_cohesion": 0.9421063718237885,
+      "groups_detail": [
+        {
+          "group_id": 0,
+          "layer_name": "fc1",
+          "neuron_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11
+          ],
+          "group_size": 12,
+          "cohesion_score": 0.9465238590548135,
+          "mean_activation": 0.5089990550861057
+        },
+        {
+          "group_id": 1,
+          "layer_name": "fc1",
+          "neuron_indices": [
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23
+          ],
+          "group_size": 12,
+          "cohesion_score": 0.9445503269906667,
+          "mean_activation": 0.5642892178429498
+        },
+        {
+          "group_id": 2,
+          "layer_name": "fc1",
+          "neuron_indices": [
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35
+          ],
+          "group_size": 12,
+          "cohesion_score": 0.9387007374035903,
+          "mean_activation": 0.42072104206652733
+        },
+        {
+          "group_id": 3,
+          "layer_name": "fc1",
+          "neuron_indices": [
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47
+          ],
+          "group_size": 12,
+          "cohesion_score": 0.9386505638460837,
+          "mean_activation": 0.6073047619591825
+        }
+      ]
+    },
+    "fc2": {
+      "total_groups": 3,
+      "total_neurons_in_groups": 48,
+      "average_group_size": 16.0,
+      "average_cohesion": 0.9425972234038699,
+      "groups_detail": [
+        {
+          "group_id": 0,
+          "layer_name": "fc2",
+          "neuron_indices": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15
+          ],
+          "group_size": 16,
+          "cohesion_score": 0.944299352838745,
+          "mean_activation": 0.5716224938666877
+        },
+        {
+          "group_id": 1,
+          "layer_name": "fc2",
+          "neuron_indices": [
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31
+          ],
+          "group_size": 16,
+          "cohesion_score": 0.9339667274838519,
+          "mean_activation": 0.501379447855335
+        },
+        {
+          "group_id": 2,
+          "layer_name": "fc2",
+          "neuron_indices": [
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47
+          ],
+          "group_size": 16,
+          "cohesion_score": 0.9495255898890126,
+          "mean_activation": 0.4075735595185966
+        }
+      ]
+    },
+    "fc3": {
+      "total_groups": 0,
+      "total_neurons_in_groups": 0,
+      "average_group_size": 0,
+      "average_cohesion": 0,
+      "groups_detail": []
+    }
+  },
+  "learning_patterns": {
+    "total_events": 20,
+    "skill_distribution": {
+      "logical": 5,
+      "mathematical": 1,
+      "memory": 9,
+      "linguistic": 5
+    },
+    "average_strength": 0.7452867135454999,
+    "temporal_span": [
+      0,
+      190
+    ]
+  },
+  "summary": {
+    "total_layers": 3,
+    "total_groups": 7,
+    "total_learning_events": 20,
+    "device_used": "cpu",
+    "analysis_complete": true
+  }
+}

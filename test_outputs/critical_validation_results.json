@@ -1,0 +1,425 @@
+{
+  "random_data_test": {
+    "groups_found_by_threshold": {
+      "0.1": 13,
+      "0.3": 0,
+      "0.5": 0,
+      "0.7": 0,
+      "0.9": 0
+    },
+    "total_groups_random": 13,
+    "correlation_significance": {
+      "t_statistic": -0.18712558342233435,
+      "p_value": 0.8515931817633092,
+      "mean_correlation": -0.0003852789814118296,
+      "std_correlation": 0.072062648832798
+    }
+  },
+  "noise_sensitivity": [
+    {
+      "noise_level": 0.1,
+      "groups_found": 2,
+      "avg_group_size": 10.0,
+      "avg_cohesion": 0.9926742288362816
+    },
+    {
+      "noise_level": 0.5,
+      "groups_found": 2,
+      "avg_group_size": 10.0,
+      "avg_cohesion": 0.850488036075865
+    },
+    {
+      "noise_level": 1.0,
+      "groups_found": 2,
+      "avg_group_size": 10.0,
+      "avg_cohesion": 0.6281987506794164
+    },
+    {
+      "noise_level": 2.0,
+      "groups_found": 2,
+      "avg_group_size": 7.0,
+      "avg_cohesion": 0.3967634661187954
+    },
+    {
+      "noise_level": 5.0,
+      "groups_found": 0,
+      "avg_group_size": 0,
+      "avg_cohesion": 0
+    }
+  ],
+  "stability_test": {
+    "group_counts": [
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2,
+      2
+    ],
+    "count_std": 0.0,
+    "avg_consistency": 1.0,
+    "runs_detail": [
+      {
+        "run": 0,
+        "num_groups": 2,
+        "group_sizes": [
+          10,
+          10
+        ],
+        "group_neurons": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ]
+        ]
+      },
+      {
+        "run": 1,
+        "num_groups": 2,
+        "group_sizes": [
+          10,
+          10
+        ],
+        "group_neurons": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ]
+        ]
+      },
+      {
+        "run": 2,
+        "num_groups": 2,
+        "group_sizes": [
+          10,
+          10
+        ],
+        "group_neurons": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ]
+        ]
+      },
+      {
+        "run": 3,
+        "num_groups": 2,
+        "group_sizes": [
+          10,
+          10
+        ],
+        "group_neurons": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ]
+        ]
+      },
+      {
+        "run": 4,
+        "num_groups": 2,
+        "group_sizes": [
+          10,
+          10
+        ],
+        "group_neurons": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ]
+        ]
+      },
+      {
+        "run": 5,
+        "num_groups": 2,
+        "group_sizes": [
+          10,
+          10
+        ],
+        "group_neurons": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ]
+        ]
+      },
+      {
+        "run": 6,
+        "num_groups": 2,
+        "group_sizes": [
+          10,
+          10
+        ],
+        "group_neurons": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ]
+        ]
+      },
+      {
+        "run": 7,
+        "num_groups": 2,
+        "group_sizes": [
+          10,
+          10
+        ],
+        "group_neurons": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ]
+        ]
+      },
+      {
+        "run": 8,
+        "num_groups": 2,
+        "group_sizes": [
+          10,
+          10
+        ],
+        "group_neurons": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ]
+        ]
+      },
+      {
+        "run": 9,
+        "num_groups": 2,
+        "group_sizes": [
+          10,
+          10
+        ],
+        "group_neurons": [
+          [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          [
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19
+          ]
+        ]
+      }
+    ]
+  },
+  "baseline_comparison": {
+    "our_ari": 1.0,
+    "random_ari": -0.07587476979742173,
+    "kmeans_ari": 1.0,
+    "our_groups": 3,
+    "improvement_over_random": 1.0758747697974218,
+    "vs_kmeans": 0.0
+  },
+  "statistical_significance": {
+    "total_pairs": 190,
+    "significant_pairs_uncorrected": 28,
+    "significant_pairs_bonferroni": 20,
+    "bonferroni_threshold": 0.0002631578947368421,
+    "groups_found": 2,
+    "mean_p_value": 0.4284923628352358,
+    "min_p_value": 0.0
+  }
+}

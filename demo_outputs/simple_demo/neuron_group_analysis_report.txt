@@ -1,0 +1,46 @@
+Neuron Group Analysis Report
+==================================================
+
+SUMMARY
+--------------------
+Total Neurons: 30
+Total Samples: 50
+Identified Groups: 3
+Learning Events: 30
+Analysis Time: 2025-08-01T15:32:21.787462
+
+NEURON GROUPS
+--------------------
+Group 0:
+  Neurons: 25
+  Cohesion: -0.013
+  Mean Activation: 0.381
+  Activation Variance: 0.073
+
+Group 1:
+  Neurons: 16
+  Cohesion: 0.144
+  Mean Activation: 0.364
+  Activation Variance: 0.064
+
+Group 2:
+  Neurons: 12
+  Cohesion: 0.361
+  Mean Activation: 0.348
+  Activation Variance: 0.053
+
+LEARNING PATTERNS
+--------------------
+Total Learning Events: 30
+Average Learning Strength: 0.532
+Skill Distribution:
+  logic: 16
+  language: 14
+
+STATISTICS
+--------------------
+Neurons in Groups: 30
+Ungrouped Neurons: 0
+Grouping Efficiency: 100.00%
+Average Group Size: 17.7
+Average Group Cohesion: 0.164

@@ -1,0 +1,75 @@
+{
+  "standalone_analysis": {
+    "device": "cuda",
+    "torch_available": true,
+    "total_layers": 2,
+    "timestamp": "2025-08-01T16:56:31.362597"
+  },
+  "model_info": {
+    "test": true,
+    "parameters": 1000
+  },
+  "layer_analysis": {
+    "fc1": {
+      "groups_found": 3,
+      "groups_detail": [
+        {
+          "group_id": 0,
+          "size": 10,
+          "cohesion": 0.012313827944457552,
+          "mean_activation": 0.030553270131349564
+        },
+        {
+          "group_id": 1,
+          "size": 14,
+          "cohesion": 0.01787311394354061,
+          "mean_activation": 0.0043438938446342945
+        },
+        {
+          "group_id": 2,
+          "size": 10,
+          "cohesion": -0.0634661722009445,
+          "mean_activation": -0.04620399326086044
+        }
+      ],
+      "activation_shape": [
+        64,
+        20
+      ]
+    },
+    "fc2": {
+      "groups_found": 3,
+      "groups_detail": [
+        {
+          "group_id": 0,
+          "size": 7,
+          "cohesion": -0.05322043856996342,
+          "mean_activation": 0.013210260309278965
+        },
+        {
+          "group_id": 1,
+          "size": 11,
+          "cohesion": -0.06887103471581,
+          "mean_activation": -0.020149847492575645
+        },
+        {
+          "group_id": 2,
+          "size": 5,
+          "cohesion": -0.18683507819165104,
+          "mean_activation": -0.07485412061214447
+        }
+      ],
+      "activation_shape": [
+        64,
+        15
+      ]
+    }
+  },
+  "learning_patterns": {},
+  "summary": {
+    "total_groups": 6,
+    "total_neurons_in_groups": 57,
+    "average_group_size": 9.5,
+    "analysis_complete": true
+  }
+}

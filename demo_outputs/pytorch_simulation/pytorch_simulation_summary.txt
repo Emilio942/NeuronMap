@@ -1,0 +1,38 @@
+PyTorch Neuron Group Simulation Report
+==================================================
+
+SIMULATION OVERVIEW
+--------------------
+Total Layers: 3
+Total Groups: 7
+Learning Events: 20
+
+LAYER ANALYSIS
+--------------------
+fc1:
+  Groups: 4
+  Neurons in Groups: 48
+  Avg Group Size: 12.0
+  Avg Cohesion: 0.942
+
+fc2:
+  Groups: 3
+  Neurons in Groups: 48
+  Avg Group Size: 16.0
+  Avg Cohesion: 0.943
+
+fc3:
+  Groups: 0
+  Neurons in Groups: 0
+  Avg Group Size: 0.0
+  Avg Cohesion: 0.000
+
+LEARNING PATTERNS
+--------------------
+Total Events: 20
+Average Strength: 0.745
+Skill Distribution:
+  logical: 5
+  mathematical: 1
+  memory: 9
+  linguistic: 5
