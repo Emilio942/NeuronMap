@@ -1,0 +1,228 @@
+# NeuronMap Tools Registry
+# Standardisierte Interface-Definition für alle neuen Interpretability-Tools
+
+version: "1.0"
+registry_created: "2025-08-02"
+description: "Registry for interpretability tools and analysis plugins"
+
+# Security settings
+security:
+  allowed_tools:
+    - "integrated_gradients"
+    - "deep_shap"
+    - "llm_auto_labeling"
+    - "ace_concepts"
+    - "tcav_concepts"
+    - "tcav_plus_comparator"
+    - "neuron_coverage"
+    - "surprise_coverage"
+    - "wasserstein_distance"
+    - "emd_clusters"
+    - "transformerlens_adapter"
+    - "residual_stream_comparison"
+  blocked_prompts:
+    - "irrelevant"
+    - "not_needed"
+    - "future_work"
+    - "deferred"
+
+# Tool Categories
+categories:
+  interpretability:
+    description: "Attribution and interpretability methods"
+    tools:
+      integrated_gradients:
+        module: "src.analysis.interpretability.ig_explainer"
+        class: "IntegratedGradientsExplainer"
+        description: "Integrated Gradients attribution method with PyTorch compatibility"
+        version: "1.0.0"
+        dependencies: ["torch", "numpy", "captum"]
+        inputs: ["model", "input_tensor", "target_layer"]
+        outputs: ["attribution_scores", "baseline_scores"]
+        test_config:
+          model: "gpt2"
+          test_input: "random_tensor"
+          validate_output: true
+        
+      deep_shap:
+        module: "src.analysis.interpretability.shap_explainer"
+        class: "DeepSHAPExplainer"
+        description: "DeepSHAP explainer for model-agnostic interpretability"
+        version: "1.0.0"
+        dependencies: ["shap", "torch", "numpy"]
+        inputs: ["model", "background_data", "test_data"]
+        outputs: ["shap_values", "expected_values"]
+        test_config:
+          model: "bert"
+          test_input: "sample_text"
+          validate_output: true
+
+      llm_auto_labeling:
+        module: "src.analysis.interpretability.semantic_labeling"
+        class: "SemanticLabeler"
+        description: "LLM-based automatic semantic labeling of neuron clusters"
+        version: "1.0.0"
+        dependencies: ["openai", "transformers", "sklearn"]
+        inputs: ["cluster_activations", "cluster_metadata"]
+        outputs: ["semantic_labels", "confidence_scores"]
+        test_config:
+          clusters: "synthetic_clusters"
+          validate_output: true
+
+  concept_analysis:
+    description: "Concept extraction and analysis methods"
+    tools:
+      ace_concepts:
+        module: "src.analysis.concepts.ace_extractor"
+        class: "ACEConceptExtractor"
+        description: "Automated Concept Extraction with TF-IDF and CNN kernels"
+        version: "1.0.0"
+        dependencies: ["sklearn", "torch", "scipy"]
+        inputs: ["model", "dataset", "layer_name"]
+        outputs: ["concepts", "concept_scores", "concept_examples"]
+        test_config:
+          model: "resnet"
+          test_concepts: 10
+          validate_output: true
+
+      tcav_concepts:
+        module: "src.analysis.concepts.tcav_comparator"
+        class: "TCAVComparator"
+        description: "Testing with Concept Activation Vectors and concept comparison"
+        version: "1.0.0"
+        dependencies: ["sklearn", "torch", "numpy"]
+        inputs: ["model", "concepts", "test_inputs"]
+        outputs: ["tcav_scores", "concept_importance"]
+        test_config:
+          concepts: ["concept_a", "concept_b"]
+          validate_output: true
+
+      tcav_plus_comparator:
+        module: "src.analysis.concepts.tcav_plus_comparator"
+        class: "TCAVPlusComparator"
+        description: "Advanced TCAV++ concept comparison with CKA and cosine similarity"
+        version: "1.0.0"
+        dependencies: ["sklearn", "torch", "numpy", "scipy"]
+        inputs: ["model", "layers", "concept_data"]
+        outputs: ["similarity_metrics", "compatibility_score", "tcav_scores"]
+        test_config:
+          concepts: ["concept_x", "concept_y"]
+          validate_output: true
+
+  testing_coverage:
+    description: "Model testing and coverage analysis"
+    tools:
+      neuron_coverage:
+        module: "src.analysis.testing.coverage_tracker"
+        class: "NeuronCoverageTracker"
+        description: "Track active neurons per layer per input for coverage analysis"
+        version: "1.0.0"
+        dependencies: ["torch", "numpy", "pandas"]
+        inputs: ["model", "inputs", "layer_names"]
+        outputs: ["coverage_matrix", "active_neurons", "coverage_stats"]
+        test_config:
+          model: "gpt2"
+          inputs: "sample_inputs"
+          validate_output: true
+
+      surprise_coverage:
+        module: "src.analysis.testing.surprise_tracker"
+        class: "SurpriseCoverageTracker"
+        description: "Compare activations to baseline distribution for surprise detection"
+        version: "1.0.0"
+        dependencies: ["torch", "numpy", "scipy"]
+        inputs: ["model", "baseline_distribution", "test_inputs"]
+        outputs: ["surprise_scores", "distribution_comparison"]
+        test_config:
+          baseline: "stored_distribution"
+          validate_output: true
+
+  metrics_comparison:
+    description: "Advanced metrics for model comparison"
+    tools:
+      wasserstein_distance:
+        module: "src.analysis.metrics.wasserstein_comparator"
+        class: "WassersteinComparator"
+        description: "Wasserstein distance for comparing activation distributions"
+        version: "1.0.0"
+        dependencies: ["scipy", "numpy", "ot"]
+        inputs: ["distribution_a", "distribution_b"]
+        outputs: ["wasserstein_distance", "optimal_transport_plan"]
+        test_config:
+          distributions: "synthetic_distributions"
+          validate_output: true
+
+      emd_clusters:
+        module: "src.analysis.metrics.emd_heatmap"
+        class: "EMDHeatmapComparator"
+        description: "Earth Mover's Distance for cluster comparison with optional heatmap"
+        version: "1.0.0"
+        dependencies: ["scipy", "numpy", "matplotlib", "seaborn"]
+        inputs: ["cluster_map_a", "cluster_map_b"]
+        outputs: ["emd_matrix", "heatmap_path"]
+        test_config:
+          clusters: "synthetic_clusters"
+          validate_output: true
+
+  mechanistic_analysis:
+    description: "Mechanistic interpretability tools"
+    tools:
+      transformerlens_adapter:
+        module: "src.analysis.mechanistic.transformerlens_adapter"
+        class: "TransformerLensAdapter"
+        description: "Adapter for TransformerLens models with advanced neuron hooking"
+        version: "1.0.0"
+        dependencies: ["transformer_lens", "torch", "einops"]
+        inputs: ["model_name", "hook_points"]
+        outputs: ["hooked_model", "activation_cache"]
+        test_config:
+          model: "gpt2_small"
+          validate_output: true
+
+      residual_stream_comparison:
+        module: "src.analysis.mechanistic.residual_analyzer"
+        class: "ResidualStreamComparator"
+        description: "Enhanced residual stream analysis combining TL and NeuronMap data"
+        version: "1.0.0"
+        dependencies: ["torch", "numpy", "transformer_lens"]
+        inputs: ["neuronmap_data", "transformerlens_data"]
+        outputs: ["comparison_results", "stream_analysis"]
+        test_config:
+          data_sources: ["neuronmap", "transformerlens"]
+          validate_output: true
+
+# Validation settings
+validation:
+  required_methods:
+    - "initialize"
+    - "execute"
+    - "validate_output"
+  required_attributes:
+    - "tool_id"
+    - "version"
+    - "description"
+  test_modes:
+    - "unit_test"
+    - "integration_test"
+    - "performance_test"
+
+# CLI integration
+cli_integration:
+  command_prefix: "neuronmap"
+  subcommands:
+    - "interpret"
+    - "concepts"
+    - "test-coverage"
+    - "metrics"
+    - "mechanistic"
+  test_mode_flag: "--test-mode"
+  output_validation: true
+
+# API endpoints
+api_endpoints:
+  base_url: "/api/v1/tools"
+  endpoints:
+    list_tools: "/list"
+    tool_info: "/info/{tool_id}"
+    execute_tool: "/execute/{tool_id}"
+    validate_tool: "/validate/{tool_id}"
