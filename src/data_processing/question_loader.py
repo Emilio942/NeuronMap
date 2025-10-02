@@ -37,7 +37,9 @@ class QuestionLoader:
             elif self.input_file.suffix.lower() == '.txt':
                 return self._load_txt()
             else:
-                logger.warning(f"Unknown file format {self.input_file.suffix}. Trying as text file.")
+                logger.warning(
+                    f"Unknown file format {
+                        self.input_file.suffix}. Trying as text file.")
                 return self._load_txt()
 
         except Exception as e:
@@ -59,17 +61,20 @@ class QuestionLoader:
                     if isinstance(data, dict):
                         # Try common question field names
                         question = (data.get('question') or
-                                  data.get('text') or
-                                  data.get('prompt') or
-                                  data.get('input'))
+                                    data.get('text') or
+                                    data.get('prompt') or
+                                    data.get('input'))
                         if question:
                             questions.append(str(question))
                         else:
-                            logger.warning(f"Line {line_num}: No question field found in JSON object")
+                            logger.warning(
+                                f"Line {line_num}: No question field found in JSON object")
                     elif isinstance(data, str):
                         questions.append(data)
                     else:
-                        logger.warning(f"Line {line_num}: Unexpected data type {type(data)}")
+                        logger.warning(
+                            f"Line {line_num}: Unexpected data type {
+                                type(data)}")
 
                 except json.JSONDecodeError as e:
                     logger.warning(f"Line {line_num}: Failed to parse JSON: {e}")
@@ -90,9 +95,9 @@ class QuestionLoader:
                     questions.append(item)
                 elif isinstance(item, dict):
                     question = (item.get('question') or
-                              item.get('text') or
-                              item.get('prompt') or
-                              item.get('input'))
+                                item.get('text') or
+                                item.get('prompt') or
+                                item.get('input'))
                     if question:
                         questions.append(str(question))
         elif isinstance(data, dict):
@@ -101,9 +106,9 @@ class QuestionLoader:
                 questions = [str(q) for q in data['questions'] if q]
             else:
                 question = (data.get('question') or
-                          data.get('text') or
-                          data.get('prompt') or
-                          data.get('input'))
+                            data.get('text') or
+                            data.get('prompt') or
+                            data.get('input'))
                 if question:
                     questions.append(str(question))
 
@@ -130,7 +135,9 @@ class QuestionLoader:
 
         questions = df[question_col].dropna().astype(str).tolist()
 
-        logger.info(f"Loaded {len(questions)} questions from CSV file (column: {question_col})")
+        logger.info(
+            f"Loaded {
+                len(questions)} questions from CSV file (column: {question_col})")
         return questions
 
     def _load_txt(self) -> List[str]:
@@ -148,23 +155,34 @@ class QuestionLoader:
         for i, question in enumerate(questions):
             # Basic validation
             if not question or not question.strip():
-                logger.warning(f"Question {i+1}: Empty question, skipping")
+                logger.warning(f"Question {i + 1}: Empty question, skipping")
                 continue
 
             # Length check
             if len(question.strip()) < 3:
-                logger.warning(f"Question {i+1}: Too short ({len(question)} chars), skipping")
+                logger.warning(
+                    f"Question {
+                        i +
+                        1}: Too short ({
+                        len(question)} chars), skipping")
                 continue
 
             # Max length check (to prevent memory issues)
             max_length = getattr(self.config.model, 'max_length', 512)
             if len(question) > max_length * 4:  # Rough estimate for token limit
-                logger.warning(f"Question {i+1}: Too long ({len(question)} chars), truncating")
+                logger.warning(
+                    f"Question {
+                        i +
+                        1}: Too long ({
+                        len(question)} chars), truncating")
                 question = question[:max_length * 4]
 
             valid_questions.append(question.strip())
 
-        logger.info(f"Validated {len(valid_questions)} out of {len(questions)} questions")
+        logger.info(
+            f"Validated {
+                len(valid_questions)} out of {
+                len(questions)} questions")
         return valid_questions
 
     def save_sample_questions(self, output_path: str = None) -> None:

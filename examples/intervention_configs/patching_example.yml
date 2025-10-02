@@ -1,0 +1,72 @@
+# Example Path Patching Experiment Configuration
+# This demonstrates path patching for causal analysis
+
+experiment_name: "gpt2_factual_recall_patching"
+description: "Analyze causal pathways in GPT-2's factual recall using path patching"
+
+# Model configuration
+model:
+  name: "gpt2"
+  device: "auto"
+  precision: "float32"
+  max_length: 256
+
+# Input configuration - CRITICAL: Both clean and corrupted prompts required for patching
+inputs:
+  clean_prompts:
+    - "The capital of France is Paris"
+    - "The largest planet is Jupiter"
+    - "Einstein developed the theory of relativity"
+  corrupted_prompts:
+    - "The capital of Germany is Paris"  # Wrong country
+    - "The smallest planet is Jupiter"   # Wrong superlative
+    - "Newton developed the theory of relativity"  # Wrong scientist
+
+# Patching targets - these layers will be patched with clean activations
+patch_targets:
+  - layer_selection:
+      names: ["transformer.h.6.attn"]  # Early attention layer
+    intervention_type: "patching"
+    
+  - layer_selection:
+      names: ["transformer.h.8.mlp"]   # Mid-layer MLP
+    intervention_type: "patching"
+    
+  - layer_selection:
+      names: ["transformer.h.10.attn"] # Late attention layer
+    intervention_type: "patching"
+
+# Analysis configuration
+analysis:
+  metrics: ["logit_diff", "probability"]
+  baseline_comparison: true
+  statistical_tests: true
+  confidence_level: 0.95
+  effect_size_threshold: 0.2
+
+# Cache configuration
+cache:
+  enabled: true
+  max_memory_gb: 3.0
+  experiment_id: "factual_recall_patching"
+  auto_cleanup: false  # Keep cache for analysis
+
+# Output configuration
+output:
+  output_dir: "./outputs/factual_recall_patching"
+  save_activations: true   # Important for patching analysis
+  save_detailed_results: true
+  plot_results: true
+  export_format: ["json", "yaml"]
+
+# Path patching specific configuration
+clean_cache_key: "clean_activations_v1"
+patch_order: ["transformer.h.6.attn", "transformer.h.8.mlp", "transformer.h.10.attn"]
+
+# Metadata
+created_by: "neuronmap_researcher"
+tags:
+  model_family: "gpt2"
+  experiment_type: "causal_analysis"
+  research_question: "factual_recall_mechanisms"
+  difficulty: "intermediate"

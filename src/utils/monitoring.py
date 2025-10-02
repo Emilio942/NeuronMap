@@ -322,6 +322,117 @@ class HealthChecker:
         self.last_check_results['ollama'] = result
         return result
 
+
+class PerformanceMonitor:
+    """Lightweight performance timing helper."""
+
+    class _TimingContext:
+        def __init__(self, monitor: "PerformanceMonitor", name: str):
+            self._monitor = monitor
+            self._name = name
+            self._start: float | None = None
+
+        def __enter__(self):
+            self._start = time.perf_counter()
+            return self
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            end = time.perf_counter()
+            duration = end - (self._start or end)
+            self._monitor._record_duration(self._name, duration)
+            # Never suppress exceptions
+            return False
+
+    def __init__(self):
+        self._metrics: Dict[str, Dict[str, float]] = {}
+
+    def time_operation(self, name: str) -> "PerformanceMonitor._TimingContext":
+        """Return a context manager for measuring an operation."""
+        return PerformanceMonitor._TimingContext(self, name)
+
+    def _record_duration(self, name: str, duration: float):
+        data = self._metrics.setdefault(name, {
+            'count': 0,
+            'total_duration': 0.0,
+            'average_duration': 0.0,
+            'last_duration': 0.0,
+            'duration': 0.0
+        })
+        data['count'] += 1
+        data['total_duration'] += duration
+        data['last_duration'] = duration
+        data['duration'] = duration
+        data['average_duration'] = data['total_duration'] / data['count']
+
+    def get_metrics(self) -> Dict[str, Dict[str, float]]:
+        """Return aggregated timing metrics."""
+        return {name: dict(values) for name, values in self._metrics.items()}
+
+    def reset(self):
+        """Clear recorded metrics."""
+        self._metrics.clear()
+
+
+class ResourceMonitor:
+    """Monitor system resource usage for the current process."""
+
+    def __init__(self):
+        try:
+            self._process = psutil.Process()
+        except Exception:
+            self._process = None
+        self._peak_memory_mb = 0.0
+
+    def get_memory_usage(self) -> Dict[str, float]:
+        """Return current and peak resident memory in MB."""
+        if self._process is None:
+            return {
+                'current_mb': 0.0,
+                'peak_mb': self._peak_memory_mb
+            }
+
+        mem_info = self._process.memory_info()
+        current_mb = mem_info.rss / 1024 / 1024
+        self._peak_memory_mb = max(self._peak_memory_mb, current_mb)
+        return {
+            'current_mb': current_mb,
+            'peak_mb': self._peak_memory_mb
+        }
+
+    def get_gpu_usage(self) -> Dict[str, float]:
+        """Return basic GPU utilisation stats if CUDA is available."""
+        if not torch.cuda.is_available():
+            return {}
+
+        usage: Dict[str, float] = {
+            'gpu_memory_mb': torch.cuda.memory_allocated() / 1024 / 1024,
+            'gpu_memory_reserved_mb': torch.cuda.memory_reserved() / 1024 / 1024
+        }
+
+        try:
+            total_memory = torch.cuda.get_device_properties(0).total_memory / 1024 / 1024
+            usage['gpu_memory_total_mb'] = total_memory
+        except Exception:
+            pass
+
+        try:
+            import pynvml
+
+            pynvml.nvmlInit()
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+            usage['gpu_utilization'] = float(util.gpu)
+            pynvml.nvmlShutdown()
+        except Exception:
+            # Best effort only
+            pass
+
+        return usage
+
+    def reset(self):
+        """Reset tracked peak metrics."""
+        self._peak_memory_mb = 0.0
+
     def check_model_availability(self, model_name: str,
                                 host: str = "http://localhost:11434") -> Dict[str, Any]:
         """Check if a specific model is available in Ollama.

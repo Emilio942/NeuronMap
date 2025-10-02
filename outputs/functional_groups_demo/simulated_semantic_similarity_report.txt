@@ -1,0 +1,73 @@
+
+FUNCTIONAL GROUPS ANALYSIS REPORT
+=================================
+
+Task Type: semantic_similarity
+Analysis Date: 2025-07-29 11:24:13
+Groups Discovered: 7
+
+SUMMARY STATISTICS:
+------------------
+Total groups: 7
+Average group size: 15.6 neurons
+Average confidence: 0.665
+High-confidence groups (>0.8): 1
+
+DETAILED GROUP ANALYSIS:
+-----------------------
+
+Group 1:
+  Neurons: 8 neurons
+  Confidence: 0.863
+  Coherence: 0.906
+  Function: semantic_relations
+  Specificity: 0.815
+  
+
+Group 2:
+  Neurons: 9 neurons
+  Confidence: 0.635
+  Coherence: 0.497
+  Function: meaning_comparison
+  Specificity: 0.554
+  
+
+Group 3:
+  Neurons: 14 neurons
+  Confidence: 0.544
+  Coherence: 0.795
+  Function: word_embeddings
+  Specificity: 0.309
+  
+
+Group 4:
+  Neurons: 24 neurons
+  Confidence: 0.707
+  Coherence: 0.731
+  Function: semantic_relations
+  Specificity: 0.419
+  
+
+Group 5:
+  Neurons: 16 neurons
+  Confidence: 0.600
+  Coherence: 0.510
+  Function: meaning_comparison
+  Specificity: 0.893
+  
+
+Group 6:
+  Neurons: 17 neurons
+  Confidence: 0.580
+  Coherence: 0.974
+  Function: word_embeddings
+  Specificity: 0.338
+  
+
+Group 7:
+  Neurons: 21 neurons
+  Confidence: 0.728
+  Coherence: 0.673
+  Function: word_embeddings
+  Specificity: 0.778
+  

@@ -10,14 +10,12 @@ This module implements analysis methods tailored for specific domains:
 import logging
 import numpy as np
 import torch
-import torch.nn.functional as F
-from typing import Dict, List, Tuple, Optional, Union, Any
+from typing import Dict, List, Tuple, Optional, Any
 from pathlib import Path
 import json
 import re
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-import ast
 import keyword
 from collections import defaultdict, Counter
 
@@ -76,7 +74,7 @@ class DomainAnalyzer(ABC):
 
     @abstractmethod
     def analyze(self, inputs: List[str], model, tokenizer,
-               target_layers: Optional[List[str]] = None) -> List[Any]:
+                target_layers: Optional[List[str]] = None) -> List[Any]:
         """Perform domain-specific analysis."""
         pass
 
@@ -101,7 +99,7 @@ class CodeUnderstandingAnalyzer(DomainAnalyzer):
         }
 
     def analyze(self, code_snippets: List[str], model, tokenizer,
-               target_layers: Optional[List[str]] = None) -> List[CodeAnalysisResult]:
+                target_layers: Optional[List[str]] = None) -> List[CodeAnalysisResult]:
         """
         Analyze code understanding in neural models.
 
@@ -125,7 +123,8 @@ class CodeUnderstandingAnalyzer(DomainAnalyzer):
                 complexity = self._calculate_complexity(code)
 
                 # Get model activations
-                activations = self._get_code_activations(code, model, tokenizer, target_layers)
+                activations = self._get_code_activations(
+                    code, model, tokenizer, target_layers)
 
                 # Calculate understanding score
                 understanding_score = self._calculate_understanding_score(
@@ -156,7 +155,7 @@ class CodeUnderstandingAnalyzer(DomainAnalyzer):
             if isinstance(matches[0], tuple) if matches else False:
                 # Handle tuples from groups
                 elements[pattern_name] = [match[0] if match[0] else match[1]
-                                        for match in matches if any(match)]
+                                          for match in matches if any(match)]
             else:
                 elements[pattern_name] = matches
 
@@ -217,7 +216,7 @@ class CodeUnderstandingAnalyzer(DomainAnalyzer):
         return comment_lines / max(total_lines, 1)
 
     def _get_code_activations(self, code: str, model, tokenizer,
-                            target_layers: Optional[List[str]]) -> Dict[str, np.ndarray]:
+                              target_layers: Optional[List[str]]) -> Dict[str, np.ndarray]:
         """Get model activations for code snippet."""
         try:
             # Tokenize code
@@ -235,7 +234,8 @@ class CodeUnderstandingAnalyzer(DomainAnalyzer):
                     if target_layers is None or layer_name in target_layers:
                         # Average over sequence length
                         activation = hidden_state.mean(dim=1).cpu().numpy()
-                        activations[layer_name] = activation[0]  # Remove batch dimension
+                        # Remove batch dimension
+                        activations[layer_name] = activation[0]
 
             return activations
 
@@ -244,16 +244,18 @@ class CodeUnderstandingAnalyzer(DomainAnalyzer):
             return {}
 
     def _calculate_understanding_score(self, syntax_elements: Dict[str, List[str]],
-                                     complexity: Dict[str, float],
-                                     activations: Dict[str, np.ndarray]) -> float:
+                                       complexity: Dict[str, float],
+                                       activations: Dict[str, np.ndarray]) -> float:
         """Calculate code understanding score based on syntax and activations."""
         # Simple heuristic combining syntax richness and activation strength
-        syntax_score = sum(len(elements) for elements in syntax_elements.values()) / 10.0
+        syntax_score = sum(len(elements)
+                           for elements in syntax_elements.values()) / 10.0
         complexity_score = min(complexity.get('cyclomatic_complexity', 1.0) / 5.0, 1.0)
 
         activation_score = 0.0
         if activations:
-            avg_activation = np.mean([np.mean(np.abs(act)) for act in activations.values()])
+            avg_activation = np.mean([np.mean(np.abs(act))
+                                     for act in activations.values()])
             activation_score = min(avg_activation / 1.0, 1.0)  # Normalize
 
         return (syntax_score + complexity_score + activation_score) / 3.0
@@ -286,7 +288,7 @@ class MathematicalReasoningAnalyzer(DomainAnalyzer):
         }
 
     def analyze(self, math_expressions: List[str], model, tokenizer,
-               target_layers: Optional[List[str]] = None) -> List[MathAnalysisResult]:
+                target_layers: Optional[List[str]] = None) -> List[MathAnalysisResult]:
         """
         Analyze mathematical reasoning in neural models.
 
@@ -316,7 +318,8 @@ class MathematicalReasoningAnalyzer(DomainAnalyzer):
                 reasoning_steps = self._extract_reasoning_steps(expression)
 
                 # Get model activations
-                activations = self._get_math_activations(expression, model, tokenizer, target_layers)
+                activations = self._get_math_activations(
+                    expression, model, tokenizer, target_layers)
 
                 result = MathAnalysisResult(
                     expression=expression,
@@ -369,9 +372,14 @@ class MathematicalReasoningAnalyzer(DomainAnalyzer):
 
         return operations
 
-    def _calculate_difficulty(self, concepts: List[str], operations: List[str]) -> float:
+    def _calculate_difficulty(
+            self,
+            concepts: List[str],
+            operations: List[str]) -> float:
         """Calculate difficulty score for mathematical expression."""
-        concept_difficulty = sum(self.operation_hierarchy.get(concept, 1) for concept in concepts)
+        concept_difficulty = sum(
+            self.operation_hierarchy.get(
+                concept, 1) for concept in concepts)
         operation_complexity = len(operations)
 
         # Normalize to 0-1 scale
@@ -405,12 +413,20 @@ class MathematicalReasoningAnalyzer(DomainAnalyzer):
 
         return steps[:5]  # Limit to 5 steps
 
-    def _get_math_activations(self, expression: str, model, tokenizer,
-                            target_layers: Optional[List[str]]) -> Dict[str, np.ndarray]:
+    def _get_math_activations(self,
+                              expression: str,
+                              model,
+                              tokenizer,
+                              target_layers: Optional[List[str]]) -> Dict[str,
+                                                                          np.ndarray]:
         """Get model activations for mathematical expression."""
         try:
             # Tokenize expression
-            inputs = tokenizer(expression, return_tensors="pt", padding=True, truncation=True)
+            inputs = tokenizer(
+                expression,
+                return_tensors="pt",
+                padding=True,
+                truncation=True)
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
             # Get activations
@@ -424,7 +440,8 @@ class MathematicalReasoningAnalyzer(DomainAnalyzer):
                     if target_layers is None or layer_name in target_layers:
                         # Average over sequence length
                         activation = hidden_state.mean(dim=1).cpu().numpy()
-                        activations[layer_name] = activation[0]  # Remove batch dimension
+                        # Remove batch dimension
+                        activations[layer_name] = activation[0]
 
             return activations
 
@@ -455,7 +472,7 @@ class MultilingualAnalyzer(DomainAnalyzer):
         }
 
     def analyze(self, multilingual_texts: List[Tuple[str, str]], model, tokenizer,
-               target_layers: Optional[List[str]] = None) -> List[MultilingualResult]:
+                target_layers: Optional[List[str]] = None) -> List[MultilingualResult]:
         """
         Analyze multilingual understanding.
 
@@ -473,7 +490,8 @@ class MultilingualAnalyzer(DomainAnalyzer):
 
         # First pass: collect all activations
         for text, language in multilingual_texts:
-            activations = self._get_multilingual_activations(text, model, tokenizer, target_layers)
+            activations = self._get_multilingual_activations(
+                text, model, tokenizer, target_layers)
             all_activations[(text, language)] = activations
 
         # Second pass: analyze each text with cross-lingual comparisons
@@ -527,7 +545,8 @@ class MultilingualAnalyzer(DomainAnalyzer):
         elif language == 'german':
             # German compound words
             long_words = [word for word in text.split() if len(word) > 10]
-            features['compound_word_ratio'] = len(long_words) / max(len(text.split()), 1)
+            features['compound_word_ratio'] = len(
+                long_words) / max(len(text.split()), 1)
         elif language == 'chinese':
             # Character-based language
             features['character_word_ratio'] = len(text) / max(len(text.split()), 1)
@@ -535,7 +554,7 @@ class MultilingualAnalyzer(DomainAnalyzer):
         return features
 
     def _calculate_cross_lingual_similarity(self, text: str, language: str,
-                                          all_activations: Dict) -> Dict[str, float]:
+                                            all_activations: Dict) -> Dict[str, float]:
         """Calculate similarity with other languages."""
         similarities = {}
         current_activations = all_activations.get((text, language), {})
@@ -546,7 +565,8 @@ class MultilingualAnalyzer(DomainAnalyzer):
         for (other_text, other_language), other_activations in all_activations.items():
             if other_language != language and other_activations:
                 # Calculate activation similarity
-                similarity = self._activation_similarity(current_activations, other_activations)
+                similarity = self._activation_similarity(
+                    current_activations, other_activations)
                 if other_language not in similarities:
                     similarities[other_language] = []
                 similarities[other_language].append(similarity)
@@ -558,7 +578,7 @@ class MultilingualAnalyzer(DomainAnalyzer):
         return similarities
 
     def _activation_similarity(self, act1: Dict[str, np.ndarray],
-                             act2: Dict[str, np.ndarray]) -> float:
+                               act2: Dict[str, np.ndarray]) -> float:
         """Calculate cosine similarity between activation patterns."""
         similarities = []
 
@@ -578,8 +598,12 @@ class MultilingualAnalyzer(DomainAnalyzer):
 
         return np.mean(similarities) if similarities else 0.0
 
-    def _get_multilingual_activations(self, text: str, model, tokenizer,
-                                    target_layers: Optional[List[str]]) -> Dict[str, np.ndarray]:
+    def _get_multilingual_activations(self,
+                                      text: str,
+                                      model,
+                                      tokenizer,
+                                      target_layers: Optional[List[str]]) -> Dict[str,
+                                                                                  np.ndarray]:
         """Get model activations for multilingual text."""
         try:
             # Tokenize text
@@ -597,7 +621,8 @@ class MultilingualAnalyzer(DomainAnalyzer):
                     if target_layers is None or layer_name in target_layers:
                         # Average over sequence length
                         activation = hidden_state.mean(dim=1).cpu().numpy()
-                        activations[layer_name] = activation[0]  # Remove batch dimension
+                        # Remove batch dimension
+                        activations[layer_name] = activation[0]
 
             return activations
 
@@ -618,7 +643,7 @@ class TemporalAnalyzer(DomainAnalyzer):
         ]
 
     def analyze(self, sequences: List[List[str]], model, tokenizer,
-               target_layers: Optional[List[str]] = None) -> List[TemporalResult]:
+                target_layers: Optional[List[str]] = None) -> List[TemporalResult]:
         """
         Analyze temporal patterns in sequential data.
 
@@ -696,7 +721,8 @@ class TemporalAnalyzer(DomainAnalyzer):
 
         # Check for alternating patterns
         if len(sequence) >= 4:
-            alternating = all(sequence[i] == sequence[i+2] for i in range(len(sequence)-2))
+            alternating = all(sequence[i] == sequence[i + 2]
+                              for i in range(len(sequence) - 2))
             if alternating:
                 patterns.append('alternating')
 
@@ -714,7 +740,8 @@ class TemporalAnalyzer(DomainAnalyzer):
 
             if len(numeric_seq) > 1:
                 lag1_corr = np.corrcoef(numeric_seq[:-1], numeric_seq[1:])[0, 1]
-                dependencies['lag_1_correlation'] = lag1_corr if not np.isnan(lag1_corr) else 0.0
+                dependencies['lag_1_correlation'] = lag1_corr if not np.isnan(
+                    lag1_corr) else 0.0
 
         # Calculate positional consistency
         position_consistency = self._calculate_position_consistency(sequence)
@@ -761,7 +788,7 @@ class TemporalAnalyzer(DomainAnalyzer):
         return np.mean(consistencies) if consistencies else 1.0
 
     def _get_temporal_activations(self, sequence: List[str], model, tokenizer,
-                                target_layers: Optional[List[str]]) -> np.ndarray:
+                                  target_layers: Optional[List[str]]) -> np.ndarray:
         """Get activation evolution throughout sequence processing."""
         try:
             activations_over_time = []
@@ -772,7 +799,7 @@ class TemporalAnalyzer(DomainAnalyzer):
 
                 # Tokenize partial sequence
                 inputs = tokenizer(partial_sequence, return_tensors="pt",
-                                 padding=True, truncation=True)
+                                   padding=True, truncation=True)
                 inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
                 # Get activations
@@ -803,7 +830,7 @@ class DomainSpecificPipeline:
         self.temporal_analyzer = TemporalAnalyzer(config_name)
 
     def run_comprehensive_analysis(self, inputs: Dict[str, Any], model, tokenizer,
-                                 output_dir: str) -> Dict[str, Any]:
+                                   output_dir: str) -> Dict[str, Any]:
         """
         Run comprehensive domain-specific analysis.
 
@@ -858,7 +885,8 @@ class DomainSpecificPipeline:
                 multilingual_results = self.multilingual_analyzer.analyze(
                     inputs['multilingual_texts'], model, tokenizer
                 )
-                results['multilingual_analysis'] = [result.__dict__ for result in multilingual_results]
+                results['multilingual_analysis'] = [
+                    result.__dict__ for result in multilingual_results]
                 results['metadata']['domains_analyzed'].append('multilingual')
 
             # Temporal analysis
@@ -867,14 +895,16 @@ class DomainSpecificPipeline:
                 temporal_results = self.temporal_analyzer.analyze(
                     inputs['sequences'], model, tokenizer
                 )
-                results['temporal_analysis'] = [result.__dict__ for result in temporal_results]
+                results['temporal_analysis'] = [
+                    result.__dict__ for result in temporal_results]
                 results['metadata']['domains_analyzed'].append('temporal')
 
             # Save results
             with open(output_path / "domain_specific_results.json", 'w') as f:
                 json.dump(results, f, indent=2, default=str)
 
-            logger.info(f"Domain-specific analysis completed. Results saved to {output_dir}")
+            logger.info(
+                f"Domain-specific analysis completed. Results saved to {output_dir}")
             return results
 
         except Exception as e:

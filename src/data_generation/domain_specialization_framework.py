@@ -126,8 +126,11 @@ class DomainSpecialist(ABC):
         pass
 
     @abstractmethod
-    def generate_domain_questions(self, topic: str, count: int = 5,
-                                question_type: Optional[QuestionType] = None) -> List[DomainQuestion]:
+    def generate_domain_questions(
+            self,
+            topic: str,
+            count: int = 5,
+            question_type: Optional[QuestionType] = None) -> List[DomainQuestion]:
         """Generate domain-specific questions for a given topic."""
         pass
 
@@ -136,10 +139,12 @@ class DomainSpecialist(ABC):
         # Calculate terminology density
         words = question.lower().split()
         all_terms = (self.vocabulary.core_terms +
-                    self.vocabulary.advanced_terms +
-                    self.vocabulary.methodology_terms)
+                     self.vocabulary.advanced_terms +
+                     self.vocabulary.methodology_terms)
 
-        terminology_count = sum(1 for word in words if word in [term.lower() for term in all_terms])
+        terminology_count = sum(
+            1 for word in words if word in [
+                term.lower() for term in all_terms])
         terminology_density = terminology_count / len(words) if words else 0
 
         # Assess concept alignment
@@ -150,12 +155,14 @@ class DomainSpecialist(ABC):
 
         # Determine if domain appropriate
         is_appropriate = (terminology_density >= 0.15 and
-                         concept_alignment >= 0.6 and
-                         methodological_soundness >= 0.5)
+                          concept_alignment >= 0.6 and
+                          methodological_soundness >= 0.5)
 
         suggestions = []
         if terminology_density < 0.15:
-            suggestions.append(f"Increase domain terminology (current: {terminology_density:.2f}, target: >0.15)")
+            suggestions.append(
+                f"Increase domain terminology (current: {
+                    terminology_density:.2f}, target: >0.15)")
         if concept_alignment < 0.6:
             suggestions.append("Improve alignment with domain concepts")
         if methodological_soundness < 0.5:
@@ -178,18 +185,29 @@ class DomainSpecialist(ABC):
         # Terminology density
         words = question.lower().split()
         all_terms = (self.vocabulary.core_terms +
-                    self.vocabulary.advanced_terms +
-                    self.vocabulary.methodology_terms)
+                     self.vocabulary.advanced_terms +
+                     self.vocabulary.methodology_terms)
 
-        terminology_density = sum(1 for word in words if word in [term.lower() for term in all_terms]) / len(words) if words else 0
+        terminology_density = sum(
+            1 for word in words if word in [
+                term.lower() for term in all_terms]) / len(words) if words else 0
 
         # Concept depth (based on advanced terminology usage)
-        advanced_term_count = sum(1 for word in words if word in [term.lower() for term in self.vocabulary.advanced_terms])
+        advanced_term_count = sum(
+            1 for word in words if word in [
+                term.lower() for term in self.vocabulary.advanced_terms])
         concept_depth = advanced_term_count / len(words) if words else 0
 
         # Methodological rigor
-        method_terms = ["method", "methodology", "approach", "technique", "procedure", "protocol"]
-        methodological_rigor = sum(1 for term in method_terms if term in question.lower()) / 10.0
+        method_terms = [
+            "method",
+            "methodology",
+            "approach",
+            "technique",
+            "procedure",
+            "protocol"]
+        methodological_rigor = sum(
+            1 for term in method_terms if term in question.lower()) / 10.0
 
         # Prerequisite knowledge (based on concept hierarchies)
         prerequisite_score = self._calculate_prerequisite_knowledge(question)
@@ -198,8 +216,11 @@ class DomainSpecialist(ABC):
         domain_specificity = min(terminology_density * 2, 1.0)
 
         # Overall score
-        overall_score = np.mean([terminology_density, concept_depth, methodological_rigor,
-                               prerequisite_score, domain_specificity])
+        overall_score = np.mean([terminology_density,
+                                 concept_depth,
+                                 methodological_rigor,
+                                 prerequisite_score,
+                                 domain_specificity])
 
         return DomainComplexityScore(
             terminology_density=terminology_density,
@@ -216,15 +237,16 @@ class DomainSpecialist(ABC):
         question_lower = question.lower()
 
         # Check for core concepts
-        core_alignment = sum(1 for term in self.vocabulary.core_terms
-                           if term.lower() in question_lower) / max(len(self.vocabulary.core_terms), 1)
+        core_alignment = sum(1 for term in self.vocabulary.core_terms if term.lower(
+        ) in question_lower) / max(len(self.vocabulary.core_terms), 1)
 
         # Check for concept hierarchies
         hierarchy_alignment = 0
         for concept, subconcepts in self.vocabulary.concept_hierarchies.items():
             if concept.lower() in question_lower:
                 hierarchy_alignment += 0.5
-                hierarchy_alignment += sum(0.3 for sub in subconcepts if sub.lower() in question_lower)
+                hierarchy_alignment += sum(
+                    0.3 for sub in subconcepts if sub.lower() in question_lower)
 
         return min((core_alignment + hierarchy_alignment) / 2, 1.0)
 
@@ -233,13 +255,19 @@ class DomainSpecialist(ABC):
         question_lower = question.lower()
 
         # Check for methodology terms
-        method_score = sum(1 for term in self.vocabulary.methodology_terms
-                         if term.lower() in question_lower) / max(len(self.vocabulary.methodology_terms), 1)
+        method_score = sum(1 for term in self.vocabulary.methodology_terms if term.lower(
+        ) in question_lower) / max(len(self.vocabulary.methodology_terms), 1)
 
         # Check for reasoning indicators
-        reasoning_indicators = ["analyze", "evaluate", "compare", "synthesize", "apply", "explain"]
+        reasoning_indicators = [
+            "analyze",
+            "evaluate",
+            "compare",
+            "synthesize",
+            "apply",
+            "explain"]
         reasoning_score = sum(1 for indicator in reasoning_indicators
-                            if indicator in question_lower) / len(reasoning_indicators)
+                              if indicator in question_lower) / len(reasoning_indicators)
 
         return min((method_score + reasoning_score) / 2, 1.0)
 
@@ -249,9 +277,11 @@ class DomainSpecialist(ABC):
         question_lower = question.lower()
 
         advanced_count = sum(1 for term in self.vocabulary.advanced_terms
-                           if term.lower() in question_lower)
-        total_terms = sum(1 for term in (self.vocabulary.core_terms + self.vocabulary.advanced_terms)
-                         if term.lower() in question_lower)
+                             if term.lower() in question_lower)
+        total_terms = sum(
+            1 for term in (
+                self.vocabulary.core_terms +
+                self.vocabulary.advanced_terms) if term.lower() in question_lower)
 
         if total_terms == 0:
             return 0.0
@@ -263,7 +293,8 @@ class DomainSpecialist(ABC):
         stats = self.generation_stats.copy()
 
         if stats['total_generated'] > 0:
-            stats['validation_pass_rate'] = stats['validation_passed'] / stats['total_generated']
+            stats['validation_pass_rate'] = stats['validation_passed'] / \
+                stats['total_generated']
         else:
             stats['validation_pass_rate'] = 0.0
 
@@ -281,24 +312,52 @@ class DomainSpecialist(ABC):
 def get_available_domains() -> List[str]:
     """Get list of available domain specialists."""
     return [
-        'physics', 'chemistry', 'biology', 'mathematics', 'computer_science', 'engineering',
-        'history', 'philosophy', 'literature', 'linguistics', 'art_history',
-        'psychology', 'sociology', 'political_science', 'economics', 'anthropology',
-        'medicine', 'law', 'education', 'business'
-    ]
+        'physics',
+        'chemistry',
+        'biology',
+        'mathematics',
+        'computer_science',
+        'engineering',
+        'history',
+        'philosophy',
+        'literature',
+        'linguistics',
+        'art_history',
+        'psychology',
+        'sociology',
+        'political_science',
+        'economics',
+        'anthropology',
+        'medicine',
+        'law',
+        'education',
+        'business']
 
 
 def create_domain_specialist(domain_name: str) -> Optional[DomainSpecialist]:
     """Factory function to create domain specialists."""
     # Import specific specialists here to avoid circular imports
     from .domain_specialists import (
-        PhysicsSpecialist, ChemistrySpecialist, BiologySpecialist, MathematicsSpecialist,
-        ComputerScienceSpecialist, EngineeringSpecialist, HistorySpecialist,
-        PhilosophySpecialist, LiteratureSpecialist, LinguisticsSpecialist,
-        ArtHistorySpecialist, PsychologySpecialist, SociologySpecialist,
-        PoliticalScienceSpecialist, EconomicsSpecialist, AnthropologySpecialist,
-        MedicineSpecialist, LawSpecialist, EducationSpecialist, BusinessSpecialist
-    )
+        PhysicsSpecialist,
+        ChemistrySpecialist,
+        BiologySpecialist,
+        MathematicsSpecialist,
+        ComputerScienceSpecialist,
+        EngineeringSpecialist,
+        HistorySpecialist,
+        PhilosophySpecialist,
+        LiteratureSpecialist,
+        LinguisticsSpecialist,
+        ArtHistorySpecialist,
+        PsychologySpecialist,
+        SociologySpecialist,
+        PoliticalScienceSpecialist,
+        EconomicsSpecialist,
+        AnthropologySpecialist,
+        MedicineSpecialist,
+        LawSpecialist,
+        EducationSpecialist,
+        BusinessSpecialist)
 
     specialist_map = {
         'physics': PhysicsSpecialist,

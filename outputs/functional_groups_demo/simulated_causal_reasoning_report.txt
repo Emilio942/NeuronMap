@@ -1,0 +1,65 @@
+
+FUNCTIONAL GROUPS ANALYSIS REPORT
+=================================
+
+Task Type: causal_reasoning
+Analysis Date: 2025-07-29 11:24:13
+Groups Discovered: 6
+
+SUMMARY STATISTICS:
+------------------
+Total groups: 6
+Average group size: 13.8 neurons
+Average confidence: 0.610
+High-confidence groups (>0.8): 1
+
+DETAILED GROUP ANALYSIS:
+-----------------------
+
+Group 1:
+  Neurons: 9 neurons
+  Confidence: 0.838
+  Coherence: 0.499
+  Function: temporal_relations
+  Specificity: 0.673
+  
+
+Group 2:
+  Neurons: 13 neurons
+  Confidence: 0.574
+  Coherence: 0.697
+  Function: cause_effect
+  Specificity: 0.249
+  
+
+Group 3:
+  Neurons: 18 neurons
+  Confidence: 0.406
+  Coherence: 0.797
+  Function: cause_effect
+  Specificity: 0.748
+  
+
+Group 4:
+  Neurons: 9 neurons
+  Confidence: 0.427
+  Coherence: 0.542
+  Function: cause_effect
+  Specificity: 0.615
+  
+
+Group 5:
+  Neurons: 13 neurons
+  Confidence: 0.637
+  Coherence: 0.414
+  Function: temporal_relations
+  Specificity: 0.221
+  
+
+Group 6:
+  Neurons: 21 neurons
+  Confidence: 0.779
+  Coherence: 0.681
+  Function: temporal_relations
+  Specificity: 0.298
+  

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimaler Cytoscape Test</title>
+    <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+        }
+        
+        #graph {
+            width: 100%;
+            height: 600px;
+            border: 5px solid #007bff;
+            background: #f8f9fa;
+            margin: 20px 0;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            margin: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        .status {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        
+        .success { background: #d1edff; }
+        .error { background: #ffebee; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 NeuronMap - Minimaler Cytoscape Test</h1>
+            <p>Teste ob Cytoscape grundsätzlich funktioniert</p>
+        </div>
+
+        <div id="status" class="status">Initialisierung...</div>
+        
+        <div id="graph"></div>
+        
+        <div class="controls">
+            <button onclick="initGraph()">🚀 Graph Initialisieren</button>
+            <button onclick="addTestData()">➕ Test-Daten</button>
+            <button onclick="clearGraph()">🗑️ Leeren</button>
+        </div>
+    </div>
+
+    <script>
+        let cy = null;
+
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            status.textContent = new Date().toLocaleTimeString() + ': ' + message;
+            status.className = 'status ' + type;
+            console.log(message);
+        }
+
+        function initGraph() {
+            updateStatus('Starte Graph-Initialisierung...');
+            
+            const container = document.getElementById('graph');
+            
+            // Prüfe Container
+            if (!container) {
+                updateStatus('FEHLER: Container nicht gefunden!', 'error');
+                return;
+            }
+            
+            updateStatus(`Container gefunden: ${container.offsetWidth}x${container.offsetHeight}px`);
+            
+            // Prüfe Cytoscape
+            if (typeof cytoscape === 'undefined') {
+                updateStatus('FEHLER: Cytoscape nicht geladen!', 'error');
+                return;
+            }
+            
+            updateStatus('Cytoscape verfügbar, erstelle Graph...');
+            
+            try {
+                cy = cytoscape({
+                    container: container,
+                    
+                    elements: [
+                        { data: { id: 'n1', label: 'Neuron 1' } },
+                        { data: { id: 'n2', label: 'Neuron 2' } },
+                        { data: { id: 'h1', label: 'Head 1' } },
+                        { data: { id: 'e1', source: 'n1', target: 'n2' } },
+                        { data: { id: 'e2', source: 'n2', target: 'h1' } }
+                    ],
+                    
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'label': 'data(label)',
+                                'text-valign': 'center',
+                                'text-halign': 'center',
+                                'color': 'white',
+                                'background-color': '#007bff',
+                                'width': 80,
+                                'height': 80,
+                                'font-size': '16px',
+                                'font-weight': 'bold',
+                                'border-width': 3,
+                                'border-color': '#0056b3'
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'width': 4,
+                                'line-color': '#28a745',
+                                'target-arrow-color': '#28a745',
+                                'target-arrow-shape': 'triangle',
+                                'curve-style': 'bezier'
+                            }
+                        }
+                    ],
+                    
+                    layout: {
+                        name: 'circle',
+                        fit: true,
+                        padding: 50
+                    }
+                });
+                
+                updateStatus(`Graph erstellt! Knoten: ${cy.nodes().length}, Kanten: ${cy.edges().length}`, 'success');
+                
+                // Event-Handler
+                cy.on('tap', 'node', function(evt) {
+                    const node = evt.target;
+                    updateStatus(`Knoten angeklickt: ${node.id()}`);
+                });
+                
+            } catch (error) {
+                updateStatus(`FEHLER: ${error.message}`, 'error');
+            }
+        }
+
+        function addTestData() {
+            if (!cy) {
+                updateStatus('Graph nicht initialisiert!', 'error');
+                return;
+            }
+            
+            const nodeId = 'test' + Date.now();
+            cy.add({
+                data: { id: nodeId, label: 'Test ' + cy.nodes().length }
+            });
+            
+            cy.layout({ name: 'circle', fit: true }).run();
+            updateStatus(`Knoten hinzugefügt: ${nodeId}`);
+        }
+
+        function clearGraph() {
+            if (!cy) {
+                updateStatus('Graph nicht initialisiert!', 'error');
+                return;
+            }
+            
+            cy.elements().remove();
+            updateStatus('Graph geleert');
+        }
+
+        // Auto-Start
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStatus('Seite geladen, starte in 2 Sekunden...');
+            setTimeout(initGraph, 2000);
+        });
+    </script>
+</body>
+</html>

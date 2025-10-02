@@ -36,7 +36,15 @@ class BaseDomainSpecialist(ABC):
         """Validate how relevant a text is to this domain (0.0 to 1.0)."""
         pass
 
-    def generate_questions(self, count: int = 5, context: Optional[str] = None) -> List[str]:
+    def get_required_indicators(self) -> Optional[List[str]]:
+        """Optional list of high-signal terms that must appear in questions."""
+
+        return None
+
+    def generate_questions(
+            self,
+            count: int = 5,
+            context: Optional[str] = None) -> List[str]:
         """Generate domain-specific questions."""
         questions = []
         vocabulary = self.get_domain_vocabulary()
@@ -55,21 +63,63 @@ class BaseDomainSpecialist(ABC):
             if not question.strip().endswith('?'):
                 question = question.strip() + '?'
 
+            question = self._ensure_domain_vocabulary(question, vocabulary)
+
             # Avoid exact duplicates
             if question not in questions:
                 questions.append(question)
                 # Update used terms from this question
                 words = question.lower().split()
-                used_terms.update(word.strip('.,!?;:') for word in words if len(word) > 3)
+                used_terms.update(word.strip('.,!?;:')
+                                  for word in words if len(word) > 3)
 
             attempts += 1
 
         return questions
 
-    def _fill_pattern(self, pattern: str, vocabulary: List[str], used_terms: Optional[set] = None) -> str:
+    def _ensure_domain_vocabulary(self, question: str, vocabulary: List[str]) -> str:
+        """Guarantee that each generated question contains explicit domain terms."""
+
+        if not vocabulary:
+            return question
+
+        vocab_lower = {term.lower() for term in vocabulary}
+        words = [word.strip('.,!?:;') for word in question.lower().split()]
+
+        if any(word in vocab_lower for word in words):
+            ensured = question
+        else:
+            fallback = next((term for term in vocabulary if len(term.split()) == 1), vocabulary[0])
+            fallback_phrase = fallback if fallback.lower() in vocab_lower else vocabulary[0]
+            base = question.rstrip(' ?!')
+            ensured = f"{base} using the concept of {fallback_phrase}?"
+
+        indicators = self.get_required_indicators() or []
+        if indicators:
+            indicator_lower = [indicator.lower() for indicator in indicators]
+            if not any(ind in ensured.lower() for ind in indicator_lower):
+                ensured = f"{ensured.rstrip(' ?!')} with emphasis on {indicators[0]}?"
+
+        return ensured
+
+    def _fill_pattern(
+            self,
+            pattern: str,
+            vocabulary: List[str],
+            used_terms: Optional[set] = None) -> str:
         """Fill a question pattern with domain-specific terms, avoiding repetition."""
         if not vocabulary:
-            vocabulary = ['concept', 'term', 'process', 'phenomenon', 'principle', 'method', 'system', 'element', 'factor', 'example']
+            vocabulary = [
+                'concept',
+                'term',
+                'process',
+                'phenomenon',
+                'principle',
+                'method',
+                'system',
+                'element',
+                'factor',
+                'example']
 
         if used_terms is None:
             used_terms = set()
@@ -95,13 +145,25 @@ class BaseDomainSpecialist(ABC):
 
         # Categorize vocabulary for better matching
         vocab_categories = {
-            'processes': [v for v in vocabulary if any(x in v.lower() for x in ['tion', 'ing', 'ment', 'sis', 'lysis', 'synthesis', 'cycle', 'process', 'method'])],
-            'objects': [v for v in vocabulary if any(x in v.lower() for x in ['cell', 'organ', 'system', 'structure', 'atom', 'molecule', 'particle'])],
-            'concepts': [v for v in vocabulary if any(x in v.lower() for x in ['theory', 'principle', 'concept', 'law', 'hypothesis', 'model'])],
-            'methods': [v for v in vocabulary if any(x in v.lower() for x in ['method', 'technique', 'approach', 'analysis', 'research', 'study', 'experiment'])],
-            'properties': [v for v in vocabulary if any(x in v.lower() for x in ['property', 'characteristic', 'feature', 'energy', 'matter', 'force'])],
-            'phenomena': [v for v in vocabulary if any(x in v.lower() for x in ['effect', 'phenomenon', 'behavior', 'event', 'reaction', 'evolution', 'growth'])]
-        }
+            'processes': [
+                v for v in vocabulary if any(
+                    x in v.lower() for x in [
+                        'tion', 'ing', 'ment', 'sis', 'lysis', 'synthesis', 'cycle', 'process', 'method'])], 'objects': [
+                v for v in vocabulary if any(
+                    x in v.lower() for x in [
+                        'cell', 'organ', 'system', 'structure', 'atom', 'molecule', 'particle'])], 'concepts': [
+                v for v in vocabulary if any(
+                    x in v.lower() for x in [
+                        'theory', 'principle', 'concept', 'law', 'hypothesis', 'model'])], 'methods': [
+                v for v in vocabulary if any(
+                    x in v.lower() for x in [
+                        'method', 'technique', 'approach', 'analysis', 'research', 'study', 'experiment'])], 'properties': [
+                v for v in vocabulary if any(
+                    x in v.lower() for x in [
+                        'property', 'characteristic', 'feature', 'energy', 'matter', 'force'])], 'phenomena': [
+                v for v in vocabulary if any(
+                    x in v.lower() for x in [
+                        'effect', 'phenomenon', 'behavior', 'event', 'reaction', 'evolution', 'growth'])]}
 
         # Enhanced placeholder mapping with smarter categorization
         placeholders = {
@@ -158,22 +220,111 @@ class BaseDomainSpecialist(ABC):
 
 # Domain-specific specialists
 class ScienceSpecialist(BaseDomainSpecialist):
+    def get_required_indicators(self) -> Optional[List[str]]:
+        return ["experiment", "research", "analysis", "energy", "matter", "theory", "study"]
+
     def get_domain_vocabulary(self) -> List[str]:
         return [
-            "hypothesis", "experiment", "theory", "data", "observation", "analysis", "method", "research",
-            "evidence", "conclusion", "variable", "control", "measurement", "peer review", "scientific method",
-            "replication", "laboratory", "empirical", "quantitative", "qualitative", "atom", "molecule",
-            "element", "compound", "reaction", "catalyst", "enzyme", "photosynthesis", "mitosis", "DNA",
-            "RNA", "protein", "cell", "organism", "evolution", "natural selection", "genetics", "chromosome",
-            "nucleus", "electron", "proton", "neutron", "energy", "force", "gravity", "acceleration",
-            "velocity", "mass", "weight", "density", "temperature", "pressure", "volume", "conservation",
-            "thermodynamics", "entropy", "equilibrium", "solution", "precipitation", "oxidation", "reduction",
-            "acid", "base", "acidity", "buffer", "titration", "spectroscopy", "chromatography", "microscopy",
-            "telescope", "laser", "radiation", "wavelength", "frequency", "spectrum", "particle", "wave",
-            "quantum", "relativity", "ecosystem", "biodiversity", "habitat", "population", "community",
-            "food chain", "carbon cycle", "nitrogen cycle", "climate", "weather", "geology", "fossil",
-            "sediment", "igneous", "metamorphic", "plate tectonics", "volcano", "earthquake", "mineral"
-        ]
+            "hypothesis",
+            "experiment",
+            "theory",
+            "data",
+            "observation",
+            "analysis",
+            "method",
+            "research",
+            "study",
+            "evidence",
+            "conclusion",
+            "variable",
+            "control",
+            "measurement",
+            "peer review",
+            "scientific method",
+            "replication",
+            "laboratory",
+            "empirical",
+            "quantitative",
+            "qualitative",
+            "atom",
+            "molecule",
+            "element",
+            "compound",
+            "reaction",
+            "catalyst",
+            "enzyme",
+            "photosynthesis",
+            "mitosis",
+            "DNA",
+            "RNA",
+            "protein",
+            "cell",
+            "organism",
+            "evolution",
+            "natural selection",
+            "genetics",
+            "chromosome",
+            "nucleus",
+            "electron",
+            "proton",
+            "neutron",
+            "energy",
+            "matter",
+            "force",
+            "gravity",
+            "acceleration",
+            "velocity",
+            "mass",
+            "weight",
+            "density",
+            "temperature",
+            "pressure",
+            "volume",
+            "conservation",
+            "thermodynamics",
+            "entropy",
+            "equilibrium",
+            "solution",
+            "precipitation",
+            "oxidation",
+            "reduction",
+            "acid",
+            "base",
+            "acidity",
+            "buffer",
+            "titration",
+            "spectroscopy",
+            "chromatography",
+            "microscopy",
+            "telescope",
+            "laser",
+            "radiation",
+            "wavelength",
+            "frequency",
+            "spectrum",
+            "particle",
+            "wave",
+            "quantum",
+            "relativity",
+            "ecosystem",
+            "biodiversity",
+            "habitat",
+            "population",
+            "community",
+            "food chain",
+            "carbon cycle",
+            "nitrogen cycle",
+            "climate",
+            "weather",
+            "geology",
+            "fossil",
+            "sediment",
+            "igneous",
+            "metamorphic",
+            "plate tectonics",
+            "volcano",
+            "earthquake",
+            "mineral"]
 
     def get_question_patterns(self) -> List[str]:
         return [
@@ -216,16 +367,53 @@ class ScienceSpecialist(BaseDomainSpecialist):
         vocab_matches = sum(1 for term in vocabulary if term in text_lower)
 
         # Count scientific indicators
-        science_indicators = ['scientific', 'research', 'study', 'analysis', 'experimental', 'biological',
-                             'chemical', 'physical', 'theoretical', 'laboratory', 'molecular', 'cellular',
-                             'process', 'converts', 'using', 'carbon', 'dioxide', 'glucose', 'sunlight']
-        indicator_matches = sum(1 for indicator in science_indicators if indicator in text_lower)
+        science_indicators = [
+            'scientific',
+            'research',
+            'study',
+            'analysis',
+            'experimental',
+            'biological',
+            'chemical',
+            'physical',
+            'theoretical',
+            'laboratory',
+            'molecular',
+            'cellular',
+            'process',
+            'converts',
+            'using',
+            'carbon',
+            'dioxide',
+            'glucose',
+            'sunlight']
+        indicator_matches = sum(
+            1 for indicator in science_indicators if indicator in text_lower)
 
         # Count scientific concepts (partial word matches)
-        concept_indicators = ['photo', 'synthesis', 'carbon', 'dioxide', 'oxygen', 'hydrogen', 'nitrogen',
-                             'enzyme', 'protein', 'genetic', 'atomic', 'molecular', 'cellular', 'organic',
-                             'chemical', 'biological', 'physical', 'thermal', 'electric', 'magnetic']
-        concept_matches = sum(1 for concept in concept_indicators if concept in text_lower)
+        concept_indicators = [
+            'photo',
+            'synthesis',
+            'carbon',
+            'dioxide',
+            'oxygen',
+            'hydrogen',
+            'nitrogen',
+            'enzyme',
+            'protein',
+            'genetic',
+            'atomic',
+            'molecular',
+            'cellular',
+            'organic',
+            'chemical',
+            'biological',
+            'physical',
+            'thermal',
+            'electric',
+            'magnetic']
+        concept_matches = sum(
+            1 for concept in concept_indicators if concept in text_lower)
 
         # Calculate score based on matches and text length
         total_matches = vocab_matches + indicator_matches + concept_matches
@@ -244,7 +432,10 @@ class ScienceSpecialist(BaseDomainSpecialist):
 
         return base_score
 
-    def generate_questions(self, count: int = 5, context: Optional[str] = None) -> List[str]:
+    def generate_questions(
+            self,
+            count: int = 5,
+            context: Optional[str] = None) -> List[str]:
         """Generate domain-specific questions with preference for scientific terminology."""
         questions = []
         vocabulary = self.get_domain_vocabulary()
@@ -256,12 +447,21 @@ class ScienceSpecialist(BaseDomainSpecialist):
         attempts = 0
 
         # Prioritize patterns with scientific indicators
-        science_indicators = ["energy", "matter", "experiment", "theory", "research", "study", "analysis"]
-        priority_patterns = [p for p in patterns if any(indicator in p.lower() for indicator in science_indicators)]
+        science_indicators = [
+            "energy",
+            "matter",
+            "experiment",
+            "theory",
+            "research",
+            "study",
+            "analysis"]
+        priority_patterns = [p for p in patterns if any(
+            indicator in p.lower() for indicator in science_indicators)]
 
         if priority_patterns:
             # Use 80% priority patterns, 20% other patterns for variety
-            pattern_pool = priority_patterns * 4 + [p for p in patterns if p not in priority_patterns]
+            pattern_pool = priority_patterns * 4 + \
+                [p for p in patterns if p not in priority_patterns]
         else:
             pattern_pool = patterns
 
@@ -269,16 +469,21 @@ class ScienceSpecialist(BaseDomainSpecialist):
             pattern = random.choice(pattern_pool)
             question = self._fill_pattern(pattern, vocabulary, used_terms)
 
+            question = self._ensure_domain_vocabulary(question, vocabulary)
+
             # Ensure question ends with question mark
             if not question.strip().endswith('?'):
                 question = question.strip() + '?'
 
+            formatted_question = question.strip()
+
             # Avoid exact duplicates
-            if question not in questions:
-                questions.append(question)
+            if formatted_question not in questions:
+                questions.append(formatted_question)
                 # Update used terms from this question
-                words = question.lower().split()
-                used_terms.update(word.strip('.,!?;:') for word in words if len(word) > 3)
+                words = formatted_question.lower().split()
+                used_terms.update(word.strip('.,!?;:')
+                                  for word in words if len(word) > 3)
 
             attempts += 1
 
@@ -288,22 +493,106 @@ class ScienceSpecialist(BaseDomainSpecialist):
 class LiteratureSpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
         return [
-            "narrative", "character", "plot", "theme", "symbolism", "metaphor", "irony", "author",
-            "protagonist", "antagonist", "conflict", "setting", "genre", "poetry", "prose", "fiction",
-            "analysis", "interpretation", "literary device", "criticism", "allegory", "allusion",
-            "alliteration", "assonance", "consonance", "imagery", "personification", "simile",
-            "hyperbole", "oxymoron", "paradox", "satire", "parody", "tragedy", "comedy", "drama",
-            "epic", "sonnet", "haiku", "ballad", "ode", "elegy", "villanelle", "sestina", "pantoum",
-            "free verse", "blank verse", "meter", "rhythm", "rhyme", "stanza", "verse", "line",
-            "caesura", "enjambment", "anaphora", "epistrophe", "chiasmus", "zeugma", "synecdoche",
-            "metonymy", "euphemism", "litotes", "meiosis", "amplification", "climax", "anticlimax",
-            "denouement", "exposition", "rising action", "falling action", "flashback", "foreshadowing",
-            "stream of consciousness", "point of view", "first person", "third person", "omniscient",
-            "limited omniscient", "unreliable narrator", "soliloquy", "monologue", "dialogue",
-            "characterization", "round character", "flat character", "dynamic character", "static character",
-            "foil", "archetype", "bildungsroman", "picaresque", "romance", "gothic", "realism",
-            "naturalism", "modernism", "postmodernism", "structuralism", "deconstruction"
-        ]
+            "narrative",
+            "character",
+            "plot",
+            "theme",
+            "symbolism",
+            "metaphor",
+            "irony",
+            "author",
+            "protagonist",
+            "antagonist",
+            "conflict",
+            "setting",
+            "genre",
+            "poetry",
+            "prose",
+            "fiction",
+            "analysis",
+            "interpretation",
+            "literary device",
+            "criticism",
+            "allegory",
+            "allusion",
+            "alliteration",
+            "assonance",
+            "consonance",
+            "imagery",
+            "personification",
+            "simile",
+            "hyperbole",
+            "oxymoron",
+            "paradox",
+            "satire",
+            "parody",
+            "tragedy",
+            "comedy",
+            "drama",
+            "epic",
+            "sonnet",
+            "haiku",
+            "ballad",
+            "ode",
+            "elegy",
+            "villanelle",
+            "sestina",
+            "pantoum",
+            "free verse",
+            "blank verse",
+            "meter",
+            "rhythm",
+            "rhyme",
+            "stanza",
+            "verse",
+            "line",
+            "caesura",
+            "enjambment",
+            "anaphora",
+            "epistrophe",
+            "chiasmus",
+            "zeugma",
+            "synecdoche",
+            "metonymy",
+            "euphemism",
+            "litotes",
+            "meiosis",
+            "amplification",
+            "climax",
+            "anticlimax",
+            "denouement",
+            "exposition",
+            "rising action",
+            "falling action",
+            "flashback",
+            "foreshadowing",
+            "stream of consciousness",
+            "point of view",
+            "first person",
+            "third person",
+            "omniscient",
+            "limited omniscient",
+            "unreliable narrator",
+            "soliloquy",
+            "monologue",
+            "dialogue",
+            "characterization",
+            "round character",
+            "flat character",
+            "dynamic character",
+            "static character",
+            "foil",
+            "archetype",
+            "bildungsroman",
+            "picaresque",
+            "romance",
+            "gothic",
+            "realism",
+            "naturalism",
+            "modernism",
+            "postmodernism",
+            "structuralism",
+            "deconstruction"]
 
     def get_question_patterns(self) -> List[str]:
         return [
@@ -330,9 +619,21 @@ class LiteratureSpecialist(BaseDomainSpecialist):
         vocab_matches = sum(1 for term in vocabulary if term in text_lower)
 
         # Count literary indicators
-        lit_indicators = ['literary', 'poem', 'novel', 'story', 'text', 'writing', 'author',
-                         'reader', 'interpretation', 'meaning', 'style', 'language']
-        indicator_matches = sum(1 for indicator in lit_indicators if indicator in text_lower)
+        lit_indicators = [
+            'literary',
+            'poem',
+            'novel',
+            'story',
+            'text',
+            'writing',
+            'author',
+            'reader',
+            'interpretation',
+            'meaning',
+            'style',
+            'language']
+        indicator_matches = sum(
+            1 for indicator in lit_indicators if indicator in text_lower)
 
         # Calculate score
         total_matches = vocab_matches + indicator_matches
@@ -393,9 +694,23 @@ class MathematicsSpecialist(BaseDomainSpecialist):
         vocab_matches = sum(1 for term in vocabulary if term in text_lower)
 
         # Count mathematical indicators
-        math_indicators = ['mathematical', 'numeric', 'calculation', 'compute', 'solve', 'prove',
-                          'formula', 'number', 'value', 'equal', 'greater', 'less', 'sum', 'product']
-        indicator_matches = sum(1 for indicator in math_indicators if indicator in text_lower)
+        math_indicators = [
+            'mathematical',
+            'numeric',
+            'calculation',
+            'compute',
+            'solve',
+            'prove',
+            'formula',
+            'number',
+            'value',
+            'equal',
+            'greater',
+            'less',
+            'sum',
+            'product']
+        indicator_matches = sum(
+            1 for indicator in math_indicators if indicator in text_lower)
 
         # Look for mathematical symbols and notation patterns
         import re
@@ -414,13 +729,37 @@ class MathematicsSpecialist(BaseDomainSpecialist):
 
 class HistorySpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["civilization", "empire", "revolution", "war", "treaty", "dynasty", "monarchy", "democracy", "republic", "constitution", "legislation", "rebellion", "conquest", "culture", "society", "politics", "economics", "diplomacy", "colonization", "independence"]
+        return [
+            "civilization",
+            "empire",
+            "revolution",
+            "war",
+            "treaty",
+            "dynasty",
+            "monarchy",
+            "democracy",
+            "republic",
+            "constitution",
+            "legislation",
+            "rebellion",
+            "conquest",
+            "culture",
+            "society",
+            "politics",
+            "economics",
+            "diplomacy",
+            "colonization",
+            "independence"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["What were the causes of {phenomenon}?", "How did {factor} influence {concept}?", "What was the impact of {term} on {system}?"]
+        return [
+            "What were the causes of {phenomenon}?",
+            "How did {factor} influence {concept}?",
+            "What was the impact of {term} on {system}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         hist_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(hist_terms.intersection(words))
@@ -429,13 +768,37 @@ class HistorySpecialist(BaseDomainSpecialist):
 
 class TechnologySpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["software", "hardware", "algorithm", "programming", "database", "network", "security", "encryption", "artificial intelligence", "machine learning", "cloud computing", "internet", "protocol", "interface", "framework", "architecture", "development", "debugging", "optimization", "innovation"]
+        return [
+            "software",
+            "hardware",
+            "algorithm",
+            "programming",
+            "database",
+            "network",
+            "security",
+            "encryption",
+            "artificial intelligence",
+            "machine learning",
+            "cloud computing",
+            "internet",
+            "protocol",
+            "interface",
+            "framework",
+            "architecture",
+            "development",
+            "debugging",
+            "optimization",
+            "innovation"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How does {system} implement {concept}?", "What are the advantages of {method} over {method}?", "How can {factor} improve {process}?"]
+        return [
+            "How does {system} implement {concept}?",
+            "What are the advantages of {method} over {method}?",
+            "How can {factor} improve {process}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         tech_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(tech_terms.intersection(words))
@@ -444,13 +807,36 @@ class TechnologySpecialist(BaseDomainSpecialist):
 
 class PsychologySpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["behavior", "cognition", "emotion", "personality", "development", "learning", "memory", "perception", "motivation", "consciousness", "therapy", "disorder", "treatment", "research", "experiment", "theory", "assessment", "intervention", "social psychology", "neuroscience"]
+        return [
+            "behavior",
+            "cognition",
+            "emotion",
+            "personality",
+            "development",
+            "learning",
+            "memory",
+            "perception",
+            "motivation",
+            "consciousness",
+            "therapy",
+            "disorder",
+            "treatment",
+            "research",
+            "experiment",
+            "theory",
+            "assessment",
+            "intervention",
+            "social psychology",
+            "neuroscience"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How does {factor} affect {phenomenon}?", "What is the relationship between {concept} and {concept}?", "How can {method} be used to study {process}?"]
+        return ["How does {factor} affect {phenomenon}?",
+                "What is the relationship between {concept} and {concept}?",
+                "How can {method} be used to study {process}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         psych_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(psych_terms.intersection(words))
@@ -459,13 +845,36 @@ class PsychologySpecialist(BaseDomainSpecialist):
 
 class EconomicsSpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["market", "demand", "supply", "price", "inflation", "recession", "GDP", "unemployment", "investment", "capital", "trade", "competition", "monopoly", "fiscal policy", "monetary policy", "economics", "microeconomics", "macroeconomics", "elasticity", "equilibrium"]
+        return [
+            "market",
+            "demand",
+            "supply",
+            "price",
+            "inflation",
+            "recession",
+            "GDP",
+            "unemployment",
+            "investment",
+            "capital",
+            "trade",
+            "competition",
+            "monopoly",
+            "fiscal policy",
+            "monetary policy",
+            "economics",
+            "microeconomics",
+            "macroeconomics",
+            "elasticity",
+            "equilibrium"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How does {factor} impact {system}?", "What happens to {concept} when {factor} changes?", "How do {element} and {element} interact in {system}?"]
+        return ["How does {factor} impact {system}?",
+                "What happens to {concept} when {factor} changes?",
+                "How do {element} and {element} interact in {system}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         econ_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(econ_terms.intersection(words))
@@ -474,13 +883,37 @@ class EconomicsSpecialist(BaseDomainSpecialist):
 
 class PhilosophySpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["ethics", "morality", "logic", "reasoning", "knowledge", "truth", "reality", "existence", "consciousness", "free will", "determinism", "justice", "virtue", "duty", "rights", "metaphysics", "epistemology", "phenomenology", "existentialism", "utilitarianism"]
+        return [
+            "ethics",
+            "morality",
+            "logic",
+            "reasoning",
+            "knowledge",
+            "truth",
+            "reality",
+            "existence",
+            "consciousness",
+            "free will",
+            "determinism",
+            "justice",
+            "virtue",
+            "duty",
+            "rights",
+            "metaphysics",
+            "epistemology",
+            "phenomenology",
+            "existentialism",
+            "utilitarianism"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["What is the nature of {concept}?", "How do we define {term}?", "What are the implications of {principle} for {system}?"]
+        return [
+            "What is the nature of {concept}?",
+            "How do we define {term}?",
+            "What are the implications of {principle} for {system}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         phil_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(phil_terms.intersection(words))
@@ -489,13 +922,36 @@ class PhilosophySpecialist(BaseDomainSpecialist):
 
 class ArtSpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["painting", "sculpture", "drawing", "color", "composition", "perspective", "style", "technique", "medium", "canvas", "brush", "pigment", "aesthetic", "beauty", "creativity", "expression", "form", "line", "shape", "texture"]
+        return [
+            "painting",
+            "sculpture",
+            "drawing",
+            "color",
+            "composition",
+            "perspective",
+            "style",
+            "technique",
+            "medium",
+            "canvas",
+            "brush",
+            "pigment",
+            "aesthetic",
+            "beauty",
+            "creativity",
+            "expression",
+            "form",
+            "line",
+            "shape",
+            "texture"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How does {element} contribute to {concept}?", "What {method} did the artist use to create {phenomenon}?", "How does {factor} affect the viewer's perception of {term}?"]
+        return ["How does {element} contribute to {concept}?",
+                "What {method} did the artist use to create {phenomenon}?",
+                "How does {factor} affect the viewer's perception of {term}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         art_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(art_terms.intersection(words))
@@ -504,13 +960,36 @@ class ArtSpecialist(BaseDomainSpecialist):
 
 class MusicSpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["melody", "harmony", "rhythm", "tempo", "pitch", "scale", "chord", "composition", "instrument", "performance", "conductor", "orchestra", "symphony", "concerto", "genre", "notation", "dynamics", "timbre", "counterpoint", "improvisation"]
+        return [
+            "melody",
+            "harmony",
+            "rhythm",
+            "tempo",
+            "pitch",
+            "scale",
+            "chord",
+            "composition",
+            "instrument",
+            "performance",
+            "conductor",
+            "orchestra",
+            "symphony",
+            "concerto",
+            "genre",
+            "notation",
+            "dynamics",
+            "timbre",
+            "counterpoint",
+            "improvisation"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How does {element} create {phenomenon}?", "What role does {factor} play in {system}?", "How do musicians use {method} to achieve {concept}?"]
+        return ["How does {element} create {phenomenon}?",
+                "What role does {factor} play in {system}?",
+                "How do musicians use {method} to achieve {concept}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         music_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(music_terms.intersection(words))
@@ -519,13 +998,36 @@ class MusicSpecialist(BaseDomainSpecialist):
 
 class GeographySpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["landscape", "climate", "topography", "population", "migration", "urbanization", "environment", "ecosystem", "resources", "sustainability", "cartography", "GIS", "spatial analysis", "region", "territory", "boundary", "location", "place", "scale", "globalization"]
+        return [
+            "landscape",
+            "climate",
+            "topography",
+            "population",
+            "migration",
+            "urbanization",
+            "environment",
+            "ecosystem",
+            "resources",
+            "sustainability",
+            "cartography",
+            "GIS",
+            "spatial analysis",
+            "region",
+            "territory",
+            "boundary",
+            "location",
+            "place",
+            "scale",
+            "globalization"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How does {factor} influence {phenomenon}?", "What is the relationship between {concept} and {system}?", "How do {element} patterns vary across {term}?"]
+        return ["How does {factor} influence {phenomenon}?",
+                "What is the relationship between {concept} and {system}?",
+                "How do {element} patterns vary across {term}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         geo_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(geo_terms.intersection(words))
@@ -534,13 +1036,36 @@ class GeographySpecialist(BaseDomainSpecialist):
 
 class SociologySpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["society", "culture", "social structure", "institution", "community", "group", "interaction", "socialization", "inequality", "stratification", "class", "race", "gender", "ethnicity", "identity", "power", "authority", "conflict", "cooperation", "social change"]
+        return [
+            "society",
+            "culture",
+            "social structure",
+            "institution",
+            "community",
+            "group",
+            "interaction",
+            "socialization",
+            "inequality",
+            "stratification",
+            "class",
+            "race",
+            "gender",
+            "ethnicity",
+            "identity",
+            "power",
+            "authority",
+            "conflict",
+            "cooperation",
+            "social change"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How does {factor} shape {phenomenon}?", "What are the {concept} implications of {process}?", "How do {element} and {element} interact in {system}?"]
+        return ["How does {factor} shape {phenomenon}?",
+                "What are the {concept} implications of {process}?",
+                "How do {element} and {element} interact in {system}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         soc_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(soc_terms.intersection(words))
@@ -549,13 +1074,36 @@ class SociologySpecialist(BaseDomainSpecialist):
 
 class AnthropologySpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["culture", "ethnography", "ritual", "kinship", "tradition", "belief", "custom", "ceremony", "anthropology", "fieldwork", "participant observation", "cultural relativism", "ethnocentrism", "acculturation", "diffusion", "evolution", "adaptation", "archaeology", "linguistics", "primatology"]
+        return [
+            "culture",
+            "ethnography",
+            "ritual",
+            "kinship",
+            "tradition",
+            "belief",
+            "custom",
+            "ceremony",
+            "anthropology",
+            "fieldwork",
+            "participant observation",
+            "cultural relativism",
+            "ethnocentrism",
+            "acculturation",
+            "diffusion",
+            "evolution",
+            "adaptation",
+            "archaeology",
+            "linguistics",
+            "primatology"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How do {factor} reflect {concept}?", "What is the significance of {term} in {system}?", "How do anthropologists study {phenomenon} in {example}?"]
+        return ["How do {factor} reflect {concept}?",
+                "What is the significance of {term} in {system}?",
+                "How do anthropologists study {phenomenon} in {example}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         anthro_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(anthro_terms.intersection(words))
@@ -564,13 +1112,36 @@ class AnthropologySpecialist(BaseDomainSpecialist):
 
 class PoliticalScienceSpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["government", "politics", "policy", "democracy", "republic", "sovereignty", "citizenship", "voting", "election", "representation", "legislation", "executive", "judicial", "federalism", "diplomacy", "international relations", "political theory", "public administration", "comparative politics", "political behavior"]
+        return [
+            "government",
+            "politics",
+            "policy",
+            "democracy",
+            "republic",
+            "sovereignty",
+            "citizenship",
+            "voting",
+            "election",
+            "representation",
+            "legislation",
+            "executive",
+            "judicial",
+            "federalism",
+            "diplomacy",
+            "international relations",
+            "political theory",
+            "public administration",
+            "comparative politics",
+            "political behavior"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How does {system} affect {process}?", "What are the {concept} consequences of {factor}?", "How do {element} influence {phenomenon} in {system}?"]
+        return ["How does {system} affect {process}?",
+                "What are the {concept} consequences of {factor}?",
+                "How do {element} influence {phenomenon} in {system}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         polsci_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(polsci_terms.intersection(words))
@@ -579,13 +1150,37 @@ class PoliticalScienceSpecialist(BaseDomainSpecialist):
 
 class LawSpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["statute", "regulation", "precedent", "jurisdiction", "contract", "tort", "criminal law", "civil law", "constitutional law", "procedure", "evidence", "trial", "court", "judge", "jury", "attorney", "legal reasoning", "interpretation", "justice", "rights"]
+        return [
+            "statute",
+            "regulation",
+            "precedent",
+            "jurisdiction",
+            "contract",
+            "tort",
+            "criminal law",
+            "civil law",
+            "constitutional law",
+            "procedure",
+            "evidence",
+            "trial",
+            "court",
+            "judge",
+            "jury",
+            "attorney",
+            "legal reasoning",
+            "interpretation",
+            "justice",
+            "rights"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["What are the legal implications of {factor}?", "How does {principle} apply to {system}?", "What {method} do courts use to determine {concept}?"]
+        return [
+            "What are the legal implications of {factor}?",
+            "How does {principle} apply to {system}?",
+            "What {method} do courts use to determine {concept}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         law_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(law_terms.intersection(words))
@@ -594,13 +1189,36 @@ class LawSpecialist(BaseDomainSpecialist):
 
 class MedicineSpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["diagnosis", "treatment", "therapy", "medication", "surgery", "patient", "symptom", "disease", "disorder", "health", "prevention", "epidemiology", "pathology", "physiology", "anatomy", "clinical trial", "medical research", "evidence-based medicine", "healthcare", "public health"]
+        return [
+            "diagnosis",
+            "treatment",
+            "therapy",
+            "medication",
+            "surgery",
+            "patient",
+            "symptom",
+            "disease",
+            "disorder",
+            "health",
+            "prevention",
+            "epidemiology",
+            "pathology",
+            "physiology",
+            "anatomy",
+            "clinical trial",
+            "medical research",
+            "evidence-based medicine",
+            "healthcare",
+            "public health"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How is {term} diagnosed and treated?", "What are the {concept} effects of {factor}?", "How does {method} improve {system} outcomes?"]
+        return ["How is {term} diagnosed and treated?",
+                "What are the {concept} effects of {factor}?",
+                "How does {method} improve {system} outcomes?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         med_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(med_terms.intersection(words))
@@ -609,13 +1227,37 @@ class MedicineSpecialist(BaseDomainSpecialist):
 
 class EngineeringSpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["design", "construction", "materials", "structure", "system", "process", "efficiency", "optimization", "safety", "testing", "analysis", "modeling", "simulation", "project", "specification", "standard", "quality", "performance", "maintenance", "innovation"]
+        return [
+            "design",
+            "construction",
+            "materials",
+            "structure",
+            "system",
+            "process",
+            "efficiency",
+            "optimization",
+            "safety",
+            "testing",
+            "analysis",
+            "modeling",
+            "simulation",
+            "project",
+            "specification",
+            "standard",
+            "quality",
+            "performance",
+            "maintenance",
+            "innovation"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How can {system} be designed for optimal {factor}?", "What engineering principles apply to {process}?", "How do {element} affect {system} performance?"]
+        return [
+            "How can {system} be designed for optimal {factor}?",
+            "What engineering principles apply to {process}?",
+            "How do {element} affect {system} performance?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         eng_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(eng_terms.intersection(words))
@@ -624,13 +1266,36 @@ class EngineeringSpecialist(BaseDomainSpecialist):
 
 class BusinessSpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["management", "strategy", "marketing", "finance", "operations", "leadership", "organization", "profit", "revenue", "customer", "market", "competition", "innovation", "entrepreneurship", "investment", "risk", "planning", "analysis", "decision making", "performance"]
+        return [
+            "management",
+            "strategy",
+            "marketing",
+            "finance",
+            "operations",
+            "leadership",
+            "organization",
+            "profit",
+            "revenue",
+            "customer",
+            "market",
+            "competition",
+            "innovation",
+            "entrepreneurship",
+            "investment",
+            "risk",
+            "planning",
+            "analysis",
+            "decision making",
+            "performance"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How can {concept} improve {system} performance?", "What {method} should be used to achieve {factor}?", "How does {element} impact {process} outcomes?"]
+        return ["How can {concept} improve {system} performance?",
+                "What {method} should be used to achieve {factor}?",
+                "How does {element} impact {process} outcomes?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         biz_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(biz_terms.intersection(words))
@@ -639,13 +1304,37 @@ class BusinessSpecialist(BaseDomainSpecialist):
 
 class EnvironmentalScienceSpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["environment", "ecosystem", "conservation", "pollution", "sustainability", "climate", "biodiversity", "habitat", "species", "renewable", "carbon", "emissions", "greenhouse", "recycling", "waste", "energy", "water", "air", "soil", "ecology"]
+        return [
+            "environment",
+            "ecosystem",
+            "conservation",
+            "pollution",
+            "sustainability",
+            "climate",
+            "biodiversity",
+            "habitat",
+            "species",
+            "renewable",
+            "carbon",
+            "emissions",
+            "greenhouse",
+            "recycling",
+            "waste",
+            "energy",
+            "water",
+            "air",
+            "soil",
+            "ecology"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How does {factor} impact environmental {system}?", "What are the environmental effects of {process}?", "How can {method} address {phenomenon}?"]
+        return [
+            "How does {factor} impact environmental {system}?",
+            "What are the environmental effects of {process}?",
+            "How can {method} address {phenomenon}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         env_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(env_terms.intersection(words))
@@ -654,13 +1343,37 @@ class EnvironmentalScienceSpecialist(BaseDomainSpecialist):
 
 class LinguisticsSpecialist(BaseDomainSpecialist):
     def get_domain_vocabulary(self) -> List[str]:
-        return ["language", "grammar", "syntax", "semantics", "phonetics", "morphology", "linguistics", "phoneme", "morpheme", "lexicon", "dialect", "sociolinguistics", "psycholinguistics", "pragmatics", "discourse", "etymology", "orthography", "phonology", "bilingual", "multilingual"]
+        return [
+            "language",
+            "grammar",
+            "syntax",
+            "semantics",
+            "phonetics",
+            "morphology",
+            "linguistics",
+            "phoneme",
+            "morpheme",
+            "lexicon",
+            "dialect",
+            "sociolinguistics",
+            "psycholinguistics",
+            "pragmatics",
+            "discourse",
+            "etymology",
+            "orthography",
+            "phonology",
+            "bilingual",
+            "multilingual"]
 
     def get_question_patterns(self) -> List[str]:
-        return ["How does {concept} influence {phenomenon}?", "What role does {element} play in {process}?", "How do {factor} affect {system}?"]
+        return [
+            "How does {concept} influence {phenomenon}?",
+            "What role does {element} play in {process}?",
+            "How do {factor} affect {system}?"]
 
     def validate_domain_relevance(self, text: str) -> float:
-        if not text.strip(): return 0.0
+        if not text.strip():
+            return 0.0
         linguistic_terms = set(term.lower() for term in self.get_domain_vocabulary())
         words = set(word.lower().strip('.,!?;:') for word in text.split())
         overlap = len(linguistic_terms.intersection(words))
@@ -704,7 +1417,8 @@ def create_domain_specialist(domain: str) -> BaseDomainSpecialist:
     return DOMAIN_SPECIALISTS[domain]()
 
 
-def generate_domain_specific_questions(domains: List[str], questions_per_domain: int = 3) -> Dict[str, List[str]]:
+def generate_domain_specific_questions(
+        domains: List[str], questions_per_domain: int = 3) -> Dict[str, List[str]]:
     """Generate questions for multiple domains."""
     results = {}
 
@@ -738,7 +1452,8 @@ class DomainSpecializationFramework:
             raise ValueError(f"No specialist available for domain: {domain}")
         return self.specialists[domain]
 
-    def generate_questions_for_all_domains(self, questions_per_domain: int = 3) -> Dict[str, List[str]]:
+    def generate_questions_for_all_domains(
+            self, questions_per_domain: int = 3) -> Dict[str, List[str]]:
         """Generate questions for all available domains."""
         return generate_domain_specific_questions(
             domains=get_available_domains(),

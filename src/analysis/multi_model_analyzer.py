@@ -44,7 +44,10 @@ class MultiModelAnalyzer:
             logger.error(f"Failed to add model {model_name}: {e}")
             return False
 
-    def _create_model_config(self, model_name: str, model_config: Optional[Dict] = None):
+    def _create_model_config(
+            self,
+            model_name: str,
+            model_config: Optional[Dict] = None):
         """Create model-specific configuration."""
         from utils.config_manager import NeuronMapConfig
 
@@ -92,7 +95,8 @@ class MultiModelAnalyzer:
             "electra-base-discriminator",
         ]
 
-    def analyze_single_model(self, model_name: str, questions: List[str]) -> Dict[str, Any]:
+    def analyze_single_model(self, model_name: str,
+                             questions: List[str]) -> Dict[str, Any]:
         """Analyze questions with a single model."""
         if model_name not in self.analyzers:
             logger.error(f"Model {model_name} not initialized")
@@ -116,8 +120,8 @@ class MultiModelAnalyzer:
         }
 
     def analyze_multiple_models(self, questions: List[str],
-                              model_names: Optional[List[str]] = None,
-                              parallel: bool = True) -> Dict[str, Any]:
+                                model_names: Optional[List[str]] = None,
+                                parallel: bool = True) -> Dict[str, Any]:
         """Analyze questions across multiple models."""
         if model_names is None:
             model_names = list(self.analyzers.keys())
@@ -209,7 +213,7 @@ class MultiModelAnalyzer:
 
         # Find layers present in multiple models
         common_layers = {layer: models for layer, models in all_layers.items()
-                        if len(models) > 1}
+                         if len(models) > 1}
 
         if not common_layers:
             return {}
@@ -230,12 +234,41 @@ class MultiModelAnalyzer:
 
         return layer_comparison
 
+    def _compute_pairwise_similarities(self, model_activations: Dict[str, np.ndarray]) -> Dict[str, Any]:
+        """Compute pairwise similarities between model activations."""
+        similarities = {}
+        model_names = list(model_activations.keys())
+
+        for i, model1 in enumerate(model_names):
+            for j, model2 in enumerate(model_names):
+                if i < j:
+                    try:
+                        min_samples = min(len(model_activations[model1]),
+                                        len(model_activations[model2]))
+
+                        act1 = model_activations[model1][:min_samples]
+                        act2 = model_activations[model2][:min_samples]
+
+                        similarities_per_sample = []
+                        for k in range(min_samples):
+                            sim = cosine_similarity([act1[k]], [act2[k]])[0][0]
+                            similarities_per_sample.append(sim)
+
+                        avg_similarity = np.mean(similarities_per_sample)
+                        similarities[f"{model1}_vs_{model2}"] = {
+                            'cosine_similarity': float(avg_similarity),
+                            'sample_count': min_samples
+                        }
+
+                    except Exception as e:
+                        logger.warning(f"Failed to compute similarity between {model1} and {model2}: {e}")
+        return similarities
+
     def _compute_activation_similarity(self, results: Dict[str, Any]) -> Dict[str, Any]:
         """Compute similarity between model activations."""
         try:
             from sklearn.metrics.pairwise import cosine_similarity
 
-            # Extract activation vectors for comparison
             model_activations = {}
 
             for model_name, model_data in results.items():
@@ -243,13 +276,11 @@ class MultiModelAnalyzer:
                 if not model_results:
                     continue
 
-                # Collect activations from successful analyses
                 activations = []
                 for result in model_results:
                     if result.get('success', False):
                         result_activations = result.get('activations', {})
                         if result_activations:
-                            # Use first layer's activations for comparison
                             first_layer = list(result_activations.keys())[0]
                             activation = result_activations[first_layer]
                             if isinstance(activation, np.ndarray):
@@ -261,37 +292,7 @@ class MultiModelAnalyzer:
             if len(model_activations) < 2:
                 return {}
 
-            # Compute pairwise similarities
-            similarities = {}
-            model_names = list(model_activations.keys())
-
-            for i, model1 in enumerate(model_names):
-                for j, model2 in enumerate(model_names):
-                    if i < j:  # Avoid duplicates
-                        try:
-                            # Ensure same number of samples
-                            min_samples = min(len(model_activations[model1]),
-                                            len(model_activations[model2]))
-
-                            act1 = model_activations[model1][:min_samples]
-                            act2 = model_activations[model2][:min_samples]
-
-                            # Compute mean similarity across samples
-                            similarities_per_sample = []
-                            for k in range(min_samples):
-                                sim = cosine_similarity([act1[k]], [act2[k]])[0][0]
-                                similarities_per_sample.append(sim)
-
-                            avg_similarity = np.mean(similarities_per_sample)
-                            similarities[f"{model1}_vs_{model2}"] = {
-                                'cosine_similarity': float(avg_similarity),
-                                'sample_count': min_samples
-                            }
-
-                        except Exception as e:
-                            logger.warning(f"Failed to compute similarity between {model1} and {model2}: {e}")
-
-            return similarities
+            return self._compute_pairwise_similarities(model_activations)
 
         except ImportError:
             logger.warning("Scikit-learn not available for similarity computation")
@@ -301,7 +302,7 @@ class MultiModelAnalyzer:
             return {}
 
     def save_multi_model_results(self, results: Dict[str, Any],
-                                comparison: Dict[str, Any]) -> None:
+                                 comparison: Dict[str, Any]) -> None:
         """Save multi-model analysis results."""
         output_dir = Path(self.config.data.outputs_dir) / "multi_model_analysis"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -331,7 +332,8 @@ class MultiModelAnalyzer:
     def _make_json_serializable(self, obj):
         """Convert numpy arrays and other non-serializable objects to JSON-compatible types."""
         if isinstance(obj, dict):
-            return {key: self._make_json_serializable(value) for key, value in obj.items()}
+            return {key: self._make_json_serializable(
+                value) for key, value in obj.items()}
         elif isinstance(obj, list):
             return [self._make_json_serializable(item) for item in obj]
         elif isinstance(obj, np.ndarray):
@@ -344,8 +346,8 @@ class MultiModelAnalyzer:
             return obj
 
     def _generate_summary_report(self, results: Dict[str, Any],
-                                comparison: Dict[str, Any],
-                                output_file: Path) -> None:
+                                 comparison: Dict[str, Any],
+                                 output_file: Path) -> None:
         """Generate a text summary of multi-model analysis."""
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write("Multi-Model Analysis Summary\n")
@@ -413,7 +415,10 @@ def create_multi_model_demo():
     # Limit to first 3 questions for demo
     demo_questions = questions[:3]
 
-    print(f"\nAnalyzing {len(demo_questions)} questions across {len(models_to_test)} models...")
+    print(
+        f"\nAnalyzing {
+            len(demo_questions)} questions across {
+            len(models_to_test)} models...")
 
     # Run multi-model analysis
     results = analyzer.analyze_multiple_models(demo_questions)

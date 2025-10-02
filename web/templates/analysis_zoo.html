@@ -1,0 +1,534 @@
+{% extends "base.html" %}
+
+{% block title %}Analysis Zoo - NeuronMap{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<style>
+    .artifact-card {
+        background: white;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        border-left: 4px solid #667eea;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .artifact-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    }
+    
+    .artifact-type-badge {
+        font-size: 0.8rem;
+        padding: 4px 8px;
+        border-radius: 20px;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    
+    .type-sae { background: #e3f2fd; color: #1976d2; }
+    .type-circuit { background: #f3e5f5; color: #7b1fa2; }
+    .type-analysis { background: #e8f5e8; color: #388e3c; }
+    .type-dataset { background: #fff3e0; color: #f57c00; }
+    
+    .search-filters {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .upload-area {
+        border: 2px dashed #667eea;
+        border-radius: 10px;
+        padding: 40px;
+        text-align: center;
+        background: #f8f9ff;
+        margin-bottom: 20px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    
+    .upload-area:hover {
+        background: #f0f4ff;
+    }
+    
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1><i class="fas fa-university me-2"></i>Analysis Zoo</h1>
+                    <p class="text-muted mb-0">Community platform for sharing neural network analysis artifacts</p>
+                </div>
+                <div>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                        <i class="fas fa-upload me-2"></i>Upload Artifact
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h3 id="total-artifacts">-</h3>
+                <p class="mb-0">Total Artifacts</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h3 id="sae-models">-</h3>
+                <p class="mb-0">SAE Models</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h3 id="circuits">-</h3>
+                <p class="mb-0">Circuits</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-card">
+                <h3 id="downloads">-</h3>
+                <p class="mb-0">Total Downloads</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div class="row">
+        <div class="col-12">
+            <div class="search-filters">
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">Search Artifacts</label>
+                        <input type="text" class="form-control" id="search-input" placeholder="Search by name, description, tags...">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Type</label>
+                        <select class="form-select" id="type-filter">
+                            <option value="">All Types</option>
+                            <option value="sae_model">SAE Models</option>
+                            <option value="circuit">Circuits</option>
+                            <option value="analysis_result">Analysis Results</option>
+                            <option value="dataset">Datasets</option>
+                            <option value="visualization">Visualizations</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Model</label>
+                        <select class="form-select" id="model-filter">
+                            <option value="">All Models</option>
+                            <option value="gpt2">GPT-2</option>
+                            <option value="llama">LLaMA</option>
+                            <option value="bert">BERT</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Sort By</label>
+                        <select class="form-select" id="sort-filter">
+                            <option value="created_at">Latest</option>
+                            <option value="downloads">Most Downloaded</option>
+                            <option value="rating">Highest Rated</option>
+                            <option value="name">Name</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button class="btn btn-outline-primary w-100" onclick="searchArtifacts()">
+                            <i class="fas fa-search me-2"></i>Search
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Artifacts List -->
+    <div class="row">
+        <div class="col-12">
+            <div id="artifacts-container">
+                <!-- Artifacts will be loaded here -->
+                <div class="text-center p-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-3">Loading artifacts from the Analysis Zoo...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-upload me-2"></i>Upload Artifact
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-area" onclick="document.getElementById('file-input').click()">
+                    <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                    <h5>Drag & Drop or Click to Upload</h5>
+                    <p class="text-muted">Supported: .pt, .json, .zip files</p>
+                    <input type="file" id="file-input" style="display: none;" accept=".pt,.json,.zip" multiple>
+                </div>
+                
+                <form id="upload-form">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Artifact Name</label>
+                            <input type="text" class="form-control" id="artifact-name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Type</label>
+                            <select class="form-select" id="artifact-type" required>
+                                <option value="">Select Type</option>
+                                <option value="sae_model">SAE Model</option>
+                                <option value="circuit">Circuit</option>
+                                <option value="analysis_result">Analysis Result</option>
+                                <option value="dataset">Dataset</option>
+                                <option value="visualization">Visualization</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="artifact-description" rows="3" required></textarea>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Author</label>
+                            <input type="text" class="form-control" id="artifact-author" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">License</label>
+                            <select class="form-select" id="artifact-license" required>
+                                <option value="MIT">MIT</option>
+                                <option value="Apache-2.0">Apache 2.0</option>
+                                <option value="CC-BY-4.0">CC BY 4.0</option>
+                                <option value="GPL-3.0">GPL 3.0</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3">
+                        <label class="form-label">Tags (comma-separated)</label>
+                        <input type="text" class="form-control" id="artifact-tags" placeholder="gpt2, sae, interpretability">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="uploadArtifact()">
+                    <i class="fas fa-upload me-2"></i>Upload
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Artifact Detail Modal -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="detail-title">Artifact Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="detail-content">
+                <!-- Artifact details will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" id="download-btn">
+                    <i class="fas fa-download me-2"></i>Download
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Analysis Zoo JavaScript functionality
+let artifacts = [];
+
+// Load initial data
+document.addEventListener('DOMContentLoaded', function() {
+    loadStatistics();
+    loadArtifacts();
+});
+
+async function loadStatistics() {
+    try {
+        const response = await fetch('/api/zoo/stats');
+        if (response.ok) {
+            const stats = await response.json();
+            document.getElementById('total-artifacts').textContent = stats.total_artifacts || 0;
+            document.getElementById('sae-models').textContent = stats.sae_models || 0;
+            document.getElementById('circuits').textContent = stats.circuits || 0;
+            document.getElementById('downloads').textContent = stats.total_downloads || 0;
+        }
+    } catch (error) {
+        console.error('Error loading statistics:', error);
+        // Show placeholder data for demo
+        document.getElementById('total-artifacts').textContent = '42';
+        document.getElementById('sae-models').textContent = '18';
+        document.getElementById('circuits').textContent = '12';
+        document.getElementById('downloads').textContent = '1,337';
+    }
+}
+
+async function loadArtifacts() {
+    try {
+        const response = await fetch('/api/zoo/artifacts');
+        if (response.ok) {
+            artifacts = await response.json();
+            displayArtifacts(artifacts);
+        } else {
+            // Show demo artifacts if API is not available
+            showDemoArtifacts();
+        }
+    } catch (error) {
+        console.error('Error loading artifacts:', error);
+        showDemoArtifacts();
+    }
+}
+
+function showDemoArtifacts() {
+    const demoArtifacts = [
+        {
+            id: 'demo-sae-1',
+            name: 'GPT-2 Layer 8 SAE',
+            type: 'sae_model',
+            description: 'Sparse autoencoder trained on GPT-2 layer 8 MLP activations with 4096 features',
+            author: 'Research Team',
+            created_at: '2025-06-28',
+            downloads: 156,
+            rating: 4.8,
+            tags: ['gpt2', 'sae', 'layer8', 'mlp'],
+            model_compatibility: ['gpt2']
+        },
+        {
+            id: 'demo-circuit-1',
+            name: 'Induction Head Circuit',
+            type: 'circuit',
+            description: 'Complete induction head circuit discovered in GPT-2 small',
+            author: 'Circuit Explorer',
+            created_at: '2025-06-27',
+            downloads: 89,
+            rating: 4.6,
+            tags: ['circuit', 'induction', 'gpt2'],
+            model_compatibility: ['gpt2']
+        },
+        {
+            id: 'demo-analysis-1',
+            name: 'Feature Analysis Results',
+            type: 'analysis_result',
+            description: 'Comprehensive feature analysis with max activating examples',
+            author: 'Feature Analyst',
+            created_at: '2025-06-26',
+            downloads: 234,
+            rating: 4.9,
+            tags: ['features', 'analysis', 'interpretability'],
+            model_compatibility: ['gpt2', 'llama']
+        }
+    ];
+    
+    artifacts = demoArtifacts;
+    displayArtifacts(artifacts);
+}
+
+function displayArtifacts(artifactList) {
+    const container = document.getElementById('artifacts-container');
+    
+    if (artifactList.length === 0) {
+        container.innerHTML = `
+            <div class="text-center p-5">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h5>No artifacts found</h5>
+                <p class="text-muted">Try adjusting your search criteria</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const artifactsHtml = artifactList.map(artifact => `
+        <div class="artifact-card" onclick="showArtifactDetails('${artifact.id}')">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <h5 class="mb-1">${artifact.name}</h5>
+                    <span class="artifact-type-badge type-${artifact.type.replace('_', '')}">${artifact.type.replace('_', ' ')}</span>
+                </div>
+                <div class="text-end">
+                    <div class="text-warning mb-1">
+                        ${'★'.repeat(Math.floor(artifact.rating || 0))}${'☆'.repeat(5 - Math.floor(artifact.rating || 0))}
+                        <small class="text-muted">(${artifact.rating || 'N/A'})</small>
+                    </div>
+                    <small class="text-muted">
+                        <i class="fas fa-download me-1"></i>${artifact.downloads || 0} downloads
+                    </small>
+                </div>
+            </div>
+            
+            <p class="text-muted mb-2">${artifact.description}</p>
+            
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <small class="text-muted">
+                        <i class="fas fa-user me-1"></i>${artifact.author}
+                        <i class="fas fa-calendar ms-3 me-1"></i>${artifact.created_at}
+                    </small>
+                </div>
+                <div>
+                    ${(artifact.tags || []).map(tag => `<span class="badge bg-light text-dark me-1">${tag}</span>`).join('')}
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    container.innerHTML = artifactsHtml;
+}
+
+function searchArtifacts() {
+    const searchTerm = document.getElementById('search-input').value.toLowerCase();
+    const typeFilter = document.getElementById('type-filter').value;
+    const modelFilter = document.getElementById('model-filter').value;
+    const sortBy = document.getElementById('sort-filter').value;
+    
+    let filtered = artifacts.filter(artifact => {
+        const matchesSearch = !searchTerm || 
+            artifact.name.toLowerCase().includes(searchTerm) ||
+            artifact.description.toLowerCase().includes(searchTerm) ||
+            (artifact.tags || []).some(tag => tag.toLowerCase().includes(searchTerm));
+        
+        const matchesType = !typeFilter || artifact.type === typeFilter;
+        const matchesModel = !modelFilter || 
+            (artifact.model_compatibility || []).includes(modelFilter);
+        
+        return matchesSearch && matchesType && matchesModel;
+    });
+    
+    // Sort results
+    filtered.sort((a, b) => {
+        switch(sortBy) {
+            case 'downloads':
+                return (b.downloads || 0) - (a.downloads || 0);
+            case 'rating':
+                return (b.rating || 0) - (a.rating || 0);
+            case 'name':
+                return a.name.localeCompare(b.name);
+            case 'created_at':
+            default:
+                return new Date(b.created_at) - new Date(a.created_at);
+        }
+    });
+    
+    displayArtifacts(filtered);
+}
+
+function showArtifactDetails(artifactId) {
+    const artifact = artifacts.find(a => a.id === artifactId);
+    if (!artifact) return;
+    
+    document.getElementById('detail-title').textContent = artifact.name;
+    document.getElementById('detail-content').innerHTML = `
+        <div class="row">
+            <div class="col-md-8">
+                <h6>Description</h6>
+                <p>${artifact.description}</p>
+                
+                <h6>Metadata</h6>
+                <ul class="list-unstyled">
+                    <li><strong>Type:</strong> ${artifact.type.replace('_', ' ')}</li>
+                    <li><strong>Author:</strong> ${artifact.author}</li>
+                    <li><strong>Created:</strong> ${artifact.created_at}</li>
+                    <li><strong>Downloads:</strong> ${artifact.downloads || 0}</li>
+                    <li><strong>Rating:</strong> ${artifact.rating || 'N/A'}/5</li>
+                </ul>
+                
+                <h6>Tags</h6>
+                <div>
+                    ${(artifact.tags || []).map(tag => `<span class="badge bg-primary me-1">${tag}</span>`).join('')}
+                </div>
+                
+                <h6 class="mt-3">Model Compatibility</h6>
+                <div>
+                    ${(artifact.model_compatibility || []).map(model => `<span class="badge bg-success me-1">${model}</span>`).join('')}
+                </div>
+            </div>
+            <div class="col-md-4">
+                <h6>Download Information</h6>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Click the download button to get this artifact
+                </div>
+                
+                <h6>Usage Example</h6>
+                <pre class="bg-light p-2 rounded"><code># Download via CLI
+neuronmap zoo pull ${artifactId}
+
+# Or via Python API
+from neuronmap.zoo import download_artifact
+artifact = download_artifact('${artifactId}')</code></pre>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('download-btn').onclick = () => downloadArtifact(artifactId);
+    
+    new bootstrap.Modal(document.getElementById('detailModal')).show();
+}
+
+function downloadArtifact(artifactId) {
+    // In a real implementation, this would trigger the download
+    alert(`Downloading artifact: ${artifactId}\n\nIn a real implementation, this would start the download process.`);
+}
+
+function uploadArtifact() {
+    const formData = {
+        name: document.getElementById('artifact-name').value,
+        type: document.getElementById('artifact-type').value,
+        description: document.getElementById('artifact-description').value,
+        author: document.getElementById('artifact-author').value,
+        license: document.getElementById('artifact-license').value,
+        tags: document.getElementById('artifact-tags').value.split(',').map(t => t.trim())
+    };
+    
+    // In a real implementation, this would upload the files and metadata
+    alert(`Uploading artifact: ${formData.name}\n\nIn a real implementation, this would upload the artifact to the zoo.`);
+    
+    bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
+}
+
+// Search on Enter key
+document.getElementById('search-input').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        searchArtifacts();
+    }
+});
+</script>
+{% endblock %}

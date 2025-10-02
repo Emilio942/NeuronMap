@@ -8,7 +8,7 @@ import logging
 import json
 import numpy as np
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 import tempfile
 import pickle
@@ -23,9 +23,6 @@ except ImportError:
     MLFLOW_AVAILABLE = False
 
 # Internal imports
-import sys
-sys.path.append(str(Path(__file__).parent.parent))
-
 from utils.error_handling import NeuronMapError
 from utils.monitoring import setup_monitoring
 
@@ -341,6 +338,47 @@ class MLFlowIntegration:
         except Exception as e:
             logger.error(f"Failed to log attention analysis: {e}")
 
+    def _log_basic_metrics(self, results: Dict[str, Any], step: Optional[int] = None):
+        if 'metrics' in results:
+            self.log_metrics(results['metrics'], step=step)
+
+    def _log_activation_data(self, results: Dict[str, Any], model_name: str, experiment_config: Dict[str, Any], step: Optional[int] = None):
+        if 'activations' in results:
+            self.log_activation_analysis(
+                results['activations'],
+                model_name,
+                experiment_config,
+                step=step
+            )
+
+    def _log_attention_data(self, results: Dict[str, Any], model_name: str, step: Optional[int] = None):
+        if 'attention_weights' in results:
+            self.log_attention_analysis(
+                results['attention_weights'],
+                model_name,
+                results.get('input_tokens'),
+                step=step
+            )
+
+    def _log_layer_statistics(self, results: Dict[str, Any], step: Optional[int] = None):
+        if 'layer_statistics' in results:
+            layer_metrics = {}
+            for layer, stats in results['layer_statistics'].items():
+                for stat_name, value in stats.items():
+                    if isinstance(value, (int, float)):
+                        layer_metrics[f"layer_{layer}_{stat_name}"] = value
+            self.log_metrics(layer_metrics, step=step)
+
+    def _log_interpretability_results(self, results: Dict[str, Any], step: Optional[int] = None):
+        if 'interpretability' in results:
+            interp_metrics = {}
+            for method, method_results in results['interpretability'].items():
+                if isinstance(method_results, dict):
+                    for metric, value in method_results.items():
+                        if isinstance(value, (int, float)):
+                            interp_metrics[f"interpretability_{method}_{metric}"] = value
+            self.log_metrics(interp_metrics, step=step)
+
     def log_experiment_results(
         self,
         results: Dict[str, Any],
@@ -348,65 +386,15 @@ class MLFlowIntegration:
         model_name: str,
         step: Optional[int] = None
     ):
-        """
-        Log comprehensive experiment results.
-
-        Args:
-            results: Complete experiment results
-            experiment_config: Configuration used for the experiment
-            model_name: Name of the model
-            step: Step number for metrics
-        """
+        """Log comprehensive experiment results."""
         try:
-            # Log experiment configuration
             self.log_parameters(experiment_config)
-
-            # Log basic metrics
-            if 'metrics' in results:
-                self.log_metrics(results['metrics'], step=step)
-
-            # Log activation analysis
-            if 'activations' in results:
-                self.log_activation_analysis(
-                    results['activations'],
-                    model_name,
-                    experiment_config,
-                    step=step
-                )
-
-            # Log attention analysis
-            if 'attention_weights' in results:
-                self.log_attention_analysis(
-                    results['attention_weights'],
-                    model_name,
-                    results.get('input_tokens'),
-                    step=step
-                )
-
-            # Log layer statistics
-            if 'layer_statistics' in results:
-                layer_metrics = {}
-                for layer, stats in results['layer_statistics'].items():
-                    for stat_name, value in stats.items():
-                        if isinstance(value, (int, float)):
-                            layer_metrics[f"layer_{layer}_{stat_name}"] = value
-
-                self.log_metrics(layer_metrics, step=step)
-
-            # Log interpretability results
-            if 'interpretability' in results:
-                interp_metrics = {}
-                for method, method_results in results['interpretability'].items():
-                    if isinstance(method_results, dict):
-                        for metric, value in method_results.items():
-                            if isinstance(value, (int, float)):
-                                interp_metrics[f"interpretability_{method}_{metric}"] = value
-
-                self.log_metrics(interp_metrics, step=step)
-
-            # Save complete results as artifact
+            self._log_basic_metrics(results, step)
+            self._log_activation_data(results, model_name, experiment_config, step)
+            self._log_attention_data(results, model_name, step)
+            self._log_layer_statistics(results, step)
+            self._log_interpretability_results(results, step)
             self._save_results_artifact(results)
-
             logger.info("Logged comprehensive experiment results")
 
         except Exception as e:

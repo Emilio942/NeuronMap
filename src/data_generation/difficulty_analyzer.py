@@ -10,11 +10,10 @@ import spacy
 import torch
 import logging
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple, Union
+from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-import re
 import json
 from collections import Counter, defaultdict
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -851,6 +850,8 @@ def assess_question_difficulty_fast(question: str) -> DifficultyMetrics:
     """Fast assessment without BERT for <150ms performance."""
     engine = get_fast_engine()
     return engine.assess_difficulty(question)
+
+
 def batch_assess_difficulty(questions: List[str],
                           bert_model: str = "bert-base-uncased",
                           fast_mode: bool = True) -> List[DifficultyMetrics]:

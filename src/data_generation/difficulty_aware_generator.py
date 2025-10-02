@@ -17,9 +17,12 @@ import json
 
 # Import difficulty assessment components
 from .difficulty_analyzer import (
-    DifficultyAssessmentEngine, DifficultyMetrics, DifficultyLevel as AssessedDifficultyLevel,
-    ReasoningType, assess_question_difficulty, get_difficulty_summary
-)
+    DifficultyAssessmentEngine,
+    DifficultyMetrics,
+    DifficultyLevel as AssessedDifficultyLevel,
+    ReasoningType,
+    assess_question_difficulty,
+    get_difficulty_summary)
 
 # Import existing enhanced generator components
 try:
@@ -113,7 +116,7 @@ class DifficultyTargetManager:
         self.tolerance = 1.0
 
     def validate_difficulty_match(self, target: DifficultyLevel,
-                                assessed: DifficultyAssessment) -> bool:
+                                  assessed: DifficultyAssessment) -> bool:
         """Check if assessed difficulty matches target."""
         target_range = self.difficulty_mappings[target]
         target_min, target_max = target_range
@@ -123,7 +126,7 @@ class DifficultyTargetManager:
                 target_max + self.tolerance)
 
     def get_difficulty_gap(self, target: DifficultyLevel,
-                          assessed: DifficultyAssessment) -> float:
+                           assessed: DifficultyAssessment) -> float:
         """Calculate gap between target and assessed difficulty."""
         target_range = self.difficulty_mappings[target]
         target_center = (target_range[0] + target_range[1]) / 2
@@ -131,7 +134,7 @@ class DifficultyTargetManager:
         return assessed.difficulty_score - target_center
 
     def suggest_adjustments(self, target: DifficultyLevel,
-                          assessed: DifficultyAssessment) -> List[str]:
+                            assessed: DifficultyAssessment) -> List[str]:
         """Suggest adjustments to reach target difficulty."""
         gap = self.get_difficulty_gap(target, assessed)
         suggestions = []
@@ -185,10 +188,11 @@ class DifficultyAwareQuestionGenerator:
         }
 
     def generate_question_with_difficulty_control(self,
-                                                source_text: str,
-                                                target_difficulty: DifficultyLevel,
-                                                category: QuestionCategory,
-                                                context: Optional[str] = None) -> Optional[Tuple[str, EnhancedQuestionMetadata]]:
+                                                  source_text: str,
+                                                  target_difficulty: DifficultyLevel,
+                                                  category: QuestionCategory,
+                                                  context: Optional[str] = None) -> Optional[Tuple[str,
+                                                                                                   EnhancedQuestionMetadata]]:
         """Generate a question with specific difficulty targeting."""
 
         start_time = time.time()
@@ -206,7 +210,8 @@ class DifficultyAwareQuestionGenerator:
             quality_score = initial_result[0].get('quality_score', 0.5)
         else:
             # Fallback to simple generation
-            initial_question = self._simple_question_generation(source_text, target_difficulty, category)
+            initial_question = self._simple_question_generation(
+                source_text, target_difficulty, category)
             quality_score = 0.5
 
         if not initial_question:
@@ -229,7 +234,8 @@ class DifficultyAwareQuestionGenerator:
 
             if refined_question and refined_question != current_question:
                 current_question = refined_question
-                difficulty_assessment = self._assess_question_difficulty(current_question)
+                difficulty_assessment = self._assess_question_difficulty(
+                    current_question)
                 refinement_attempts += 1
                 self.generation_stats['refinement_attempts'] += 1
             else:
@@ -247,7 +253,8 @@ class DifficultyAwareQuestionGenerator:
             generation_model="difficulty-aware-generator",
             generation_timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
             quality_score=quality_score,
-            validation_passed=self.difficulty_manager.validate_difficulty_match(target_difficulty, difficulty_assessment),
+            validation_passed=self.difficulty_manager.validate_difficulty_match(
+                target_difficulty, difficulty_assessment),
             processing_time_ms=processing_time,
             topic_tags=self._extract_topic_tags(source_text),
             complexity_factors=self._extract_complexity_factors(difficulty_assessment)
@@ -270,12 +277,17 @@ class DifficultyAwareQuestionGenerator:
                 difficulty_score=metrics.difficulty_score,
                 confidence=metrics.confidence,
                 reasoning_type=metrics.reasoning_type,
-                linguistic_complexity=metrics.complexity_factors.get('linguistic_complexity', 0),
-                cognitive_load=metrics.complexity_factors.get('cognitive_load', 0),
-                semantic_complexity=metrics.complexity_factors.get('semantic_complexity', 0),
+                linguistic_complexity=metrics.complexity_factors.get(
+                    'linguistic_complexity',
+                    0),
+                cognitive_load=metrics.complexity_factors.get(
+                    'cognitive_load',
+                    0),
+                semantic_complexity=metrics.complexity_factors.get(
+                    'semantic_complexity',
+                    0),
                 domain_indicators=metrics.domain_indicators,
-                recommendations=metrics.recommendations
-            )
+                recommendations=metrics.recommendations)
         except Exception as e:
             logger.error(f"Difficulty assessment failed: {e}")
             # Return default assessment
@@ -291,11 +303,15 @@ class DifficultyAwareQuestionGenerator:
                 recommendations=["Unable to assess difficulty"]
             )
 
-    def _refine_question_difficulty(self, question: str, target_difficulty: DifficultyLevel,
-                                  current_assessment: DifficultyAssessment) -> Optional[str]:
+    def _refine_question_difficulty(
+            self,
+            question: str,
+            target_difficulty: DifficultyLevel,
+            current_assessment: DifficultyAssessment) -> Optional[str]:
         """Attempt to refine question to match target difficulty."""
 
-        gap = self.difficulty_manager.get_difficulty_gap(target_difficulty, current_assessment)
+        gap = self.difficulty_manager.get_difficulty_gap(
+            target_difficulty, current_assessment)
 
         if abs(gap) < 0.5:  # Close enough
             return question
@@ -310,7 +326,10 @@ class DifficultyAwareQuestionGenerator:
 
         return refined if refined else question
 
-    def _simplify_question(self, question: str, assessment: DifficultyAssessment) -> Optional[str]:
+    def _simplify_question(
+            self,
+            question: str,
+            assessment: DifficultyAssessment) -> Optional[str]:
         """Simplify a question to reduce difficulty."""
         modifications = []
 
@@ -351,12 +370,17 @@ class DifficultyAwareQuestionGenerator:
 
         return modifications[0] if modifications else None
 
-    def _complexify_question(self, question: str, assessment: DifficultyAssessment) -> Optional[str]:
+    def _complexify_question(
+            self,
+            question: str,
+            assessment: DifficultyAssessment) -> Optional[str]:
         """Increase question complexity to raise difficulty."""
         modifications = []
 
         # Add analytical components
-        if assessment.reasoning_type in [ReasoningType.FACTUAL_RECALL, ReasoningType.DEFINITIONAL]:
+        if assessment.reasoning_type in [
+                ReasoningType.FACTUAL_RECALL,
+                ReasoningType.DEFINITIONAL]:
             if question.startswith('What'):
                 modifications.append(f"Analyze why {question[5:].lower()}")
             elif question.startswith('Who'):
@@ -364,30 +388,40 @@ class DifficultyAwareQuestionGenerator:
 
         # Add complexity through comparison
         if assessment.cognitive_load < 4:
-            modifications.append(f"{question.rstrip('?')} and compare this with alternative approaches?")
+            modifications.append(
+                f"{question.rstrip('?')} and compare this with alternative approaches?")
 
         # Add theoretical framework requirement
         if 'theory' not in question.lower() and assessment.semantic_complexity < 5:
-            modifications.append(f"{question.rstrip('?')} using relevant theoretical frameworks?")
+            modifications.append(
+                f"{question.rstrip('?')} using relevant theoretical frameworks?")
 
         # Add evaluation component
-        if assessment.reasoning_type not in [ReasoningType.EVALUATIVE, ReasoningType.CREATIVE]:
-            modifications.append(f"{question.rstrip('?')} and critically evaluate the implications?")
+        if assessment.reasoning_type not in [
+                ReasoningType.EVALUATIVE,
+                ReasoningType.CREATIVE]:
+            modifications.append(
+                f"{question.rstrip('?')} and critically evaluate the implications?")
 
         return modifications[0] if modifications else None
 
     def _simple_question_generation(self, source_text: str, difficulty: DifficultyLevel,
-                                   category: QuestionCategory) -> Optional[str]:
+                                    category: QuestionCategory) -> Optional[str]:
         """Fallback simple question generation."""
         # Basic template-based generation
         templates = {
-            QuestionCategory.FACTUAL: ["What is {concept}?", "Who discovered {concept}?", "When did {event} occur?"],
-            QuestionCategory.REASONING: ["Why does {concept} occur?", "How does {concept} work?"],
+            QuestionCategory.FACTUAL: [
+                "What is {concept}?",
+                "Who discovered {concept}?",
+                "When did {event} occur?"],
+            QuestionCategory.REASONING: [
+                "Why does {concept} occur?",
+                "How does {concept} work?"],
             QuestionCategory.ANALYTICAL: ["Analyze the relationship between {concept1} and {concept2}"],
-            QuestionCategory.CREATIVE: ["Design a solution for {problem}"]
-        }
+            QuestionCategory.CREATIVE: ["Design a solution for {problem}"]}
 
-        category_templates = templates.get(category, templates[QuestionCategory.FACTUAL])
+        category_templates = templates.get(
+            category, templates[QuestionCategory.FACTUAL])
 
         # Extract key concepts (simplified)
         words = source_text.split()
@@ -397,7 +431,13 @@ class DifficultyAwareQuestionGenerator:
             import random
             template = random.choice(category_templates)
             concept = random.choice(concepts[:5])  # Use first 5 concepts
-            return template.replace('{concept}', concept).replace('{concept1}', concept).replace('{concept2}', concepts[1] if len(concepts) > 1 else concept)
+            return template.replace(
+                '{concept}',
+                concept).replace(
+                '{concept1}',
+                concept).replace(
+                '{concept2}',
+                concepts[1] if len(concepts) > 1 else concept)
 
         return "What is the main idea in this text?"
 
@@ -410,14 +450,30 @@ class DifficultyAwareQuestionGenerator:
         """Extract topic tags from source text."""
         # Simple keyword extraction
         words = text.lower().split()
-        common_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by'}
-        keywords = [word for word in words if len(word) > 4 and word not in common_words]
+        common_words = {
+            'the',
+            'a',
+            'an',
+            'and',
+            'or',
+            'but',
+            'in',
+            'on',
+            'at',
+            'to',
+            'for',
+            'of',
+            'with',
+            'by'}
+        keywords = [word for word in words if len(
+            word) > 4 and word not in common_words]
 
         # Return top 5 most frequent keywords
         from collections import Counter
         return [word for word, count in Counter(keywords).most_common(5)]
 
-    def _extract_complexity_factors(self, assessment: DifficultyAssessment) -> Dict[str, float]:
+    def _extract_complexity_factors(
+            self, assessment: DifficultyAssessment) -> Dict[str, float]:
         """Extract complexity factors from assessment."""
         return {
             'linguistic_complexity': assessment.linguistic_complexity,
@@ -428,10 +484,11 @@ class DifficultyAwareQuestionGenerator:
         }
 
     def batch_generate_with_difficulty_control(self,
-                                             source_texts: List[str],
-                                             target_difficulty: DifficultyLevel,
-                                             category: QuestionCategory,
-                                             count_per_text: int = 1) -> List[Tuple[str, EnhancedQuestionMetadata]]:
+                                               source_texts: List[str],
+                                               target_difficulty: DifficultyLevel,
+                                               category: QuestionCategory,
+                                               count_per_text: int = 1) -> List[Tuple[str,
+                                                                                      EnhancedQuestionMetadata]]:
         """Generate multiple questions with difficulty control."""
         results = []
 
@@ -450,17 +507,18 @@ class DifficultyAwareQuestionGenerator:
         stats = self.generation_stats.copy()
 
         if stats['total_generated'] > 0:
-            stats['difficulty_match_rate'] = stats['difficulty_matches'] / stats['total_generated']
-            stats['average_refinements'] = stats['refinement_attempts'] / stats['total_generated']
+            stats['difficulty_match_rate'] = stats['difficulty_matches'] / \
+                stats['total_generated']
+            stats['average_refinements'] = stats['refinement_attempts'] / \
+                stats['total_generated']
         else:
             stats['difficulty_match_rate'] = 0.0
             stats['average_refinements'] = 0.0
 
         return stats
 
-    def export_questions_with_difficulty_analysis(self,
-                                                 questions_with_metadata: List[Tuple[str, EnhancedQuestionMetadata]],
-                                                 output_file: str) -> None:
+    def export_questions_with_difficulty_analysis(
+            self, questions_with_metadata: List[Tuple[str, EnhancedQuestionMetadata]], output_file: str) -> None:
         """Export questions with comprehensive difficulty analysis."""
 
         export_data = []
@@ -474,16 +532,21 @@ class DifficultyAwareQuestionGenerator:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(export_data, f, indent=2, ensure_ascii=False)
 
-        logger.info(f"Exported {len(export_data)} questions with difficulty analysis to {output_file}")
+        logger.info(
+            f"Exported {
+                len(export_data)} questions with difficulty analysis to {output_file}")
 
 
 # Convenience functions
 def generate_question_with_target_difficulty(source_text: str,
-                                           target_difficulty: DifficultyLevel,
-                                           category: QuestionCategory = QuestionCategory.FACTUAL) -> Optional[Tuple[str, Dict[str, Any]]]:
+                                             target_difficulty: DifficultyLevel,
+                                             category: QuestionCategory = QuestionCategory.FACTUAL) -> Optional[Tuple[str,
+                                                                                                                      Dict[str,
+                                                                                                                           Any]]]:
     """Convenience function to generate a single question with target difficulty."""
     generator = DifficultyAwareQuestionGenerator()
-    result = generator.generate_question_with_difficulty_control(source_text, target_difficulty, category)
+    result = generator.generate_question_with_difficulty_control(
+        source_text, target_difficulty, category)
 
     if result:
         question, metadata = result

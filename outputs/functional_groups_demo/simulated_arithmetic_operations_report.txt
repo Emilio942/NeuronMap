@@ -1,0 +1,57 @@
+
+FUNCTIONAL GROUPS ANALYSIS REPORT
+=================================
+
+Task Type: arithmetic_operations
+Analysis Date: 2025-07-29 11:24:13
+Groups Discovered: 5
+
+SUMMARY STATISTICS:
+------------------
+Total groups: 5
+Average group size: 17.4 neurons
+Average confidence: 0.712
+High-confidence groups (>0.8): 2
+
+DETAILED GROUP ANALYSIS:
+-----------------------
+
+Group 1:
+  Neurons: 13 neurons
+  Confidence: 0.449
+  Coherence: 0.392
+  Function: addition
+  Specificity: 0.935
+  
+
+Group 2:
+  Neurons: 18 neurons
+  Confidence: 0.870
+  Coherence: 0.969
+  Function: carry_operations
+  Specificity: 0.596
+  
+
+Group 3:
+  Neurons: 16 neurons
+  Confidence: 0.981
+  Coherence: 0.463
+  Function: multiplication
+  Specificity: 0.135
+  
+
+Group 4:
+  Neurons: 23 neurons
+  Confidence: 0.797
+  Coherence: 0.469
+  Function: addition
+  Specificity: 0.851
+  
+
+Group 5:
+  Neurons: 17 neurons
+  Confidence: 0.465
+  Coherence: 0.873
+  Function: number_recognition
+  Specificity: 0.106
+  

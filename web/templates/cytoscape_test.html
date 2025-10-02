@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Cytoscape Test</title>
+    <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        
+        #cy {
+            width: 800px;
+            height: 600px;
+            border: 3px solid #007bff;
+            background-color: #f8f9fa;
+            margin: 20px 0;
+        }
+        
+        .info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧠 NeuronMap - Cytoscape Debug Test</h1>
+    
+    <div class="info">
+        <h3>Debug Information:</h3>
+        <p id="debug-info">Loading...</p>
+    </div>
+    
+    <div id="cy"></div>
+    
+    <div>
+        <button onclick="initGraph()">Initialize Graph</button>
+        <button onclick="addNodes()">Add Test Nodes</button>
+        <button onclick="clearGraph()">Clear Graph</button>
+        <button onclick="testLayout()">Test Layout</button>
+    </div>
+    
+    <div class="info">
+        <h3>Console Output:</h3>
+        <div id="console-output" style="font-family: monospace; white-space: pre-wrap; max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6;"></div>
+    </div>
+    
+    <script>
+        let cy = null;
+        
+        function log(message) {
+            console.log(message);
+            const output = document.getElementById('console-output');
+            output.textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        function updateDebugInfo() {
+            const container = document.getElementById('cy');
+            const info = document.getElementById('debug-info');
+            
+            info.innerHTML = `
+                <strong>Cytoscape Available:</strong> ${typeof cytoscape !== 'undefined'}<br>
+                <strong>Container Exists:</strong> ${!!container}<br>
+                <strong>Container Dimensions:</strong> ${container.offsetWidth}x${container.offsetHeight}<br>
+                <strong>Cytoscape Instance:</strong> ${!!cy}<br>
+                <strong>Nodes Count:</strong> ${cy ? cy.nodes().length : 'N/A'}<br>
+                <strong>Edges Count:</strong> ${cy ? cy.edges().length : 'N/A'}
+            `;
+        }
+        
+        function initGraph() {
+            log('Initializing Cytoscape graph...');
+            
+            const container = document.getElementById('cy');
+            if (!container) {
+                log('ERROR: Container not found!');
+                return;
+            }
+            
+            log('Container found: ' + container.offsetWidth + 'x' + container.offsetHeight);
+            
+            if (typeof cytoscape === 'undefined') {
+                log('ERROR: Cytoscape library not loaded!');
+                return;
+            }
+            
+            try {
+                cy = cytoscape({
+                    container: container,
+                    
+                    elements: [
+                        { data: { id: 'n1', label: 'Neuron 1' } },
+                        { data: { id: 'n2', label: 'Neuron 2' } },
+                        { data: { id: 'n3', label: 'Attention Head' } },
+                        { data: { id: 'e1', source: 'n1', target: 'n2' } },
+                        { data: { id: 'e2', source: 'n2', target: 'n3' } }
+                    ],
+                    
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'label': 'data(label)',
+                                'text-valign': 'center',
+                                'text-halign': 'center',
+                                'color': 'white',
+                                'background-color': '#007bff',
+                                'width': 80,
+                                'height': 80,
+                                'font-size': '14px',
+                                'border-width': 2,
+                                'border-color': '#0056b3'
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'width': 4,
+                                'line-color': '#28a745',
+                                'target-arrow-color': '#28a745',
+                                'target-arrow-shape': 'triangle',
+                                'curve-style': 'bezier'
+                            }
+                        }
+                    ],
+                    
+                    layout: {
+                        name: 'circle',
+                        fit: true,
+                        padding: 50
+                    }
+                });
+                
+                log('SUCCESS: Cytoscape initialized with ' + cy.nodes().length + ' nodes and ' + cy.edges().length + ' edges');
+                
+                cy.on('tap', 'node', function(evt) {
+                    const node = evt.target;
+                    log('Node clicked: ' + node.id());
+                });
+                
+            } catch (error) {
+                log('ERROR initializing Cytoscape: ' + error.message);
+            }
+            
+            updateDebugInfo();
+        }
+        
+        function addNodes() {
+            if (!cy) {
+                log('ERROR: Graph not initialized');
+                return;
+            }
+            
+            const nodeId = 'node_' + Date.now();
+            cy.add({
+                data: { 
+                    id: nodeId, 
+                    label: 'Node ' + (cy.nodes().length + 1)
+                }
+            });
+            
+            cy.layout({ name: 'circle', fit: true }).run();
+            log('Added node: ' + nodeId);
+            updateDebugInfo();
+        }
+        
+        function clearGraph() {
+            if (!cy) {
+                log('ERROR: Graph not initialized');
+                return;
+            }
+            
+            cy.elements().remove();
+            log('Graph cleared');
+            updateDebugInfo();
+        }
+        
+        function testLayout() {
+            if (!cy) {
+                log('ERROR: Graph not initialized');
+                return;
+            }
+            
+            cy.layout({ 
+                name: 'grid',
+                fit: true,
+                padding: 30
+            }).run();
+            
+            log('Layout applied: grid');
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            log('Page loaded, updating debug info...');
+            updateDebugInfo();
+            
+            // Auto-initialize after 1 second
+            setTimeout(() => {
+                log('Auto-initializing graph...');
+                initGraph();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

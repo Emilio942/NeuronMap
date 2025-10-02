@@ -1,17 +1,13 @@
 """Attention-specific analysis for transformer models."""
 
 import numpy as np
-import torch
-import torch.nn.functional as F
-from typing import Dict, List, Optional, Tuple, Any, Union
 import logging
-from pathlib import Path
-import json
+from typing import Dict, List, Optional, Any
+from collections import defaultdict
+from collections import defaultdict
 from collections import defaultdict
 
 from ..utils.config import get_config
-from ..utils.error_handling import with_retry, safe_execute
-
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +21,24 @@ class AttentionAnalyzer:
         Args:
             config_name: Name of experiment configuration.
         """
-        self.config = get_config()
-        self.experiment_config = self.config.get_experiment_config(config_name)
+        # Defensive configuration loading
+        self.config = None
+        self.experiment_config = {}
+        try:
+            config_source = get_config()
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.debug("Failed to load configuration via utils.config: %s", exc)
+            config_source = None
+        if config_source is not None:
+            self.config = config_source
+            self.experiment_config = self._extract_experiment_config(config_source, config_name)
+        if not self.experiment_config:
+            logger.debug(
+                "No experiment configuration found for '%s'; using empty defaults",
+                config_name,
+            )
+            self.experiment_config = {}
+
         self.attention_patterns = {}
         self.attention_weights = {}
         self.logger = logging.getLogger(__name__)
@@ -949,6 +961,41 @@ class AttentionAnalyzer:
             self.logger.error(f"Attention pattern classification failed: {e}")
             return {'pattern_type': 'unknown', 'error': str(e)}
 
+    def _extract_experiment_config(self, config_source: Any, config_name: str) -> Dict[str, Any]:
+        """Return experiment configuration regardless of config backend type."""
+        if hasattr(config_source, "get_experiment_config"):
+            try:
+                experiment_cfg = config_source.get_experiment_config(config_name)
+                if isinstance(experiment_cfg, dict):
+                    return experiment_cfg
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.debug("Config provider failed to return experiment '%s': %s", config_name, exc)
+
+        if isinstance(config_source, dict):
+            candidates = [config_source.get("experiments", {}), config_source]
+            for candidate in candidates:
+                if not isinstance(candidate, dict):
+                    continue
+                if config_name in candidate and isinstance(candidate[config_name], dict):
+                    return candidate[config_name]
+                nested = candidate.get("experiments") if isinstance(candidate.get("experiments"), dict) else None
+                if isinstance(nested, dict) and config_name in nested:
+                    nested_cfg = nested[config_name]
+                    if isinstance(nested_cfg, dict):
+                        return nested_cfg
+
+        try:
+            from ..utils.config_manager import get_config_manager  # local import to avoid cycles
+
+            manager = get_config_manager()
+            if hasattr(manager, "get_config_model"):
+                model = manager.get_config_model()
+                if hasattr(model, "get_experiment_config"):
+                    return model.get_experiment_config(config_name)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.debug("Fallback config manager lookup failed: %s", exc)
+
+        return {}
 
 def main():
     """Command line interface for attention analysis."""
@@ -968,9 +1015,6 @@ def main():
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
 
-    analyzer = AttentionAnalyzer(args.config)
-
-    # Load and analyze attention data
     # Implementation would depend on the specific data format
     logger.info("Attention analysis functionality available")
 

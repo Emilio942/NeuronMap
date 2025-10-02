@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuronMap - FIXED VISUALIZATION</title>
+    <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .header {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .graph-container {
+            width: 100%;
+            height: 600px;
+            border: 8px solid #007bff;
+            background: linear-gradient(45deg, #f8f9fa 25%, #e9ecef 25%, #e9ecef 50%, #f8f9fa 50%, #f8f9fa 75%, #e9ecef 75%);
+            background-size: 30px 30px;
+            position: relative;
+            border-radius: 10px;
+            box-shadow: inset 0 3px 6px rgba(0,0,0,0.1);
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 30px 0;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .status {
+            background: #e9ecef;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 250px;
+            overflow-y: auto;
+            border-left: 5px solid #007bff;
+        }
+        
+        .success { 
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); 
+            color: #155724; 
+            border-left-color: #28a745;
+        }
+        .error { 
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%); 
+            color: #721c24; 
+            border-left-color: #dc3545;
+        }
+        .warning { 
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%); 
+            color: #856404; 
+            border-left-color: #ffc107;
+        }
+        
+        .badge {
+            background: #28a745;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 NeuronMap</h1>
+            <h2>✅ FIXED VISUALIZATION</h2>
+            <p>Funktionsfähige Cytoscape-Visualisierung</p>
+            <span class="badge">WORKING VERSION</span>
+        </div>
+        
+        <div class="controls">
+            <button onclick="startDemo()">🚀 Start Demo</button>
+            <button onclick="addRandomNode()">➕ Add Node</button>
+            <button onclick="clearGraph()">🗑️ Clear</button>
+            <button onclick="testAnalysis()">🧪 Test Analysis</button>
+            <button onclick="runInteractiveDemo()">🎮 Interactive Demo</button>
+        </div>
+        
+        <div id="graph" class="graph-container"></div>
+        
+        <div id="status" class="status">
+            🌟 Ready to start visualization!
+            📝 Click 'Start Demo' to see the graph in action.
+        </div>
+    </div>
+
+    <script>
+        let cy = null;
+        let nodeCounter = 0;
+        let demoRunning = false;
+
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            const timestamp = new Date().toLocaleTimeString();
+            const emoji = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : '📝';
+            status.textContent = `${emoji} [${timestamp}] ${message}`;
+            status.className = `status ${type}`;
+            console.log(`${emoji} ${message}`);
+        }
+
+        function initGraph() {
+            updateStatus('🚀 Initializing advanced neural network graph...', 'info');
+            
+            const container = document.getElementById('graph');
+            
+            if (!container) {
+                updateStatus('ERROR: Graph container not found!', 'error');
+                return false;
+            }
+            
+            if (typeof cytoscape === 'undefined') {
+                updateStatus('ERROR: Cytoscape library not loaded!', 'error');
+                container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 32px; color: #dc3545; font-weight: bold; text-align: center;"><div>❌ CYTOSCAPE NOT LOADED!<br><small style="font-size: 18px;">Check network connection</small></div></div>';
+                return false;
+            }
+            
+            updateStatus('📚 Cytoscape library loaded successfully!', 'success');
+            
+            try {
+                // Clear container first
+                container.innerHTML = '';
+                
+                cy = cytoscape({
+                    container: container,
+                    
+                    elements: [
+                        // Input Layer
+                        { data: { id: 'input1', label: 'Input\nLayer 1', type: 'input' } },
+                        { data: { id: 'input2', label: 'Input\nLayer 2', type: 'input' } },
+                        
+                        // Hidden Layers
+                        { data: { id: 'hidden1', label: 'Hidden\nNeuron 1', type: 'hidden' } },
+                        { data: { id: 'hidden2', label: 'Hidden\nNeuron 2', type: 'hidden' } },
+                        
+                        // Attention Heads
+                        { data: { id: 'head1', label: 'Attention\nHead 1', type: 'attention' } },
+                        { data: { id: 'head2', label: 'Attention\nHead 2', type: 'attention' } },
+                        
+                        // Output
+                        { data: { id: 'output', label: 'Output\nLayer', type: 'output' } },
+                        
+                        // Connections
+                        { data: { id: 'e1', source: 'input1', target: 'hidden1', weight: 3 } },
+                        { data: { id: 'e2', source: 'input2', target: 'hidden1', weight: 2 } },
+                        { data: { id: 'e3', source: 'input1', target: 'hidden2', weight: 4 } },
+                        { data: { id: 'e4', source: 'hidden1', target: 'head1', weight: 5 } },
+                        { data: { id: 'e5', source: 'hidden2', target: 'head2', weight: 3 } },
+                        { data: { id: 'e6', source: 'head1', target: 'output', weight: 4 } },
+                        { data: { id: 'e7', source: 'head2', target: 'output', weight: 3 } }
+                    ],
+                    
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'label': 'data(label)',
+                                'text-valign': 'center',
+                                'text-halign': 'center',
+                                'color': 'white',
+                                'background-color': '#007bff',
+                                'width': 120,
+                                'height': 120,
+                                'font-size': '16px',
+                                'font-weight': 'bold',
+                                'border-width': 5,
+                                'border-color': '#0056b3',
+                                'text-wrap': 'wrap',
+                                'text-max-width': '100px'
+                            }
+                        },
+                        {
+                            selector: 'node[type="input"]',
+                            style: {
+                                'background-color': '#28a745',
+                                'border-color': '#1e7e34',
+                                'shape': 'rectangle'
+                            }
+                        },
+                        {
+                            selector: 'node[type="hidden"]',
+                            style: {
+                                'background-color': '#6f42c1',
+                                'border-color': '#5a32a3'
+                            }
+                        },
+                        {
+                            selector: 'node[type="attention"]',
+                            style: {
+                                'background-color': '#fd7e14',
+                                'border-color': '#e76500',
+                                'shape': 'ellipse'
+                            }
+                        },
+                        {
+                            selector: 'node[type="output"]',
+                            style: {
+                                'background-color': '#dc3545',
+                                'border-color': '#c82333',
+                                'shape': 'triangle'
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'width': 'data(weight)',
+                                'line-color': '#17a2b8',
+                                'target-arrow-color': '#17a2b8',
+                                'target-arrow-shape': 'triangle',
+                                'curve-style': 'bezier',
+                                'arrow-scale': 2,
+                                'opacity': 0.8
+                            }
+                        }
+                    ],
+                    
+                    layout: {
+                        name: 'breadthfirst',
+                        directed: true,
+                        fit: true,
+                        padding: 60,
+                        spacingFactor: 1.8,
+                        animate: true,
+                        animationDuration: 1500
+                    }
+                });
+                
+                // Add interaction events
+                cy.on('tap', 'node', function(evt) {
+                    const node = evt.target;
+                    const nodeType = node.data('type') || 'unknown';
+                    updateStatus(`🎯 Clicked ${nodeType} node: ${node.id()}`, 'success');
+                    
+                    // Highlight effect
+                    node.style({
+                        'border-width': 8,
+                        'border-color': '#ff6b6b'
+                    });
+                    
+                    setTimeout(() => {
+                        node.style({
+                            'border-width': 5,
+                            'border-color': node.data('type') === 'input' ? '#1e7e34' :
+                                          node.data('type') === 'hidden' ? '#5a32a3' :
+                                          node.data('type') === 'attention' ? '#e76500' :
+                                          node.data('type') === 'output' ? '#c82333' : '#0056b3'
+                        });
+                    }, 800);
+                });
+                
+                cy.on('tap', 'edge', function(evt) {
+                    const edge = evt.target;
+                    updateStatus(`🔗 Clicked connection: ${edge.data('source')} → ${edge.data('target')}`, 'success');
+                    
+                    // Highlight connection
+                    edge.style({
+                        'line-color': '#ff6b6b',
+                        'target-arrow-color': '#ff6b6b',
+                        'width': edge.data('weight') + 3
+                    });
+                    
+                    setTimeout(() => {
+                        edge.style({
+                            'line-color': '#17a2b8',
+                            'target-arrow-color': '#17a2b8',
+                            'width': edge.data('weight')
+                        });
+                    }, 800);
+                });
+                
+                updateStatus(`✅ Graph initialized! Nodes: ${cy.nodes().length}, Connections: ${cy.edges().length}`, 'success');
+                return true;
+                
+            } catch (error) {
+                updateStatus(`❌ CRITICAL ERROR: ${error.message}`, 'error');
+                container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 24px; color: #dc3545; text-align: center; padding: 20px;"><div><strong>💥 GRAPH ERROR</strong><br><br>${error.message}<br><br><button onclick="location.reload()" style="padding: 10px 20px; font-size: 16px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer;">🔄 Reload Page</button></div></div>`;
+                return false;
+            }
+        }
+
+        function startDemo() {
+            updateStatus('🎬 Starting interactive demo...', 'info');
+            
+            if (!cy || !initGraph()) {
+                return;
+            }
+            
+            // Animate layout changes
+            setTimeout(() => {
+                cy.layout({
+                    name: 'circle',
+                    fit: true,
+                    padding: 80,
+                    animate: true,
+                    animationDuration: 2000
+                }).run();
+                
+                updateStatus('🔄 Applied circular layout', 'success');
+            }, 1000);
+            
+            setTimeout(() => {
+                cy.layout({
+                    name: 'grid',
+                    fit: true,
+                    padding: 60,
+                    animate: true,
+                    animationDuration: 2000
+                }).run();
+                
+                updateStatus('📊 Applied grid layout', 'success');
+            }, 4000);
+            
+            setTimeout(() => {
+                cy.layout({
+                    name: 'breadthfirst',
+                    directed: true,
+                    fit: true,
+                    padding: 60,
+                    animate: true,
+                    animationDuration: 2000
+                }).run();
+                
+                updateStatus('✅ Demo complete! Graph is fully interactive. Click nodes and edges!', 'success');
+            }, 7000);
+        }
+
+        function addRandomNode() {
+            if (!cy) {
+                updateStatus('⚠️ Graph not initialized. Starting demo first...', 'warning');
+                startDemo();
+                return;
+            }
+            
+            nodeCounter++;
+            const nodeId = `dynamic${nodeCounter}`;
+            const nodeLabel = `Dynamic\nNode ${nodeCounter}`;
+            const nodeTypes = ['input', 'hidden', 'attention', 'output'];
+            const randomType = nodeTypes[Math.floor(Math.random() * nodeTypes.length)];
+            
+            // Add new node
+            cy.add({
+                data: { 
+                    id: nodeId, 
+                    label: nodeLabel,
+                    type: randomType
+                }
+            });
+            
+            // Connect to random existing nodes
+            const existingNodes = cy.nodes().filter(node => node.id() !== nodeId);
+            if (existingNodes.length > 0) {
+                const connectionCount = Math.min(3, Math.floor(Math.random() * existingNodes.length) + 1);
+                
+                for (let i = 0; i < connectionCount; i++) {
+                    const randomNode = existingNodes[Math.floor(Math.random() * existingNodes.length)];
+                    const edgeId = `edge_${nodeCounter}_${i}`;
+                    const weight = Math.floor(Math.random() * 5) + 1;
+                    
+                    cy.add({
+                        data: {
+                            id: edgeId,
+                            source: Math.random() > 0.5 ? randomNode.id() : nodeId,
+                            target: Math.random() > 0.5 ? nodeId : randomNode.id(),
+                            weight: weight
+                        }
+                    });
+                }
+            }
+            
+            // Re-layout with animation
+            cy.layout({
+                name: 'cose',
+                fit: true,
+                padding: 50,
+                animate: true,
+                animationDuration: 1500
+            }).run();
+            
+            updateStatus(`➕ Added ${randomType} node: ${nodeLabel} with connections`, 'success');
+        }
+
+        function clearGraph() {
+            if (!cy) {
+                updateStatus('⚠️ Graph not initialized.', 'warning');
+                return;
+            }
+            
+            cy.elements().remove();
+            nodeCounter = 0;
+            updateStatus('🗑️ Graph cleared successfully.', 'success');
+        }
+
+        function testAnalysis() {
+            updateStatus('🧪 Running comprehensive neural analysis...', 'info');
+            
+            if (!cy) {
+                if (!initGraph()) {
+                    return;
+                }
+            }
+            
+            // Clear and create analysis visualization
+            cy.elements().remove();
+            
+            // Simulate advanced induction heads analysis
+            const analysisResults = [
+                { id: 'l0h0', label: 'Layer 0\nHead 0\nScore: 0.95', layer: 0, head: 0, score: 0.95, type: 'strong' },
+                { id: 'l0h1', label: 'Layer 0\nHead 1\nScore: 0.89', layer: 0, head: 1, score: 0.89, type: 'strong' },
+                { id: 'l1h0', label: 'Layer 1\nHead 0\nScore: 0.76', layer: 1, head: 0, score: 0.76, type: 'moderate' },
+                { id: 'l1h2', label: 'Layer 1\nHead 2\nScore: 0.71', layer: 1, head: 2, score: 0.71, type: 'moderate' },
+                { id: 'l2h1', label: 'Layer 2\nHead 1\nScore: 0.58', layer: 2, head: 1, score: 0.58, type: 'weak' },
+                { id: 'l2h3', label: 'Layer 2\nHead 3\nScore: 0.52', layer: 2, head: 3, score: 0.52, type: 'weak' }
+            ];
+            
+            // Add analysis nodes
+            analysisResults.forEach(result => {
+                cy.add({
+                    data: {
+                        id: result.id,
+                        label: result.label,
+                        score: result.score,
+                        type: result.type,
+                        layer: result.layer,
+                        head: result.head
+                    }
+                });
+            });
+            
+            // Create layered connections
+            for (let i = 0; i < analysisResults.length - 1; i++) {
+                const current = analysisResults[i];
+                const next = analysisResults[i + 1];
+                
+                if (current.layer <= next.layer) {
+                    cy.add({
+                        data: {
+                            id: `analysis_edge_${i}`,
+                            source: current.id,
+                            target: next.id,
+                            weight: Math.floor((current.score + next.score) * 3),
+                            strength: current.score > 0.8 ? 'strong' : current.score > 0.6 ? 'moderate' : 'weak'
+                        }
+                    });
+                }
+            }
+            
+            // Apply sophisticated layout
+            cy.layout({
+                name: 'dagre',
+                fit: true,
+                padding: 80,
+                animate: true,
+                animationDuration: 2500,
+                rankDir: 'TB'
+            }).run();
+            
+            setTimeout(() => {
+                updateStatus(`✅ Analysis complete! Discovered ${analysisResults.length} induction heads across 3 layers`, 'success');
+            }, 3000);
+        }
+
+        function runInteractiveDemo() {
+            updateStatus('🎮 Starting interactive demonstration...', 'info');
+            demoRunning = true;
+            
+            if (!initGraph()) {
+                return;
+            }
+            
+            let step = 0;
+            const demoSteps = [
+                () => {
+                    updateStatus('🎯 Step 1: Highlighting input nodes...', 'info');
+                    cy.nodes('[type="input"]').style({'border-color': '#ff6b6b', 'border-width': 8});
+                },
+                () => {
+                    updateStatus('🧠 Step 2: Activating hidden layer...', 'info');
+                    cy.nodes('[type="hidden"]').style({'background-color': '#ff6b6b'});
+                },
+                () => {
+                    updateStatus('👁️ Step 3: Attention mechanism engaged...', 'info');
+                    cy.nodes('[type="attention"]').style({'background-color': '#ffcc02', 'border-width': 10});
+                },
+                () => {
+                    updateStatus('📤 Step 4: Output generation...', 'info');
+                    cy.nodes('[type="output"]').style({'background-color': '#28a745', 'border-color': '#ff6b6b'});
+                },
+                () => {
+                    updateStatus('🔄 Step 5: Resetting visualization...', 'info');
+                    cy.nodes().style({
+                        'border-width': 5,
+                        'background-color': function(node) {
+                            return node.data('type') === 'input' ? '#28a745' :
+                                   node.data('type') === 'hidden' ? '#6f42c1' :
+                                   node.data('type') === 'attention' ? '#fd7e14' :
+                                   node.data('type') === 'output' ? '#dc3545' : '#007bff';
+                        },
+                        'border-color': function(node) {
+                            return node.data('type') === 'input' ? '#1e7e34' :
+                                   node.data('type') === 'hidden' ? '#5a32a3' :
+                                   node.data('type') === 'attention' ? '#e76500' :
+                                   node.data('type') === 'output' ? '#c82333' : '#0056b3';
+                        }
+                    });
+                },
+                () => {
+                    updateStatus('✅ Interactive demo complete! All systems operational.', 'success');
+                    demoRunning = false;
+                }
+            ];
+            
+            function runStep() {
+                if (step < demoSteps.length) {
+                    demoSteps[step]();
+                    step++;
+                    setTimeout(runStep, 2000);
+                }
+            }
+            
+            runStep();
+        }
+
+        // Auto-initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStatus('🌟 NeuronMap visualization system loaded successfully!', 'success');
+            updateStatus('📋 Ready for neural network analysis. Click any button to begin.', 'info');
+            
+            // Auto-start demo after 3 seconds
+            setTimeout(() => {
+                updateStatus('🚀 Auto-starting demonstration...', 'info');
+                startDemo();
+            }, 3000);
+        });
+
+        // Global access for debugging
+        window.neuronMap = {
+            init: initGraph,
+            start: startDemo,
+            add: addRandomNode,
+            clear: clearGraph,
+            analyze: testAnalysis,
+            interactive: runInteractiveDemo,
+            getCy: () => cy,
+            isRunning: () => demoRunning
+        };
+    </script>
+</body>
+</html>

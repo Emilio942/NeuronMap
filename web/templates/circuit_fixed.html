@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circuit Explorer - NeuronMap (Fixed)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        .circuit-graph {
+            width: 100%;
+            height: 500px;
+            border: 3px solid #007bff;
+            background: #f8f9fa;
+            margin: 20px 0;
+        }
+        
+        .debug-info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        
+        .success { background: #d1edff; }
+        .error { background: #ffebee; }
+        .warning { background: #fff3cd; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <span class="navbar-brand">🧠 NeuronMap - Circuit Explorer (Fixed)</span>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">Home</a>
+                <a class="nav-link" href="/circuits">Circuits</a>
+                <a class="nav-link" href="/minimal-test">Minimal Test</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Control Panel -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-cogs me-2"></i>Controls</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-primary" onclick="initializeGraph()">
+                                <i class="fas fa-play me-2"></i>Initialize Graph
+                            </button>
+                            <button class="btn btn-success" onclick="addTestData()">
+                                <i class="fas fa-plus me-2"></i>Add Test Data
+                            </button>
+                            <button class="btn btn-warning" onclick="runDemoAnalysis()">
+                                <i class="fas fa-vial me-2"></i>Demo Analysis
+                            </button>
+                            <button class="btn btn-secondary" onclick="clearGraph()">
+                                <i class="fas fa-trash me-2"></i>Clear Graph
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Debug Info -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6><i class="fas fa-bug me-2"></i>Debug Info</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="debugInfo" class="debug-info">Loading...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Graph Visualization -->
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="fas fa-project-diagram me-2"></i>Graph Visualization</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="circuitGraph" class="circuit-graph"></div>
+                    </div>
+                </div>
+
+                <!-- Status Log -->
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6><i class="fas fa-list me-2"></i>Status Log</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="statusLog" class="debug-info" style="max-height: 200px; overflow-y: auto;"></div>
+                        <button class="btn btn-sm btn-outline-secondary mt-2" onclick="clearLog()">Clear Log</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let cy = null;
+        let logMessages = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            logMessages.push(logEntry);
+            
+            console.log(message);
+            
+            const logOutput = document.getElementById('statusLog');
+            logOutput.textContent = logMessages.slice(-20).join('\n'); // Keep only last 20 messages
+            logOutput.scrollTop = logOutput.scrollHeight;
+            
+            updateDebugInfo();
+        }
+
+        function updateDebugInfo() {
+            const debugInfo = document.getElementById('debugInfo');
+            const container = document.getElementById('circuitGraph');
+            
+            let info = '';
+            info += `🌐 Cytoscape: ${typeof cytoscape !== 'undefined' ? '✅ Available' : '❌ Not loaded'}\n`;
+            info += `📦 Container: ${container ? '✅ Found' : '❌ Missing'}\n`;
+            
+            if (container) {
+                info += `📏 Size: ${container.offsetWidth}x${container.offsetHeight}px\n`;
+                info += `👁️ Visible: ${container.offsetWidth > 0 && container.offsetHeight > 0 ? '✅ Yes' : '❌ No'}\n`;
+            }
+            
+            info += `🎯 Graph: ${cy ? '✅ Initialized' : '❌ Not initialized'}\n`;
+            
+            if (cy) {
+                info += `🔘 Nodes: ${cy.nodes().length}\n`;
+                info += `🔗 Edges: ${cy.edges().length}\n`;
+            }
+            
+            debugInfo.textContent = info;
+            
+            // Color coding
+            if (typeof cytoscape !== 'undefined' && container && cy) {
+                debugInfo.className = 'debug-info success';
+            } else if (typeof cytoscape === 'undefined') {
+                debugInfo.className = 'debug-info error';
+            } else {
+                debugInfo.className = 'debug-info warning';
+            }
+        }
+
+        function initializeGraph() {
+            log('🚀 Starting graph initialization...');
+            
+            const container = document.getElementById('circuitGraph');
+            if (!container) {
+                log('❌ ERROR: Container not found!');
+                return;
+            }
+            
+            log(`📦 Container found: ${container.offsetWidth}x${container.offsetHeight}px`);
+            
+            if (typeof cytoscape === 'undefined') {
+                log('❌ ERROR: Cytoscape library not loaded!');
+                container.innerHTML = '<div class="d-flex align-items-center justify-content-center h-100 text-danger"><h4>❌ Cytoscape not loaded!</h4></div>';
+                return;
+            }
+            
+            log('📚 Cytoscape library available');
+            
+            try {
+                // Clear container
+                container.innerHTML = '';
+                
+                cy = cytoscape({
+                    container: container,
+                    
+                    elements: [
+                        { data: { id: 'n1', label: 'Neuron Layer 1' } },
+                        { data: { id: 'n2', label: 'Neuron Layer 2' } },
+                        { data: { id: 'h1', label: 'Attention Head' } },
+                        { data: { id: 'e1', source: 'n1', target: 'n2' } },
+                        { data: { id: 'e2', source: 'n2', target: 'h1' } }
+                    ],
+                    
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'label': 'data(label)',
+                                'text-valign': 'center',
+                                'text-halign': 'center',
+                                'color': 'white',
+                                'background-color': '#007bff',
+                                'width': 100,
+                                'height': 100,
+                                'font-size': '16px',
+                                'font-weight': 'bold',
+                                'border-width': 4,
+                                'border-color': '#0056b3'
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'width': 5,
+                                'line-color': '#28a745',
+                                'target-arrow-color': '#28a745',
+                                'target-arrow-shape': 'triangle',
+                                'curve-style': 'bezier',
+                                'arrow-scale': 2
+                            }
+                        }
+                    ],
+                    
+                    layout: {
+                        name: 'circle',
+                        fit: true,
+                        padding: 80,
+                        animate: true,
+                        animationDuration: 1000
+                    }
+                });
+                
+                log(`✅ Graph initialized successfully! Nodes: ${cy.nodes().length}, Edges: ${cy.edges().length}`);
+                
+                // Event listeners
+                cy.on('tap', 'node', function(evt) {
+                    const node = evt.target;
+                    log(`🎯 Node clicked: ${node.id()}`);
+                    
+                    // Visual feedback
+                    node.style('background-color', '#ff6b6b');
+                    setTimeout(() => {
+                        node.style('background-color', '#007bff');
+                    }, 1000);
+                });
+                
+                cy.on('tap', 'edge', function(evt) {
+                    const edge = evt.target;
+                    log(`🔗 Edge clicked: ${edge.id()}`);
+                });
+                
+            } catch (error) {
+                log(`❌ ERROR initializing graph: ${error.message}`);
+                container.innerHTML = `<div class="d-flex align-items-center justify-content-center h-100 text-danger text-center"><div><h4>❌ Graph Error</h4><p>${error.message}</p></div></div>`;
+            }
+            
+            updateDebugInfo();
+        }
+
+        function addTestData() {
+            if (!cy) {
+                log('❌ Graph not initialized!');
+                return;
+            }
+            
+            const nodeId = 'test_' + Date.now();
+            const nodeLabel = 'Test Node ' + (cy.nodes().length + 1);
+            
+            cy.add({
+                data: { 
+                    id: nodeId, 
+                    label: nodeLabel 
+                }
+            });
+            
+            // Connect to random existing node
+            const existingNodes = cy.nodes();
+            if (existingNodes.length > 1) {
+                const randomNode = existingNodes[Math.floor(Math.random() * (existingNodes.length - 1))];
+                cy.add({
+                    data: {
+                        id: 'edge_' + Date.now(),
+                        source: randomNode.id(),
+                        target: nodeId
+                    }
+                });
+            }
+            
+            cy.layout({ name: 'circle', fit: true, animate: true }).run();
+            
+            log(`➕ Added node: ${nodeLabel}`);
+            updateDebugInfo();
+        }
+
+        function runDemoAnalysis() {
+            log('🧪 Running demo analysis...');
+            
+            if (!cy) {
+                log('❌ Graph not initialized, initializing first...');
+                initializeGraph();
+                
+                setTimeout(() => {
+                    runDemoAnalysis();
+                }, 2000);
+                return;
+            }
+            
+            // Simulate analysis data
+            const demoData = {
+                induction_heads: [
+                    { layer: 0, head: 0, score: 0.95, label: 'Strong Induction Head' },
+                    { layer: 1, head: 2, score: 0.78, label: 'Moderate Induction Head' },
+                    { layer: 2, head: 1, score: 0.65, label: 'Weak Induction Head' }
+                ]
+            };
+            
+            // Clear existing graph
+            cy.elements().remove();
+            
+            // Add demo nodes
+            demoData.induction_heads.forEach((head, index) => {
+                cy.add({
+                    data: {
+                        id: `head_${head.layer}_${head.head}`,
+                        label: `L${head.layer}H${head.head}\n(${head.score.toFixed(2)})`,
+                        score: head.score
+                    }
+                });
+            });
+            
+            // Add connections
+            for (let i = 0; i < demoData.induction_heads.length - 1; i++) {
+                const source = `head_${demoData.induction_heads[i].layer}_${demoData.induction_heads[i].head}`;
+                const target = `head_${demoData.induction_heads[i + 1].layer}_${demoData.induction_heads[i + 1].head}`;
+                
+                cy.add({
+                    data: {
+                        id: `edge_${i}`,
+                        source: source,
+                        target: target
+                    }
+                });
+            }
+            
+            // Apply layout
+            cy.layout({
+                name: 'breadthfirst',
+                directed: true,
+                fit: true,
+                padding: 50,
+                animate: true
+            }).run();
+            
+            log(`✅ Demo analysis complete! Added ${demoData.induction_heads.length} induction heads`);
+            updateDebugInfo();
+        }
+
+        function clearGraph() {
+            if (!cy) {
+                log('❌ Graph not initialized!');
+                return;
+            }
+            
+            cy.elements().remove();
+            log('🗑️ Graph cleared');
+            updateDebugInfo();
+        }
+
+        function clearLog() {
+            logMessages = [];
+            document.getElementById('statusLog').textContent = '';
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🌟 Page loaded, updating debug info...');
+            updateDebugInfo();
+            
+            // Auto-initialize after 2 seconds
+            setTimeout(() => {
+                log('🚀 Auto-initializing graph...');
+                initializeGraph();
+            }, 2000);
+        });
+
+        // Make functions globally available for debugging
+        window.circuitExplorer = {
+            init: initializeGraph,
+            addTest: addTestData,
+            demo: runDemoAnalysis,
+            clear: clearGraph,
+            cy: () => cy
+        };
+    </script>
+</body>
+</html>

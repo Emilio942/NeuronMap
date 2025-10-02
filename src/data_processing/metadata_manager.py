@@ -1,35 +1,45 @@
 """Metadata and experiment management for NeuronMap."""
 
+from __future__ import annotations
+
 import json
+import logging
 import time
 import uuid
-import yaml
 import hashlib
-import logging
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, Iterable, List, Optional
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
 
+def _ensure_parent(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
 class MetadataManager:
-    """Manage experiment metadata and provenance."""
+    """Persist experiment metadata and provenance information."""
 
-    def __init__(self, data_dir: str = "data"):
-        """Initialize metadata manager.
+    def __init__(self, location: str = "data"):
+        path = Path(location)
 
-        Args:
-            data_dir: Base data directory.
-        """
-        self.data_dir = Path(data_dir)
-        self.metadata_dir = self.data_dir / "metadata"
-        self.metadata_dir.mkdir(parents=True, exist_ok=True)
+        if path.suffix:  # explicit metadata file provided
+            self.metadata_file = path
+            _ensure_parent(self.metadata_file)
+            self.metadata_dir = self.metadata_file.parent
+        else:
+            self.metadata_dir = path / "metadata"
+            self.metadata_dir.mkdir(parents=True, exist_ok=True)
+            self.metadata_file = self.metadata_dir / "experiments.yaml"
 
-        self.experiments_file = self.metadata_dir / "experiments.yaml"
+        self.experiments_file = self.metadata_file  # backwards-compatible alias
         self.provenance_file = self.metadata_dir / "provenance.jsonl"
 
     def create_experiment(self, name: str, description: str,
-                         config: Dict[str, Any]) -> str:
+                          config: Dict[str, Any]) -> str:
         """Create a new experiment record.
 
         Args:
@@ -55,17 +65,15 @@ class MetadataManager:
         }
 
         # Load existing experiments
-        experiments = self._load_experiments()
-        experiments[experiment_id] = experiment_data
-
-        # Save updated experiments
-        self._save_experiments(experiments)
-
-        logger.info(f"Created experiment: {name} ({experiment_id})")
-        return experiment_id
+        return self.record_experiment(
+            config_name=name,
+            model_name=config.get('model_name', 'unknown'),
+            parameters=config,
+            description=description,
+        )
 
     def update_experiment_status(self, experiment_id: str, status: str,
-                               metadata: Optional[Dict[str, Any]] = None):
+                                 metadata: Optional[Dict[str, Any]] = None):
         """Update experiment status.
 
         Args:
@@ -76,11 +84,12 @@ class MetadataManager:
         experiments = self._load_experiments()
 
         if experiment_id in experiments:
-            experiments[experiment_id]['status'] = status
-            experiments[experiment_id]['updated_at'] = time.time()
+            experiment = experiments[experiment_id]
+            experiment['status'] = status
+            experiment['updated_at'] = time.time()
 
             if metadata:
-                experiments[experiment_id].update(metadata)
+                experiment.update(metadata)
 
             self._save_experiments(experiments)
             logger.info(f"Updated experiment {experiment_id} status to {status}")
@@ -88,7 +97,7 @@ class MetadataManager:
             logger.warning(f"Experiment {experiment_id} not found")
 
     def log_provenance(self, event_type: str, experiment_id: str,
-                      data: Dict[str, Any]):
+                       data: Dict[str, Any]):
         """Log a provenance event.
 
         Args:
@@ -149,6 +158,62 @@ class MetadataManager:
         experiments = self._load_experiments()
         return experiments.get(experiment_id)
 
+    # ------------------------------------------------------------------
+    # Modern test-facing API -------------------------------------------------
+    # ------------------------------------------------------------------
+    def record_experiment(self, config_name: str, model_name: Optional[str] = None,
+                          parameters: Optional[Dict[str, Any]] = None,
+                          description: str = "") -> str:
+        experiment_id = str(uuid.uuid4())
+        experiments = self._load_experiments()
+
+        parameters = parameters or {}
+        resolved_model = (model_name
+                          or parameters.get('model')
+                          or parameters.get('model_name')
+                          or 'unknown')
+
+        experiment = {
+            'experiment_id': experiment_id,
+            'config_name': config_name,
+            'model_name': resolved_model,
+            'parameters': parameters,
+            'description': description,
+            'created_at': time.time(),
+            'status': 'created',
+            'progress': 0,
+        }
+
+        experiments[experiment_id] = experiment
+        self._save_experiments(experiments)
+        return experiment_id
+
+    def list_experiments(self) -> List[Dict[str, Any]]:
+        experiments = self._load_experiments()
+        return list(experiments.values())
+
+    def filter_experiments(self, **criteria: Any) -> List[Dict[str, Any]]:
+        experiments = self.list_experiments()
+        if not criteria:
+            return experiments
+
+        results: List[Dict[str, Any]] = []
+        for experiment in experiments:
+            if all(experiment.get(key) == value for key, value in criteria.items()):
+                results.append(experiment)
+        return results
+
+    def record_results(self, experiment_id: str, results: Dict[str, Any]) -> None:
+        experiments = self._load_experiments()
+        if experiment_id not in experiments:
+            raise KeyError(f"Experiment {experiment_id} not found")
+
+        experiment = experiments[experiment_id]
+        experiment.setdefault('results', {}).update(results)
+        experiment['updated_at'] = time.time()
+        experiment['status'] = results.get('status', experiment.get('status', 'completed'))
+        self._save_experiments(experiments)
+
     def _load_experiments(self) -> Dict[str, Any]:
         """Load experiments from file."""
         if self.experiments_file.exists():
@@ -160,6 +225,45 @@ class MetadataManager:
         """Save experiments to file."""
         with open(self.experiments_file, 'w') as f:
             yaml.dump(experiments, f, default_flow_style=False)
+
+
+class ExperimentTracker:
+    """High-level helper that wraps :class:`MetadataManager` for tests."""
+
+    def __init__(self, base_dir: str = "experiments"):
+        self.base_dir = Path(base_dir)
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+        self._manager = MetadataManager(self.base_dir / "experiments.yaml")
+
+    def start_experiment(self, name: str, config: Dict[str, Any]) -> str:
+        experiment_id = self._manager.record_experiment(
+            config_name=name,
+            model_name=config.get('model', 'unknown'),
+            parameters=config,
+            description=config.get('description', ''),
+        )
+        self._manager.update_experiment_status(experiment_id, 'running', {'progress': 0})
+        return experiment_id
+
+    def log_progress(self, experiment_id: str, stage: str, progress: int) -> None:
+        metadata = {
+            'last_stage': stage,
+            'progress': max(0, min(100, progress)),
+        }
+        self._manager.update_experiment_status(experiment_id, 'running', metadata)
+
+    def finish_experiment(self, experiment_id: str, results: Dict[str, Any]) -> None:
+        results = dict(results)
+        results.setdefault('status', 'completed')
+        results.setdefault('completed_at', time.time())
+        self._manager.record_results(experiment_id, results)
+        self._manager.update_experiment_status(experiment_id, 'completed', {'progress': 100})
+
+    def get_experiment_status(self, experiment_id: str) -> Dict[str, Any]:
+        experiment = self._manager.get_experiment(experiment_id)
+        if experiment is None:
+            raise KeyError(f"Experiment {experiment_id} not found")
+        return experiment
 
 
 class DatasetVersionManager:
@@ -175,7 +279,7 @@ class DatasetVersionManager:
         self.versions_file = self.data_dir / "dataset_versions.yaml"
 
     def create_version(self, dataset_name: str, file_path: str,
-                      description: str = "") -> str:
+                       description: str = "") -> str:
         """Create a new dataset version.
 
         Args:
@@ -254,7 +358,7 @@ class DatasetVersionManager:
 
         # Sort by creation time and return latest
         sorted_versions = sorted(versions[dataset_name],
-                               key=lambda x: x['created_at'], reverse=True)
+                                 key=lambda x: x['created_at'], reverse=True)
         return sorted_versions[0]
 
     def list_versions(self, dataset_name: str) -> List[Dict[str, Any]]:

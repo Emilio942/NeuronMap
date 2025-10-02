@@ -7,7 +7,7 @@ import logging
 import numpy as np
 import torch
 import torch.nn as nn
-from typing import Dict, List, Optional, Any, Tuple, Union
+from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from collections import defaultdict
 from .universal_model_support import (
@@ -62,26 +62,53 @@ class DomainSpecificAnalyzer:
     def __init__(self):
         self.domain_configs = {
             "code": {
-                "special_tokens": ["<code>", "</code>", "<comment>", "</comment>"],
+                "special_tokens": [
+                    "<code>",
+                    "</code>",
+                    "<comment>",
+                    "</comment>"],
                 "syntax_aware": True,
-                "programming_languages": ["python", "java", "javascript", "c++"],
-                "code_patterns": [r"\bdef\b", r"\bclass\b", r"\bfunction\b", r"\bimport\b"]
-            },
+                "programming_languages": [
+                    "python",
+                    "java",
+                    "javascript",
+                    "c++"],
+                "code_patterns": [
+                    r"\bdef\b",
+                    r"\bclass\b",
+                    r"\bfunction\b",
+                    r"\bimport\b"]},
             "scientific": {
-                "special_tokens": ["<formula>", "</formula>", "<citation>", "</citation>"],
+                "special_tokens": [
+                    "<formula>",
+                    "</formula>",
+                    "<citation>",
+                    "</citation>"],
                 "latex_aware": True,
-                "scientific_domains": ["physics", "chemistry", "biology", "mathematics"],
-                "citation_patterns": [r"\[[0-9]+\]", r"\(.*\d{4}.*\)"]
-            },
+                "scientific_domains": [
+                    "physics",
+                    "chemistry",
+                    "biology",
+                    "mathematics"],
+                "citation_patterns": [
+                    r"\[[0-9]+\]",
+                    r"\(.*\d{4}.*\)"]},
             "biomedical": {
-                "special_tokens": ["<protein>", "</protein>", "<gene>", "</gene>"],
-                "entity_types": ["DRUG", "DISEASE", "PROTEIN", "GENE"],
+                "special_tokens": [
+                    "<protein>",
+                    "</protein>",
+                    "<gene>",
+                    "</gene>"],
+                "entity_types": [
+                    "DRUG",
+                    "DISEASE",
+                    "PROTEIN",
+                    "GENE"],
                 "medical_terminology": True,
-                "pubmed_vocab": True
-            }
-        }
+                "pubmed_vocab": True}}
 
-    def analyze_domain_specificity(self, model: nn.Module, model_name: str, domain: str) -> Dict[str, Any]:
+    def analyze_domain_specificity(
+            self, model: nn.Module, model_name: str, domain: str) -> Dict[str, Any]:
         """Analyze how well a model is adapted for a specific domain."""
         if domain not in self.domain_configs:
             raise ValueError(f"Unsupported domain: {domain}")
@@ -89,13 +116,16 @@ class DomainSpecificAnalyzer:
         domain_config = self.domain_configs[domain]
 
         # Analyze vocabulary specialization
-        vocab_specialization = self._analyze_vocabulary_specialization(model, domain_config)
+        vocab_specialization = self._analyze_vocabulary_specialization(
+            model, domain_config)
 
         # Analyze attention patterns for domain-specific features
-        attention_analysis = self._analyze_domain_attention_patterns(model, domain_config)
+        attention_analysis = self._analyze_domain_attention_patterns(
+            model, domain_config)
 
         # Check for domain-specific architectural adaptations
-        architectural_adaptations = self._check_architectural_adaptations(model, domain_config)
+        architectural_adaptations = self._check_architectural_adaptations(
+            model, domain_config)
 
         return {
             "domain": domain,
@@ -107,7 +137,8 @@ class DomainSpecificAnalyzer:
             )
         }
 
-    def _analyze_vocabulary_specialization(self, model: nn.Module, domain_config: Dict) -> Dict[str, Any]:
+    def _analyze_vocabulary_specialization(
+            self, model: nn.Module, domain_config: Dict) -> Dict[str, Any]:
         """Analyze vocabulary specialization for the domain."""
         # This would analyze the tokenizer and embedding layer
         # For now, return a simplified analysis
@@ -117,7 +148,8 @@ class DomainSpecificAnalyzer:
             "vocabulary_coverage": 0.85  # Would calculate actual coverage
         }
 
-    def _analyze_domain_attention_patterns(self, model: nn.Module, domain_config: Dict) -> Dict[str, Any]:
+    def _analyze_domain_attention_patterns(
+            self, model: nn.Module, domain_config: Dict) -> Dict[str, Any]:
         """Analyze attention patterns specific to the domain."""
         return {
             "domain_specific_attention_heads": 3,  # Would detect specialized heads
@@ -125,7 +157,8 @@ class DomainSpecificAnalyzer:
             "attention_specialization_score": 0.72
         }
 
-    def _check_architectural_adaptations(self, model: nn.Module, domain_config: Dict) -> Dict[str, Any]:
+    def _check_architectural_adaptations(
+            self, model: nn.Module, domain_config: Dict) -> Dict[str, Any]:
         """Check for domain-specific architectural adaptations."""
         return {
             "has_domain_specific_layers": False,
@@ -133,8 +166,11 @@ class DomainSpecificAnalyzer:
             "specialized_output_head": True
         }
 
-    def _calculate_domain_compatibility_score(self, vocab_analysis: Dict, attention_analysis: Dict,
-                                            arch_analysis: Dict) -> float:
+    def _calculate_domain_compatibility_score(
+            self,
+            vocab_analysis: Dict,
+            attention_analysis: Dict,
+            arch_analysis: Dict) -> float:
         """Calculate overall domain compatibility score."""
         # Simplified scoring based on key indicators
         score = 0.0
@@ -154,7 +190,7 @@ class PerformanceAnalyzer:
         self.baseline_metrics = {}
 
     def analyze_performance(self, model: nn.Module, model_name: str,
-                          sample_inputs: Optional[List[str]] = None) -> PerformanceMetrics:
+                            sample_inputs: Optional[List[str]] = None) -> PerformanceMetrics:
         """Comprehensive performance analysis of a model."""
 
         # Memory usage analysis
@@ -219,7 +255,7 @@ class PerformanceAnalyzer:
         return base_time + param_factor * 10
 
     def _calculate_efficiency_score(self, memory_mb: float, inference_ms: float,
-                                  total_params: int, sparsity: float) -> float:
+                                    total_params: int, sparsity: float) -> float:
         """Calculate overall efficiency score (0-1, higher is better)."""
         # Normalize factors and combine
         memory_score = max(0, 1 - memory_mb / 1000)  # Penalty for >1GB memory
@@ -229,31 +265,33 @@ class PerformanceAnalyzer:
 
         return (memory_score + speed_score + param_score + sparsity_bonus) / 3
 
-    def generate_optimization_recommendations(self, metrics: PerformanceMetrics,
-                                            model_name: str) -> List[OptimizationRecommendation]:
+    def generate_optimization_recommendations(
+            self,
+            metrics: PerformanceMetrics,
+            model_name: str) -> List[OptimizationRecommendation]:
         """Generate optimization recommendations based on performance metrics."""
         recommendations = []
 
         # Memory optimization
         if metrics.memory_usage_mb > 500:
-            recommendations.append(OptimizationRecommendation(
-                category="memory",
-                priority="high",
-                description="High memory usage detected. Consider model compression or quantization.",
-                expected_improvement="30-50% memory reduction",
-                implementation_complexity="moderate",
-                code_example="torch.quantization.quantize_dynamic(model, {nn.Linear}, dtype=torch.qint8)"
-            ))
+            recommendations.append(
+                OptimizationRecommendation(
+                    category="memory",
+                    priority="high",
+                    description="High memory usage detected. Consider model compression or quantization.",
+                    expected_improvement="30-50% memory reduction",
+                    implementation_complexity="moderate",
+                    code_example="torch.quantization.quantize_dynamic(model, {nn.Linear}, dtype=torch.qint8)"))
 
         # Speed optimization
         if metrics.inference_time_ms > 200:
-            recommendations.append(OptimizationRecommendation(
-                category="speed",
-                priority="medium",
-                description="Slow inference detected. Consider batch processing or model distillation.",
-                expected_improvement="20-40% speed improvement",
-                implementation_complexity="moderate"
-            ))
+            recommendations.append(
+                OptimizationRecommendation(
+                    category="speed",
+                    priority="medium",
+                    description="Slow inference detected. Consider batch processing or model distillation.",
+                    expected_improvement="20-40% speed improvement",
+                    implementation_complexity="moderate"))
 
         # Sparsity optimization
         if metrics.sparsity_ratio < 0.1:
@@ -267,13 +305,13 @@ class PerformanceAnalyzer:
 
         # Efficiency optimization
         if metrics.efficiency_score < 0.5:
-            recommendations.append(OptimizationRecommendation(
-                category="efficiency",
-                priority="high",
-                description="Low overall efficiency. Consider comprehensive optimization strategy.",
-                expected_improvement="Significant overall improvement",
-                implementation_complexity="complex"
-            ))
+            recommendations.append(
+                OptimizationRecommendation(
+                    category="efficiency",
+                    priority="high",
+                    description="Low overall efficiency. Consider comprehensive optimization strategy.",
+                    expected_improvement="Significant overall improvement",
+                    implementation_complexity="complex"))
 
         return recommendations
 
@@ -285,13 +323,19 @@ class CrossArchitectureAnalyzer:
         self.universal_support = universal_support
         self.performance_analyzer = PerformanceAnalyzer()
 
-    def compare_architectures(self, model1: nn.Module, model1_name: str,
-                            model2: nn.Module, model2_name: str) -> CrossArchitectureComparison:
+    def compare_architectures(
+            self,
+            model1: nn.Module,
+            model1_name: str,
+            model2: nn.Module,
+            model2_name: str) -> CrossArchitectureComparison:
         """Compare two different model architectures."""
 
         # Analyze both models
-        analysis1 = self.universal_support.analyze_model_architecture(model1, model1_name)
-        analysis2 = self.universal_support.analyze_model_architecture(model2, model2_name)
+        analysis1 = self.universal_support.analyze_model_architecture(
+            model1, model1_name)
+        analysis2 = self.universal_support.analyze_model_architecture(
+            model2, model2_name)
 
         # Get performance metrics
         perf1 = self.performance_analyzer.analyze_performance(model1, model1_name)
@@ -301,7 +345,8 @@ class CrossArchitectureAnalyzer:
         similarity_score = self._calculate_architecture_similarity(analysis1, analysis2)
 
         # Identify shared and unique features
-        shared_features, unique1, unique2 = self._identify_feature_differences(analysis1, analysis2)
+        shared_features, unique1, unique2 = self._identify_feature_differences(
+            analysis1, analysis2)
 
         # Performance comparison
         performance_comparison = self._compare_performance(perf1, perf2)
@@ -324,7 +369,8 @@ class CrossArchitectureAnalyzer:
             recommendations=recommendations
         )
 
-    def _calculate_architecture_similarity(self, analysis1: Dict, analysis2: Dict) -> float:
+    def _calculate_architecture_similarity(
+            self, analysis1: Dict, analysis2: Dict) -> float:
         """Calculate similarity score between two architectures."""
         similarity_factors = []
 
@@ -337,7 +383,9 @@ class CrossArchitectureAnalyzer:
         # Layer count similarity
         max_layers = max(analysis1["total_layers"], analysis2["total_layers"])
         if max_layers > 0:
-            layer_ratio = min(analysis1["total_layers"], analysis2["total_layers"]) / max_layers
+            layer_ratio = min(
+                analysis1["total_layers"],
+                analysis2["total_layers"]) / max_layers
             similarity_factors.append(layer_ratio)
         else:
             similarity_factors.append(1.0)  # Both have 0 layers, consider similar
@@ -360,7 +408,8 @@ class CrossArchitectureAnalyzer:
 
         return sum(similarity_factors) / len(similarity_factors)
 
-    def _identify_feature_differences(self, analysis1: Dict, analysis2: Dict) -> Tuple[List[str], List[str], List[str]]:
+    def _identify_feature_differences(
+            self, analysis1: Dict, analysis2: Dict) -> Tuple[List[str], List[str], List[str]]:
         """Identify shared and unique features between architectures."""
         features1 = set()
         features2 = set()
@@ -388,7 +437,8 @@ class CrossArchitectureAnalyzer:
 
         return shared_features, unique_features1, unique_features2
 
-    def _compare_performance(self, perf1: PerformanceMetrics, perf2: PerformanceMetrics) -> Dict[str, Any]:
+    def _compare_performance(self, perf1: PerformanceMetrics,
+                             perf2: PerformanceMetrics) -> Dict[str, Any]:
         """Compare performance metrics between two models."""
         return {
             "memory_ratio": perf1.memory_usage_mb / perf2.memory_usage_mb,
@@ -397,17 +447,14 @@ class CrossArchitectureAnalyzer:
             "efficiency_comparison": {
                 "model1_efficiency": perf1.efficiency_score,
                 "model2_efficiency": perf2.efficiency_score,
-                "better_model": "model1" if perf1.efficiency_score > perf2.efficiency_score else "model2"
-            },
+                "better_model": "model1" if perf1.efficiency_score > perf2.efficiency_score else "model2"},
             "sparsity_comparison": {
                 "model1_sparsity": perf1.sparsity_ratio,
                 "model2_sparsity": perf2.sparsity_ratio,
-                "sparser_model": "model1" if perf1.sparsity_ratio > perf2.sparsity_ratio else "model2"
-            }
-        }
+                "sparser_model": "model1" if perf1.sparsity_ratio > perf2.sparsity_ratio else "model2"}}
 
     def _generate_comparison_recommendations(self, analysis1: Dict, analysis2: Dict,
-                                           performance_comparison: Dict) -> List[str]:
+                                             performance_comparison: Dict) -> List[str]:
         """Generate recommendations based on architecture comparison."""
         recommendations = []
 
@@ -459,37 +506,41 @@ class UniversalAdvancedAnalyzer:
         self.performance_analyzer = PerformanceAnalyzer()
         self.cross_arch_analyzer = CrossArchitectureAnalyzer(self.universal_support)
 
-    def comprehensive_analysis(self, model: nn.Module, model_name: str,
-                             domain: Optional[str] = None,
-                             comparison_model: Optional[nn.Module] = None,
-                             comparison_model_name: Optional[str] = None) -> Dict[str, Any]:
+    def comprehensive_analysis(self,
+                               model: nn.Module,
+                               model_name: str,
+                               domain: Optional[str] = None,
+                               comparison_model: Optional[nn.Module] = None,
+                               comparison_model_name: Optional[str] = None) -> Dict[str,
+                                                                                    Any]:
         """Perform comprehensive analysis of a model with all available methods."""
 
         results = {}
 
         # Basic architecture analysis
-        results["architecture_analysis"] = self.universal_support.analyze_model_architecture(model, model_name)
+        results["architecture_analysis"] = self.universal_support.analyze_model_architecture(
+            model, model_name)
 
         # Performance analysis
-        results["performance_analysis"] = self.performance_analyzer.analyze_performance(model, model_name)
+        results["performance_analysis"] = self.performance_analyzer.analyze_performance(
+            model, model_name)
 
         # Optimization recommendations
         results["optimization_recommendations"] = self.performance_analyzer.generate_optimization_recommendations(
-            results["performance_analysis"], model_name
-        )
+            results["performance_analysis"], model_name)
 
         # Domain-specific analysis if requested
         if domain:
             try:
-                results["domain_analysis"] = self.domain_analyzer.analyze_domain_specificity(model, model_name, domain)
+                results["domain_analysis"] = self.domain_analyzer.analyze_domain_specificity(
+                    model, model_name, domain)
             except ValueError as e:
                 results["domain_analysis"] = {"error": str(e)}
 
         # Cross-architecture comparison if comparison model provided
         if comparison_model and comparison_model_name:
             results["cross_architecture_comparison"] = self.cross_arch_analyzer.compare_architectures(
-                model, model_name, comparison_model, comparison_model_name
-            )
+                model, model_name, comparison_model, comparison_model_name)
 
         # Generate overall summary
         results["summary"] = self._generate_summary(results)
@@ -506,11 +557,15 @@ class UniversalAdvancedAnalyzer:
             "total_layers": arch_analysis["total_layers"],
             "is_encoder_decoder": arch_analysis["is_encoder_decoder"],
             "performance_score": perf_analysis.efficiency_score,
-            "memory_usage_category": self._categorize_memory_usage(perf_analysis.memory_usage_mb),
-            "speed_category": self._categorize_speed(perf_analysis.inference_time_ms),
-            "optimization_priority": self._get_optimization_priority(analysis_results.get("optimization_recommendations", [])),
-            "key_insights": self._extract_key_insights(analysis_results)
-        }
+            "memory_usage_category": self._categorize_memory_usage(
+                perf_analysis.memory_usage_mb),
+            "speed_category": self._categorize_speed(
+                perf_analysis.inference_time_ms),
+            "optimization_priority": self._get_optimization_priority(
+                analysis_results.get(
+                    "optimization_recommendations",
+                    [])),
+            "key_insights": self._extract_key_insights(analysis_results)}
 
         return summary
 
@@ -536,7 +591,8 @@ class UniversalAdvancedAnalyzer:
         else:
             return "slow"
 
-    def _get_optimization_priority(self, recommendations: List[OptimizationRecommendation]) -> str:
+    def _get_optimization_priority(
+            self, recommendations: List[OptimizationRecommendation]) -> str:
         """Get overall optimization priority."""
         if not recommendations:
             return "low"
@@ -558,10 +614,12 @@ class UniversalAdvancedAnalyzer:
 
         # Architecture insights
         if arch_analysis["is_encoder_decoder"]:
-            insights.append("Model uses encoder-decoder architecture, suitable for sequence-to-sequence tasks")
+            insights.append(
+                "Model uses encoder-decoder architecture, suitable for sequence-to-sequence tasks")
 
         if arch_analysis["supports_bidirectional"]:
-            insights.append("Model supports bidirectional attention, good for understanding tasks")
+            insights.append(
+                "Model supports bidirectional attention, good for understanding tasks")
 
         # Performance insights
         if perf_analysis.efficiency_score > 0.8:
@@ -570,14 +628,17 @@ class UniversalAdvancedAnalyzer:
             insights.append("Model has efficiency concerns that should be addressed")
 
         if perf_analysis.sparsity_ratio > 0.3:
-            insights.append("Model shows significant sparsity, compression opportunities available")
+            insights.append(
+                "Model shows significant sparsity, compression opportunities available")
 
         # Domain insights
         if "domain_analysis" in analysis_results:
-            domain_score = analysis_results["domain_analysis"].get("domain_compatibility_score", 0)
+            domain_score = analysis_results["domain_analysis"].get(
+                "domain_compatibility_score", 0)
             if domain_score > 0.8:
                 insights.append("Model shows strong domain specialization")
             elif domain_score < 0.5:
-                insights.append("Model may need domain adaptation for optimal performance")
+                insights.append(
+                    "Model may need domain adaptation for optimal performance")
 
         return insights

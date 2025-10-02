@@ -5,12 +5,9 @@ Provides common interface and utilities for all model handlers.
 
 import torch
 import torch.nn as nn
-from transformers import AutoTokenizer, AutoModel
-from typing import Dict, List, Tuple, Optional, Any, Union, Protocol
-import numpy as np
+from typing import Dict, List, Optional, Any, Tuple
 import logging
 from abc import ABC, abstractmethod
-from pathlib import Path
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)

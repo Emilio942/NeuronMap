@@ -1,0 +1,498 @@
+{
+  "file_path": "outputs/functional_groups_demo/simulated_results.json",
+  "validation_passed": false,
+  "total_groups": 18,
+  "passed_groups": 0,
+  "critical_flags": 7,
+  "detailed_results": [
+    {
+      "group_id": 1,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "LOW_CONFIDENCE_FUNCTION",
+          "severity": "MEDIUM",
+          "description": "Funktions-Confidence von 0.449 ist niedrig f\u00fcr wissenschaftliche Aussagen"
+        },
+        {
+          "type": "HIGH_SPECIFICITY_LOW_COHERENCE",
+          "severity": "MEDIUM",
+          "description": "Hohe Spezifit\u00e4t (>0.9) bei niedriger Koh\u00e4renz (<0.5) deutet auf Shortcut-Logik hin"
+        },
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'addition' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.42442253826781334,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": [
+        "MULTIPLE_VALIDIERUNGSFEHLER"
+      ]
+    },
+    {
+      "group_id": 2,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        }
+      ],
+      "confidence_in_function_claim": 0.8699881869761403,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": []
+    },
+    {
+      "group_id": 3,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        }
+      ],
+      "confidence_in_function_claim": 1.0,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": []
+    },
+    {
+      "group_id": 4,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'addition' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.9974846307449989,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": []
+    },
+    {
+      "group_id": 5,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "LOW_CONFIDENCE_FUNCTION",
+          "severity": "MEDIUM",
+          "description": "Funktions-Confidence von 0.465 ist niedrig f\u00fcr wissenschaftliche Aussagen"
+        },
+        {
+          "type": "FUNCTION_TASK_MISMATCH",
+          "severity": "HIGH",
+          "description": "Funktion 'number_recognition' passt nicht zum Task Type 'arithmetic_operations'"
+        },
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'number_recognition' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.23239638632172216,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": [
+        "SEHR_NIEDRIGE_FUNKTIONS_CONFIDENCE",
+        "MULTIPLE_VALIDIERUNGSFEHLER"
+      ]
+    },
+    {
+      "group_id": 1,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        }
+      ],
+      "confidence_in_function_claim": 0.8630640226271147,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": []
+    },
+    {
+      "group_id": 2,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'meaning_comparison' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.6352182932022735,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": []
+    },
+    {
+      "group_id": 3,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'word_embeddings' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.5436607576630199,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": []
+    },
+    {
+      "group_id": 4,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'semantic_relations' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.7067628937577031,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": []
+    },
+    {
+      "group_id": 5,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'meaning_comparison' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.5995646967280983,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": []
+    },
+    {
+      "group_id": 6,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'word_embeddings' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.5800433242012654,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": []
+    },
+    {
+      "group_id": 7,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'word_embeddings' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.7282242024846703,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": []
+    },
+    {
+      "group_id": 1,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "UNKNOWN_TASK_TYPE",
+          "severity": "HIGH",
+          "description": "Task Type 'causal_reasoning' ist nicht in den validierten Task-Types enthalten"
+        },
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        }
+      ],
+      "confidence_in_function_claim": 0.8383658621073937,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": []
+    },
+    {
+      "group_id": 2,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "UNKNOWN_TASK_TYPE",
+          "severity": "HIGH",
+          "description": "Task Type 'causal_reasoning' ist nicht in den validierten Task-Types enthalten"
+        },
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'cause_effect' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.5744577647685264,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": [
+        "MULTIPLE_VALIDIERUNGSFEHLER"
+      ]
+    },
+    {
+      "group_id": 3,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "LOW_CONFIDENCE_FUNCTION",
+          "severity": "MEDIUM",
+          "description": "Funktions-Confidence von 0.406 ist niedrig f\u00fcr wissenschaftliche Aussagen"
+        },
+        {
+          "type": "UNKNOWN_TASK_TYPE",
+          "severity": "HIGH",
+          "description": "Task Type 'causal_reasoning' ist nicht in den validierten Task-Types enthalten"
+        },
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'cause_effect' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.20288123388164014,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": [
+        "SEHR_NIEDRIGE_FUNKTIONS_CONFIDENCE",
+        "MULTIPLE_VALIDIERUNGSFEHLER"
+      ]
+    },
+    {
+      "group_id": 4,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "LOW_CONFIDENCE_FUNCTION",
+          "severity": "MEDIUM",
+          "description": "Funktions-Confidence von 0.427 ist niedrig f\u00fcr wissenschaftliche Aussagen"
+        },
+        {
+          "type": "UNKNOWN_TASK_TYPE",
+          "severity": "HIGH",
+          "description": "Task Type 'causal_reasoning' ist nicht in den validierten Task-Types enthalten"
+        },
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'cause_effect' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.21351789425099546,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": [
+        "SEHR_NIEDRIGE_FUNKTIONS_CONFIDENCE",
+        "MULTIPLE_VALIDIERUNGSFEHLER"
+      ]
+    },
+    {
+      "group_id": 5,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "UNKNOWN_TASK_TYPE",
+          "severity": "HIGH",
+          "description": "Task Type 'causal_reasoning' ist nicht in den validierten Task-Types enthalten"
+        },
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'temporal_relations' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.6369707438436649,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": [
+        "MULTIPLE_VALIDIERUNGSFEHLER"
+      ]
+    },
+    {
+      "group_id": 6,
+      "validation_passed": false,
+      "issues": [
+        {
+          "type": "UNKNOWN_TASK_TYPE",
+          "severity": "HIGH",
+          "description": "Task Type 'causal_reasoning' ist nicht in den validierten Task-Types enthalten"
+        },
+        {
+          "type": "NO_ABLATION_EVIDENCE",
+          "severity": "CRITICAL",
+          "description": "Keine Evidenz f\u00fcr Ablationstests - Funktionsaussagen sind nicht validiert"
+        },
+        {
+          "type": "NO_FUNCTIONAL_IMPACT_MEASUREMENT",
+          "severity": "HIGH",
+          "description": "Keine Messung des funktionalen Impacts bei Neuron-Deaktivierung"
+        },
+        {
+          "type": "ABSOLUTE_CLAIM_LOW_CONFIDENCE",
+          "severity": "MEDIUM",
+          "description": "Absolute Funktionsaussage 'temporal_relations' bei Confidence < 0.8 ist nicht objektiv"
+        }
+      ],
+      "confidence_in_function_claim": 0.7789069815428227,
+      "comments": "KRITISCHE VALIDIERUNGSFEHLER: 1 kritische Issues gefunden. Wissenschaftliche Validit\u00e4t stark gef\u00e4hrdet.",
+      "critical_flags": [
+        "MULTIPLE_VALIDIERUNGSFEHLER"
+      ]
+    }
+  ]
+}

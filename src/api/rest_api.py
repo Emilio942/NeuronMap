@@ -5,11 +5,10 @@ Provides a comprehensive REST API for all NeuronMap functionality.
 Supports analysis, visualization, model management, and more.
 """
 
-import asyncio
 import logging
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from pathlib import Path
 import json
 import traceback
@@ -17,7 +16,6 @@ import traceback
 try:
     from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, UploadFile, File
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
     from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
     from pydantic import BaseModel, Field
     import uvicorn
@@ -28,9 +26,6 @@ except ImportError:
     BaseModel = None
 
 # Internal imports
-import sys
-sys.path.append(str(Path(__file__).parent.parent))
-
 from core.neuron_map import NeuronMap
 from config.config_manager import ConfigManager
 from utils.error_handling import NeuronMapError, setup_error_handling
@@ -41,6 +36,8 @@ from visualization.advanced_plots import create_interactive_dashboard
 logger = logging.getLogger(__name__)
 
 # Pydantic models for API requests/responses
+
+
 class AnalysisRequest(BaseModel):
     """Request model for analysis endpoint."""
     model_name: str = Field(..., description="Name of the model to analyze")
@@ -49,6 +46,7 @@ class AnalysisRequest(BaseModel):
     analysis_type: str = Field("basic", description="Type of analysis to perform")
     config: Optional[Dict[str, Any]] = Field(None, description="Analysis configuration")
 
+
 class AnalysisResponse(BaseModel):
     """Response model for analysis results."""
     analysis_id: str = Field(..., description="Unique identifier for this analysis")
@@ -56,6 +54,7 @@ class AnalysisResponse(BaseModel):
     results: Optional[Dict[str, Any]] = Field(None, description="Analysis results")
     metadata: Dict[str, Any] = Field(..., description="Analysis metadata")
     created_at: datetime = Field(..., description="Creation timestamp")
+
 
 class ModelInfo(BaseModel):
     """Model information response."""
@@ -66,11 +65,14 @@ class ModelInfo(BaseModel):
     supported_tasks: List[str]
     description: Optional[str] = None
 
+
 class VisualizationRequest(BaseModel):
     """Request for creating visualizations."""
     analysis_id: str = Field(..., description="Analysis ID to visualize")
     plot_type: str = Field(..., description="Type of plot to create")
-    config: Optional[Dict[str, Any]] = Field(None, description="Visualization configuration")
+    config: Optional[Dict[str, Any]] = Field(
+        None, description="Visualization configuration")
+
 
 class JobStatus(BaseModel):
     """Background job status."""
@@ -81,6 +83,7 @@ class JobStatus(BaseModel):
     error: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
 
 class NeuronMapAPI:
     """Main API class for NeuronMap REST service."""
@@ -155,8 +158,13 @@ class NeuronMapAPI:
         logger.info(f"Created job {job_id} of type {job_type}")
         return job_id
 
-    def update_job(self, job_id: str, status: str, progress: Optional[float] = None,
-                   result: Optional[Dict[str, Any]] = None, error: Optional[str] = None):
+    def update_job(self,
+                   job_id: str,
+                   status: str,
+                   progress: Optional[float] = None,
+                   result: Optional[Dict[str,
+                                         Any]] = None,
+                   error: Optional[str] = None):
         """Update job status."""
         if job_id in self.jobs:
             job = self.jobs[job_id]
@@ -242,9 +250,12 @@ class NeuronMapAPI:
             }
 
             # Complete job
-            self.update_job(job_id, "completed", progress=1.0, result={'analysis_id': analysis_id})
+            self.update_job(
+                job_id, "completed", progress=1.0, result={
+                    'analysis_id': analysis_id})
 
-            logger.info(f"Analysis completed for job {job_id}, analysis_id: {analysis_id}")
+            logger.info(f"Analysis completed for job {
+                        job_id}, analysis_id: {analysis_id}")
 
         except Exception as e:
             error_msg = f"Analysis failed: {str(e)}"
@@ -271,24 +282,8 @@ class NeuronMapAPI:
 
         return convert_tensor(results)
 
-def create_app(config_path: Optional[str] = None) -> FastAPI:
-    """Create FastAPI application."""
-    if FastAPI is None:
-        raise ImportError("FastAPI is required for the REST API. Install with: pip install fastapi uvicorn")
 
-    # Initialize API
-    api = NeuronMapAPI(config_path)
-
-    # Create FastAPI app
-    app = FastAPI(
-        title="NeuronMap API",
-        description="REST API for neural network activation analysis",
-        version="1.0.0",
-        docs_url="/docs",
-        redoc_url="/redoc"
-    )
-
-    # Add CORS middleware
+def _setup_cors_middleware(app: FastAPI):
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],  # Configure appropriately for production
@@ -297,13 +292,32 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Authentication (optional)
+def _setup_authentication(app: FastAPI):
     security = HTTPBearer(auto_error=False)
 
     def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-        """Placeholder for authentication."""
         # Implement your authentication logic here
         return {"user_id": "anonymous"}
+
+    app.dependency_overrides[Depends(security)] = get_current_user
+
+def create_app(config_path: Optional[str] = None) -> FastAPI:
+    """Create FastAPI application."""
+    if FastAPI is None:
+        raise ImportError("FastAPI is required for the REST API. Install with: pip install fastapi uvicorn")
+
+    api = NeuronMapAPI(config_path)
+
+    app = FastAPI(
+        title="NeuronMap API",
+        description="REST API for neural network activation analysis",
+        version="1.0.0",
+        docs_url="/docs",
+        redoc_url="/redoc"
+    )
+
+    _setup_cors_middleware(app)
+    _setup_authentication(app)
 
     # API Routes
 
@@ -335,13 +349,12 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
     async def create_analysis(
         request: AnalysisRequest,
         background_tasks: BackgroundTasks,
-        user = Depends(get_current_user)
+        user=Depends(get_current_user)
     ):
         """Create a new analysis job."""
         try:
             job_id = api.create_job("analysis", request=request.dict())
 
-            # Start analysis in background
             background_tasks.add_task(api.run_analysis, request, job_id)
 
             return {
@@ -382,7 +395,6 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
         try:
             job_id = api.create_job("visualization", request=request.dict())
 
-            # Create visualization in background
             background_tasks.add_task(
                 api.create_visualization_job,
                 request,
@@ -402,7 +414,6 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
     @app.get("/visualizations/{viz_id}")
     async def get_visualization(viz_id: str):
         """Get visualization file."""
-        # This would serve the actual visualization file
         viz_path = Path(f"./outputs/visualizations/{viz_id}.html")
         if not viz_path.exists():
             raise HTTPException(status_code=404, detail="Visualization not found")
@@ -413,7 +424,6 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
     async def upload_file(file: UploadFile = File(...)):
         """Upload file for analysis."""
         try:
-            # Save uploaded file
             upload_dir = Path("./uploads")
             upload_dir.mkdir(exist_ok=True)
 
@@ -440,11 +450,9 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
 
         try:
             while True:
-                # Handle WebSocket communication
                 data = await websocket.receive_text()
                 message = json.loads(data)
 
-                # Echo back for now
                 await websocket.send_text(json.dumps({
                     "type": "response",
                     "client_id": client_id,
@@ -456,12 +464,13 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
         finally:
             await websocket.close()
 
-    # Add API instance to app state
     app.state.api = api
 
     return app
 
 # Additional methods for NeuronMapAPI
+
+
 def _add_api_methods():
     """Add additional methods to NeuronMapAPI class."""
 
@@ -507,10 +516,13 @@ def _add_api_methods():
     # Add method to class
     NeuronMapAPI.create_visualization_job = create_visualization_job
 
+
 # Apply additional methods
 _add_api_methods()
 
 # CLI for running the API server
+
+
 def run_server(
     host: str = "0.0.0.0",
     port: int = 8000,
@@ -527,6 +539,7 @@ def run_server(
         reload=reload,
         log_level="info"
     )
+
 
 if __name__ == "__main__":
     import argparse

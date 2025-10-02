@@ -4,24 +4,16 @@ Supports CodeBERT, SciBERT, BioBERT with specialized domain analysis.
 """
 
 import torch
-import torch.nn as nn
 from transformers import (
     AutoTokenizer,
-    AutoModel,
-    AutoModelForSequenceClassification,
-    RobertaModel,
-    RobertaTokenizer
+    AutoModel
 )
-from typing import Dict, List, Tuple, Optional, Any, Union
-import numpy as np
+from typing import Dict, List, Optional, Any
 import logging
-from pathlib import Path
 from dataclasses import dataclass
 import re
-from collections import defaultdict
 
-from ..utils.config import get_config_manager
-from .base_model_handler import BaseModelHandler, ModelConfig, ActivationResult
+from .base_model_handler import BaseModelHandler, ModelConfig, ActivationResult, ModelFactory
 
 logger = logging.getLogger(__name__)
 
@@ -326,7 +318,7 @@ class DomainSpecificBERTHandler(BaseModelHandler):
 
         try:
             with torch.no_grad():
-                outputs = self.model(
+                self.model(
                     input_ids=inputs['input_ids'],
                     attention_mask=inputs.get('attention_mask'),
                     output_attentions=return_attention,

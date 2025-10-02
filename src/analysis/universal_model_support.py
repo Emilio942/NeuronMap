@@ -3,19 +3,16 @@ Universal Model Support Framework
 Provides automatic layer mapping and cross-architecture compatibility for all supported models.
 """
 
-import json
 import logging
-import inspect
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Union, Any, Tuple, Set
+from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 import torch
 import torch.nn as nn
-from transformers import AutoModel, AutoConfig
-import re
 
-# Set up logging
+from transformers import AutoModel, AutoConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -185,7 +182,12 @@ class ArchitectureRegistry:
         model_name_lower = model_name.lower()
 
         # Check for known patterns
-        if any(pattern in model_name_lower for pattern in ["gpt", "codegen", "gpt-j", "gpt-neo"]):
+        if any(
+            pattern in model_name_lower for pattern in [
+                "gpt",
+                "codegen",
+                "gpt-j",
+                "gpt-neo"]):
             return ArchitectureType.GPT
         elif any(pattern in model_name_lower for pattern in ["bert", "roberta", "deberta", "distilbert"]):
             return ArchitectureType.BERT
@@ -219,7 +221,8 @@ class UniversalLayerMapper:
         config = self.registry.get_config(architecture_type.value)
 
         if config is None:
-            logger.warning(f"No configuration found for {model_name}, using generic discovery")
+            logger.warning(f"No configuration found for {
+                           model_name}, using generic discovery")
             layers = self._generic_layer_discovery(model)
         else:
             layers = self._pattern_based_discovery(model, config)
@@ -230,7 +233,10 @@ class UniversalLayerMapper:
 
         return layers
 
-    def _pattern_based_discovery(self, model: nn.Module, config: AdapterConfig) -> List[LayerInfo]:
+    def _pattern_based_discovery(
+            self,
+            model: nn.Module,
+            config: AdapterConfig) -> List[LayerInfo]:
         """Discover layers using architecture-specific patterns."""
         layers = []
 
@@ -262,7 +268,8 @@ class UniversalLayerMapper:
 
         return layers
 
-    def _analyze_module(self, name: str, module: nn.Module, config: AdapterConfig) -> Optional[LayerInfo]:
+    def _analyze_module(self, name: str, module: nn.Module,
+                        config: AdapterConfig) -> Optional[LayerInfo]:
         """Analyze a module to determine if it's a relevant layer."""
         # Extract layer index from name using patterns
         layer_index = self._extract_layer_index(name, config.layer_patterns)
@@ -316,7 +323,12 @@ class UniversalLayerMapper:
             return LayerType.ATTENTION
 
         # Check for feed-forward layers
-        if any(pattern in name_lower for pattern in ["mlp", "ffn", "feed_forward", "intermediate"]):
+        if any(
+            pattern in name_lower for pattern in [
+                "mlp",
+                "ffn",
+                "feed_forward",
+                "intermediate"]):
             return LayerType.FEED_FORWARD
 
         # Check for normalization layers
@@ -324,11 +336,21 @@ class UniversalLayerMapper:
             return LayerType.NORMALIZATION
 
         # Check for embedding layers
-        if any(pattern in name_lower for pattern in ["embed", "wte", "wpe", "position"]):
+        if any(
+            pattern in name_lower for pattern in [
+                "embed",
+                "wte",
+                "wpe",
+                "position"]):
             return LayerType.EMBEDDING
 
         # Check for output layers
-        if any(pattern in name_lower for pattern in ["output", "head", "classifier", "lm_head"]):
+        if any(
+            pattern in name_lower for pattern in [
+                "output",
+                "head",
+                "classifier",
+                "lm_head"]):
             return LayerType.OUTPUT
 
         # Check for pooler layers
@@ -337,7 +359,8 @@ class UniversalLayerMapper:
 
         return LayerType.UNKNOWN
 
-    def _extract_dimensions(self, module: nn.Module) -> Tuple[Optional[int], Optional[int]]:
+    def _extract_dimensions(
+            self, module: nn.Module) -> Tuple[Optional[int], Optional[int]]:
         """Extract input and output dimensions from a module."""
         if isinstance(module, nn.Linear):
             return module.in_features, module.out_features
@@ -365,7 +388,10 @@ class UniversalLayerMapper:
 
         return None
 
-    def get_layers_by_type(self, layers: List[LayerInfo], layer_type: LayerType) -> List[LayerInfo]:
+    def get_layers_by_type(
+            self,
+            layers: List[LayerInfo],
+            layer_type: LayerType) -> List[LayerInfo]:
         """Get all layers of a specific type."""
         return [layer for layer in layers if layer.layer_type == layer_type]
 
@@ -412,7 +438,8 @@ class UniversalModelSupport:
         self.architecture_registry.register(model_family, adapter_config)
         logger.info(f"Added support for model family: {model_family}")
 
-    def analyze_model_architecture(self, model: nn.Module, model_name: str) -> Dict[str, Any]:
+    def analyze_model_architecture(
+            self, model: nn.Module, model_name: str) -> Dict[str, Any]:
         """Analyze a model's architecture and return comprehensive information."""
         # Discover layers
         layers = self.layer_mapper.discover_layers(model, model_name)
@@ -463,7 +490,11 @@ class UniversalModelSupport:
 
         return analysis
 
-    def get_layer_mapping(self, model: nn.Module, model_name: str, target_layers: Optional[List[int]] = None) -> Dict[int, LayerInfo]:
+    def get_layer_mapping(self,
+                          model: nn.Module,
+                          model_name: str,
+                          target_layers: Optional[List[int]] = None) -> Dict[int,
+                                                                             LayerInfo]:
         """Get a mapping of layer indices to LayerInfo objects."""
         layers = self.layer_mapper.discover_layers(model, model_name)
 
@@ -474,7 +505,8 @@ class UniversalModelSupport:
 
         return layer_mapping
 
-    def validate_cross_architecture_compatibility(self, model1_name: str, model2_name: str) -> Dict[str, Any]:
+    def validate_cross_architecture_compatibility(
+            self, model1_name: str, model2_name: str) -> Dict[str, Any]:
         """Validate compatibility between two different architectures."""
         arch1 = self.architecture_registry.detect_architecture(model1_name)
         arch2 = self.architecture_registry.detect_architecture(model2_name)
@@ -546,7 +578,10 @@ def analyze_model(model: nn.Module, model_name: str) -> Dict[str, Any]:
     return ums.analyze_model_architecture(model, model_name)
 
 
-def get_layer_info(model: nn.Module, model_name: str, layer_index: int) -> Optional[LayerInfo]:
+def get_layer_info(
+        model: nn.Module,
+        model_name: str,
+        layer_index: int) -> Optional[LayerInfo]:
     """Get information about a specific layer."""
     ums = create_universal_model_support()
     layer_mapping = ums.get_layer_mapping(model, model_name)

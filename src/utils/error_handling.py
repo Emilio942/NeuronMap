@@ -33,6 +33,13 @@ class NeuronMapException(Exception):
         return msg
 
 
+class NeuronMapError(NeuronMapException):
+    """Backward compatible generic NeuronMap error."""
+
+    def __init__(self, message: str, error_code: str = "NEURONMAP_ERROR", context: dict | None = None):
+        super().__init__(message=message, error_code=error_code, context=context)
+
+
 class ModelLoadingError(NeuronMapException):
     """Raised when model loading fails."""
 
@@ -79,14 +86,26 @@ class ConfigurationError(NeuronMapException):
 class ValidationError(NeuronMapException):
     """Raised when input validation fails."""
 
-    def __init__(self, field: str, value: Any, reason: str, context: dict = None):
-        super().__init__(
-            message=f"Validation failed for field '{field}' with value '{value}': {reason}",
-            error_code="VALIDATION_ERROR",
-            context=context
-        )
-        self.field = field
-        self.value = value
+    def __init__(self,
+                 field: Any = None,
+                 value: Any = None,
+                 reason: str | None = None,
+                 context: dict | None = None):
+        # Support legacy single-message usage (e.g. ValidationError("message"))
+        if reason is None and value is None and (field is not None and not isinstance(field, (list, tuple, dict))):
+            message = str(field)
+            field_name = None
+            field_value = None
+        else:
+            field_name = field
+            field_value = value
+            if reason is None:
+                reason = "Invalid value"
+            message = f"Validation failed for field '{field_name}' with value '{field_value}': {reason}"
+
+        super().__init__(message=message, error_code="VALIDATION_ERROR", context=context)
+        self.field = field_name
+        self.value = field_value
 
 
 class ResourceError(NeuronMapException):
@@ -598,6 +617,19 @@ class ErrorHandler:
         """
         self.error_log_file = log_file or "neuronmap_errors.jsonl"
         self.error_history: List[ErrorContext] = []
+        self._errors: List[Dict[str, Any]] = []
+
+    def __enter__(self):
+        """Support context manager protocol."""
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        """Record uncaught exceptions when used as a context manager."""
+        if exc_type is not None:
+            trace = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+            self.record_error(exc_type.__name__, str(exc_value), {"traceback": trace})
+        # Do not suppress exceptions by default
+        return False
 
     def handle_error(self, error: Exception,
                     operation: str,
@@ -633,11 +665,65 @@ class ErrorHandler:
 
         # Add to history
         self.error_history.append(error_context)
+        self._errors.append({
+            'error_type': error_context.error_type,
+            'message': error_context.error_message,
+            'context': error_context.context_data,
+            'timestamp': error_context.timestamp
+        })
 
         # Save to file
         self._save_error_to_file(error_context)
 
         return error_context
+
+    def record_error(self,
+                     error_type: str,
+                     message: str,
+                     context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Record a lightweight error entry.
+
+        Args:
+            error_type: Type or name of the error.
+            message: Human-readable message.
+            context: Optional additional context data.
+
+        Returns:
+            Stored error dictionary.
+        """
+        context = context or {}
+        entry = {
+            'error_type': error_type,
+            'message': message,
+            'context': context,
+            'timestamp': time.time()
+        }
+
+        self._errors.append(entry)
+
+        error_context = ErrorContext(
+            operation=error_type,
+            timestamp=entry['timestamp'],
+            attempt=context.get('attempt', 1),
+            max_attempts=context.get('max_attempts', 1),
+            error_type=error_type,
+            error_message=message,
+            traceback_str=context.get('traceback', ''),
+            context_data=context
+        )
+        self.error_history.append(error_context)
+        self._save_error_to_file(error_context)
+
+        logger.error(f"{error_type}: {message}")
+        return entry
+
+    def get_errors(self) -> List[Dict[str, Any]]:
+        """Return a copy of recorded errors."""
+        return list(self._errors)
+
+    def clear_errors(self):
+        """Clear stored errors."""
+        self._errors.clear()
 
     def _save_error_to_file(self, error_context: ErrorContext):
         """Save error context to log file.
@@ -774,7 +860,7 @@ class GracefulDegradation:
         return default_config
 
 
-class BatchProcessor:
+class ResilientBatchProcessor:
     """Process items in batches with error recovery."""
 
     def __init__(self,
@@ -1063,4 +1149,4 @@ class PerformanceOptimizer:
 
 
 # Alias for test compatibility
-NeuronMapError = NeuronMapException
+LegacyNeuronMapError = NeuronMapError

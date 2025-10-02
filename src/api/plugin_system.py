@@ -11,13 +11,13 @@ import inspect
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Type, Callable, Union
+from typing import Dict, List, Optional, Any
 import traceback
-import json
 from dataclasses import dataclass
 from enum import Enum
 
 logger = logging.getLogger(__name__)
+
 
 class PluginType(Enum):
     """Types of plugins supported by NeuronMap."""
@@ -40,6 +40,7 @@ class PluginMetadata:
     config_schema: Optional[Dict[str, Any]] = None
     supported_models: Optional[List[str]] = None
     api_version: str = "1.0"
+
 
 class BasePlugin(abc.ABC):
     """
@@ -107,6 +108,7 @@ class BasePlugin(abc.ABC):
         """Return list of capabilities this plugin provides."""
         return []
 
+
 class AnalysisPlugin(BasePlugin):
     """Base class for analysis plugins."""
 
@@ -165,6 +167,7 @@ class VisualizationPlugin(BasePlugin):
         """Return list of supported plot types."""
         return []
 
+
 class ModelLoaderPlugin(BasePlugin):
     """Base class for model loader plugins."""
 
@@ -199,6 +202,7 @@ class ModelLoaderPlugin(BasePlugin):
         """
         pass
 
+
 class DataProcessorPlugin(BasePlugin):
     """Base class for data processing plugins."""
 
@@ -219,6 +223,7 @@ class DataProcessorPlugin(BasePlugin):
             Processed data
         """
         pass
+
 
 class ExporterPlugin(BasePlugin):
     """Base class for export plugins."""
@@ -249,6 +254,7 @@ class ExporterPlugin(BasePlugin):
         """Return list of supported export formats."""
         return []
 
+
 class IntegrationPlugin(BasePlugin):
     """Base class for integration plugins."""
 
@@ -278,6 +284,7 @@ class IntegrationPlugin(BasePlugin):
         """
         pass
 
+
 class PluginManager:
     """
     Manages loading, initialization, and execution of plugins.
@@ -302,6 +309,7 @@ class PluginManager:
         }
 
         logger.info("Plugin manager initialized")
+
 
     def discover_plugins(self) -> List[str]:
         """
@@ -480,6 +488,7 @@ class PluginManager:
 
         return plugin.create_visualization(data, plot_type, **kwargs)
 
+
     def unload_plugin(self, plugin_name: str) -> bool:
         """Unload a plugin."""
         if plugin_name not in self.plugins:
@@ -572,6 +581,7 @@ class ExampleSentimentAnalysisPlugin(AnalysisPlugin):
 
     def get_capabilities(self) -> List[str]:
         return ["sentiment_classification", "confidence_scoring"]
+
 
 class ExampleVisualizationPlugin(VisualizationPlugin):
     """Example visualization plugin."""

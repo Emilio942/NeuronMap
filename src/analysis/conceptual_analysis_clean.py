@@ -353,38 +353,8 @@ class ConceptualAnalyzer:
         logger.info(f"Generated {len(results)} concept algebra results")
         return results
 
-    @handle_errors
-    @log_performance
-    def discover_circuits(
-        self,
-        model: nn.Module,
-        activations: Dict[str, np.ndarray],
-        concepts: Dict[str, List[ConceptVector]],
-        threshold: float = 0.1
-    ) -> List[Circuit]:
-        """Discover computational circuits in the neural network.
-
-        Args:
-            model: The neural network model
-            activations: Layer activations
-            concepts: Extracted concepts
-            threshold: Minimum connection strength to include in circuit
-
-        Returns:
-            List of discovered Circuit objects
-        """
-        if not NETWORKX_AVAILABLE:
-            logger.warning("NetworkX not available, cannot perform circuit discovery")
-            return []
-
-        logger.info("Discovering computational circuits")
-
-        circuits = []
-
-        # Build connectivity graph
-        G = nx.DiGraph()
-
-        # Add nodes for each concept
+    def _add_circuit_nodes(self, G: nx.DiGraph, concepts: Dict[str, List[ConceptVector]]):
+        """Helper to add nodes to the circuit graph."""
         for layer_name, layer_concepts in concepts.items():
             for i, concept in enumerate(layer_concepts):
                 node_id = f"{layer_name}_{i}"
@@ -393,7 +363,8 @@ class ConceptualAnalyzer:
                           concept=concept.name,
                           confidence=concept.confidence)
 
-        # Add edges based on activation correlation
+    def _add_circuit_edges(self, G: nx.DiGraph, activations: Dict[str, np.ndarray], concepts: Dict[str, List[ConceptVector]], threshold: float):
+        """Helper to add edges to the circuit graph based on correlations."""
         layer_names = list(activations.keys())
         for i in range(len(layer_names) - 1):
             current_layer = layer_names[i]
@@ -402,14 +373,11 @@ class ConceptualAnalyzer:
             current_acts = activations[current_layer]
             next_acts = activations[next_layer]
 
-            # Calculate correlation matrix
             correlation_matrix = np.corrcoef(current_acts.T, next_acts.T)
             current_size = current_acts.shape[1]
 
-            # Extract cross-correlation block
             cross_corr = correlation_matrix[:current_size, current_size:]
 
-            # Add edges above threshold
             for src_idx in range(cross_corr.shape[0]):
                 for dst_idx in range(cross_corr.shape[1]):
                     corr_strength = abs(cross_corr[src_idx, dst_idx])
@@ -419,21 +387,21 @@ class ConceptualAnalyzer:
                         if G.has_node(src_node) and G.has_node(dst_node):
                             G.add_edge(src_node, dst_node, weight=corr_strength)
 
-        # Find strongly connected components as circuits
+    def _extract_circuits_from_graph(self, G: nx.DiGraph) -> List[Circuit]:
+        """Helper to extract Circuit objects from a NetworkX graph."""
+        circuits = []
         try:
             components = list(nx.weakly_connected_components(G))
 
             for i, component in enumerate(components):
-                if len(component) > 1:  # Only consider multi-node circuits
+                if len(component) > 1:
                     subgraph = G.subgraph(component)
 
-                    # Extract circuit information
                     nodes = []
                     edges = []
 
                     for node in component:
                         layer = G.nodes[node]['layer']
-                        # Extract neuron index from node ID
                         neuron_idx = int(node.split('_')[-1])
                         nodes.append((layer, neuron_idx))
 
@@ -446,14 +414,13 @@ class ConceptualAnalyzer:
 
                         edges.append(((src_layer, src_idx), (dst_layer, dst_idx), weight))
 
-                    # Calculate circuit confidence as average edge weight
                     avg_weight = np.mean([edge[2] for edge in edges])
 
                     circuit = Circuit(
                         name=f"circuit_{i}",
                         nodes=nodes,
                         edges=edges,
-                        function="unknown",  # Could be inferred from concept analysis
+                        function="unknown",
                         confidence=float(avg_weight)
                     )
 
@@ -461,6 +428,28 @@ class ConceptualAnalyzer:
 
         except Exception as e:
             logger.warning(f"Error in circuit discovery: {e}")
+        return circuits
+
+    @handle_errors
+    @log_performance
+    def discover_circuits(
+        self,
+        model: nn.Module,
+        activations: Dict[str, np.ndarray],
+        concepts: Dict[str, List[ConceptVector]],
+        threshold: float = 0.1
+    ) -> List[Circuit]:
+        """Discover computational circuits in the neural network."""
+        if not NETWORKX_AVAILABLE:
+            logger.warning("NetworkX not available, cannot perform circuit discovery")
+            return []
+
+        logger.info("Discovering computational circuits")
+
+        G = nx.DiGraph()
+        self._add_circuit_nodes(G, concepts)
+        self._add_circuit_edges(G, activations, concepts, threshold)
+        circuits = self._extract_circuits_from_graph(G)
 
         logger.info(f"Discovered {len(circuits)} circuits")
         return circuits

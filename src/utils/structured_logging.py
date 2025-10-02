@@ -246,6 +246,16 @@ class NeuronMapLogger:
         
         if enable_console:
             self._setup_console_handler(enable_structured)
+
+        # Prevent double logging when root logger also receives handlers
+        self.logger.propagate = False
+
+        # Mirror handlers to root logger so other components inherit configuration
+        root_logger = logging.getLogger()
+        root_logger.setLevel(self.logger.level)
+        root_logger.handlers.clear()
+        for handler in self.logger.handlers:
+            root_logger.addHandler(handler)
         
         # Initialize specialized loggers
         self.performance = PerformanceLogger(self.logger)

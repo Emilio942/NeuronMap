@@ -67,33 +67,67 @@ class DifficultyAssessmentEngine:
             4: ['evaluate', 'critique', 'justify', 'synthesize']
         }
 
-    def assess_difficulty(self, text: str, context: Optional[str] = None) -> DifficultyMetrics:
-        """
-        Assess the difficulty of a given text.
+    def assess_difficulty(self, text: str, context: Optional[str] = None) -> float:
+        """Return a scalar overall difficulty score in ``[0.0, 1.0]``."""
+
+        metrics = self._compute_metrics(text, context)
+        return metrics.overall_difficulty
+
+    def assess_question_difficulty(
+        self,
+        question: str,
+        domain: Optional[str] = None,
+        *,
+        detailed: bool = False
+    ) -> DifficultyMetrics | float:
+        """Assess the difficulty of a question.
 
         Args:
-            text: The text to assess
-            context: Optional context for domain-specific assessment
-
-        Returns:
-            DifficultyMetrics object with assessment results
+            question: Question text.
+            domain: Optional domain context.
+            detailed: When ``True`` return :class:`DifficultyMetrics`, otherwise
+                return the scalar difficulty score.
         """
+
+        metrics = self._compute_metrics(question, domain)
+        return metrics if detailed else metrics.overall_difficulty
+
+    def assess_question_quality(self, question: str) -> Dict[str, Any]:
+        """Assess question quality - compatibility method for tests."""
+
+        metrics = self._compute_metrics(question)
+
+        specificity = min(1.0, metrics.vocabulary_density + 0.25)
+        clarity = min(1.0, metrics.confidence)
+
+        return {
+            'overall_score': metrics.overall_difficulty,
+            'complexity': metrics.complexity_score,
+            'specificity': specificity,
+            'clarity': clarity,
+            'level': metrics.level.value,
+            'metrics': metrics
+        }
+
+    def assess_difficulty_metrics(self, text: str, context: Optional[str] = None) -> DifficultyMetrics:
+        """Return detailed difficulty metrics for a piece of text."""
+
+        return self._compute_metrics(text, context)
+
+    def _compute_metrics(self, text: str, context: Optional[str] = None) -> DifficultyMetrics:
+        """Internal helper that computes full difficulty metrics."""
+
         try:
-            # Calculate various metrics
             complexity_score = self._calculate_complexity_score(text)
             vocabulary_density = self._calculate_vocabulary_density(text)
             concept_depth = self._calculate_concept_depth(text)
             reasoning_level = self._calculate_reasoning_level(text)
 
-            # Calculate overall difficulty
             overall_difficulty = self._calculate_overall_difficulty(
                 complexity_score, vocabulary_density, concept_depth, reasoning_level
             )
 
-            # Determine confidence level
             confidence = self._calculate_confidence(text)
-
-            # Determine difficulty level
             level = self._determine_level(overall_difficulty)
 
             return DifficultyMetrics(
@@ -108,7 +142,6 @@ class DifficultyAssessmentEngine:
 
         except Exception as e:
             self.logger.error(f"Error assessing difficulty: {e}")
-            # Return default metrics on error
             return DifficultyMetrics(
                 complexity_score=0.5,
                 vocabulary_density=0.5,
@@ -243,33 +276,6 @@ class DifficultyAssessmentEngine:
         else:
             return DifficultyLevel.EXPERT
 
-    def assess_question_difficulty(self, question: str, domain: Optional[str] = None) -> DifficultyMetrics:
-        """
-        Assess the difficulty of a specific question.
-
-        Args:
-            question: The question to assess
-            domain: Optional domain context
-
-        Returns:
-            DifficultyMetrics object
-        """
-        return self.assess_difficulty(question, domain)
-
-    def assess_question_quality(self, question: str) -> Dict[str, Any]:
-        """Assess question quality - compatibility method for tests."""
-        metrics = self.assess_question_difficulty(question)
-
-        # Convert DifficultyMetrics to dict format expected by tests
-        return {
-            'overall_score': metrics.overall_difficulty,
-            'complexity': metrics.complexity_score,
-            'vocabulary_density': metrics.vocabulary_density,
-            'clarity': metrics.confidence,
-            'level': metrics.level.value,
-            'metrics': metrics
-        }
-
     def batch_assess(self, texts: List[str], context: Optional[str] = None) -> List[DifficultyMetrics]:
         """
         Assess difficulty for multiple texts.
@@ -281,7 +287,7 @@ class DifficultyAssessmentEngine:
         Returns:
             List of DifficultyMetrics objects
         """
-        return [self.assess_difficulty(text, context) for text in texts]
+        return [self._compute_metrics(text, context) for text in texts]
 
     def get_difficulty_summary(self, metrics_list: List[DifficultyMetrics]) -> Dict[str, Any]:
         """

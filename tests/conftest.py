@@ -5,13 +5,61 @@ This module provides common fixtures and utilities that are used across
 multiple test modules to ensure consistency and reduce duplication.
 """
 
+import importlib
 import numpy as np
 import pytest
 import tempfile
 import json
+import yaml
 from pathlib import Path
 from unittest.mock import MagicMock
 from typing import Dict, Any, List
+
+_CONFIG_MANAGER_CLASS = None
+
+
+def _populate_basic_configs(config_dir: Path) -> None:
+    base_config = {
+        "models": {
+            "default": {
+                "name": "test-model",
+                "type": "transformer",
+                "parameters": {"num_layers": 6, "hidden_size": 256}
+            }
+        },
+        "analysis": {
+            "batch_size": 4,
+            "max_sequence_length": 64
+        }
+    }
+
+    dev_config = {
+        "models": {
+            "default": {
+                "name": "test-model-dev",
+                "parameters": {"num_layers": 2, "hidden_size": 128}
+            }
+        },
+        "analysis": {
+            "batch_size": 2
+        }
+    }
+
+    with open(config_dir / "models.yaml", "w", encoding="utf-8") as handle:
+        yaml.dump(base_config, handle)
+
+    with open(config_dir / "environment_dev.yaml", "w", encoding="utf-8") as handle:
+        yaml.dump(dev_config, handle)
+
+
+def _load_config_manager_class():
+    global _CONFIG_MANAGER_CLASS
+    if _CONFIG_MANAGER_CLASS is not None:
+        return _CONFIG_MANAGER_CLASS
+
+    module = importlib.import_module("src.utils.config_manager")
+    _CONFIG_MANAGER_CLASS = module.ConfigManager
+    return _CONFIG_MANAGER_CLASS
 
 # Test configuration for fixtures
 TEST_CONFIG = {
@@ -43,6 +91,29 @@ TEST_CONFIG = {
 def test_config():
     """Provide test configuration for all tests."""
     return TEST_CONFIG.copy()
+
+
+@pytest.fixture
+def config_manager():
+    """Provide a ConfigManager instance backed by temporary YAML files."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir)
+
+        _populate_basic_configs(config_dir)
+
+        ConfigManager = _load_config_manager_class()
+        manager = ConfigManager(config_dir=str(config_dir))
+        manager.load_config()
+        yield manager
+
+
+@pytest.fixture
+def temp_config_dir():
+    """Provide a temporary configuration directory with baseline files."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        config_dir = Path(tmpdir)
+        _populate_basic_configs(config_dir)
+        yield config_dir
 
 
 @pytest.fixture(scope="session")

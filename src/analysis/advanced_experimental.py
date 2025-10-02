@@ -11,16 +11,13 @@ This module implements cutting-edge analysis methods including:
 import logging
 import numpy as np
 import torch
-import torch.nn.functional as F
-from typing import Dict, List, Tuple, Optional, Union, Any
+from typing import Dict, List, Tuple, Optional, Any, Union
 from pathlib import Path
 import json
 from dataclasses import dataclass
-from scipy.stats import pearsonr, spearmanr
-from sklearn.linear_model import LinearRegression
+from scipy.stats import pearsonr
 from sklearn.metrics import mutual_info_score
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +98,6 @@ class CausalityAnalyzer:
                 if pvalue < best_pvalue:
                     best_pvalue = pvalue
                     best_fstat = fstat
-                    best_lag = lag
 
             # Calculate causality score (normalized F-statistic)
             causality_score = best_fstat / (1 + best_fstat)

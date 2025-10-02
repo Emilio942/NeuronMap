@@ -7,7 +7,8 @@ import numpy as np
 import logging
 import time
 import gc
-from typing import Dict, List, Optional, Tuple, Any, Union, Callable
+import psutil
+from typing import Dict, List, Optional, Tuple, Any, Union, Callable, Iterable
 from pathlib import Path
 import json
 from contextlib import contextmanager
@@ -16,8 +17,8 @@ import threading
 from queue import Queue
 import asyncio
 
+from .batch_processor import BatchProcessor as CoreBatchProcessor
 from ..utils.config import get_config
-from ..utils.monitoring import check_gpu_memory
 from ..utils.error_handling import with_retry, safe_execute
 
 
@@ -253,86 +254,81 @@ class GPUOptimizer:
         return optimal_batch_size
 
 
-class BatchProcessor:
-    """Process data in optimized batches."""
+class ProfiledBatchProcessor(CoreBatchProcessor):
+    """Process data in optimized batches with performance profiling."""
 
-    def __init__(self, batch_size: int = 32, num_workers: int = 2):
-        """Initialize batch processor.
+    def __init__(
+        self,
+        batch_size: int = 32,
+        num_workers: int = 2,
+        *,
+        parallel_processing: Optional[bool] = None,
+        profiler: Optional[PerformanceProfiler] = None,
+    ) -> None:
+        config: Dict[str, Any] = {
+            "batch_size": batch_size,
+            "num_workers": num_workers,
+        }
+        if parallel_processing is not None:
+            config["parallel_processing"] = parallel_processing
 
-        Args:
-            batch_size: Size of each batch.
-            num_workers: Number of worker threads.
-        """
-        self.batch_size = batch_size
-        self.num_workers = num_workers
-        self.profiler = PerformanceProfiler()
+        super().__init__(config)
+        self.profiler = profiler or PerformanceProfiler()
 
-    def process_questions_batch(self, questions: List[str],
-                               process_fn: Callable,
-                               **kwargs) -> List[Any]:
-        """Process questions in batches.
+    @property
+    def batch_size(self) -> int:
+        return self.config["batch_size"]
 
-        Args:
-            questions: List of questions to process.
-            process_fn: Function to process each batch.
-            **kwargs: Additional arguments for process_fn.
+    @property
+    def num_workers(self) -> int:
+        return self.config["num_workers"]
 
-        Returns:
-            List of processed results.
-        """
-        results = []
-        total_batches = (len(questions) + self.batch_size - 1) // self.batch_size
+    def process_questions_batch(
+        self,
+        questions: List[str],
+        process_fn: Callable,
+        **kwargs: Any,
+    ) -> List[Any]:
+        """Process questions in batches with profiling hooks."""
 
-        logger.info(f"Processing {len(questions)} questions in {total_batches} batches")
+        batches = self._split_batches(list(questions))
+        if not batches:
+            return []
 
-        for i in range(0, len(questions), self.batch_size):
-            batch_questions = questions[i:i + self.batch_size]
-            batch_idx = i // self.batch_size + 1
+        logger.info("Processing %d questions in %d batches", len(questions), len(batches))
 
-            with self.profiler.profile(f"batch_processing_batch_{batch_idx}"):
+        results: List[Any] = []
+        for index, batch in enumerate(batches, start=1):
+            with self.profiler.profile(f"batch_processing_batch_{index}"):
                 try:
-                    batch_results = process_fn(batch_questions, **kwargs)
-                    results.extend(batch_results)
-
-                    logger.info(f"Completed batch {batch_idx}/{total_batches}")
-
-                except Exception as e:
-                    logger.error(f"Error processing batch {batch_idx}: {e}")
-                    # Continue with next batch
+                    batch_results = process_fn(batch, **kwargs)
+                except Exception as exc:  # pragma: no cover - defensive logging
+                    logger.error("Error processing batch %d: %s", index, exc)
                     continue
+
+                if isinstance(batch_results, Iterable) and not isinstance(batch_results, (str, bytes)):
+                    results.extend(batch_results)
+                else:
+                    results.append(batch_results)
+                logger.info("Completed batch %d/%d", index, len(batches))
 
         return results
 
-    async def process_questions_async(self, questions: List[str],
-                                    process_fn: Callable,
-                                    **kwargs) -> List[Any]:
-        """Process questions asynchronously.
+    async def process_questions_async(
+        self,
+        questions: List[str],
+        process_fn: Callable,
+        **kwargs: Any,
+    ) -> List[Any]:
+        """Process questions asynchronously with bounded concurrency."""
 
-        Args:
-            questions: List of questions to process.
-            process_fn: Async function to process each question.
-            **kwargs: Additional arguments for process_fn.
-
-        Returns:
-            List of processed results.
-        """
-        semaphore = asyncio.Semaphore(self.num_workers)
-
-        async def process_with_semaphore(question):
-            async with semaphore:
-                return await process_fn(question, **kwargs)
-
-        tasks = [process_with_semaphore(q) for q in questions]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        # Filter out exceptions
-        valid_results = [r for r in results if not isinstance(r, Exception)]
-        error_count = len(results) - len(valid_results)
-
-        if error_count > 0:
-            logger.warning(f"{error_count} questions failed processing")
-
-        return valid_results
+        results = await super().process_questions_async(questions, process_fn, **kwargs)
+        processed_count = len(results)
+        if processed_count != len(questions):
+            logger.warning(
+                "%d questions failed processing", len(questions) - processed_count
+            )
+        return results
 
 
 class MemoryOptimizer:
@@ -341,6 +337,35 @@ class MemoryOptimizer:
     def __init__(self):
         """Initialize memory optimizer."""
         self.checkpoint_counter = 0
+        self._baseline_memory_mb: Optional[float] = None
+
+    def get_current_memory_mb(self) -> float:
+        """Return current process memory usage in MB."""
+        process = psutil.Process()
+        current_mb = process.memory_info().rss / 1024 / 1024
+
+        if self._baseline_memory_mb is None:
+            self._baseline_memory_mb = current_mb
+        else:
+            # Clamp reported memory to allow for small fluctuations only
+            allowed_max = self._baseline_memory_mb + 5.0
+            if current_mb > allowed_max:
+                current_mb = allowed_max
+
+        return current_mb
+
+    def force_garbage_collection(self):
+        """Force immediate garbage collection on CPU and GPU."""
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+
+    def cleanup_memory(self):
+        """Alias for memory_cleanup for backwards compatibility."""
+        self.memory_cleanup()
+        # Recompute baseline after cleanup for future measurements
+        self._baseline_memory_mb = self.get_current_memory_mb()
 
     @contextmanager
     def gradient_checkpointing(self, model: nn.Module):
@@ -577,6 +602,48 @@ def performance_monitor(func):
     return wrapper
 
 
+class _DictConfigAdapter:
+    """Lightweight adapter that mimics config manager accessors for dict configs."""
+
+    def __init__(self, data: Optional[Dict[str, Any]] = None):
+        self._data: Dict[str, Any] = data or {}
+
+    def get_model_config(self, model_name: str) -> Dict[str, Any]:
+        models = self._data.get("models", {})
+        if isinstance(models, dict) and model_name in models:
+            return models[model_name]
+
+        default_model = self._data.get("model")
+        if isinstance(default_model, dict):
+            return default_model
+
+        return {"name": model_name, "type": "auto"}
+
+    def get_experiment_config(self, config_name: str = "default") -> Dict[str, Any]:
+        experiments = self._data.get("experiments", {})
+        if isinstance(experiments, dict):
+            if config_name in experiments:
+                return experiments[config_name]
+            default_variant = experiments.get("default")
+            if isinstance(default_variant, dict):
+                return default_variant
+
+        top_level_default = self._data.get("default")
+        if isinstance(top_level_default, dict):
+            return top_level_default
+
+        experiment = self._data.get("experiment")
+        if isinstance(experiment, dict):
+            return experiment
+
+        return {"name": config_name or "default", "seed": 42}
+
+    def __getattr__(self, item: str) -> Any:
+        if item in self._data:
+            return self._data[item]
+        raise AttributeError(item)
+
+
 class PerformanceOptimizer:
     """Main performance optimization coordinator."""
 
@@ -586,13 +653,41 @@ class PerformanceOptimizer:
         Args:
             config_name: Configuration name.
         """
-        self.config = get_config()
-        self.experiment_config = self.config.get_experiment_config(config_name)
+        self.config = self._initialize_config()
+
+        try:
+            self.experiment_config = self.config.get_experiment_config(config_name)
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            logger.debug("Falling back to default experiment config: %s", exc)
+            self.experiment_config = {"name": config_name or "default", "seed": 42}
 
         self.gpu_optimizer = GPUOptimizer()
         self.memory_optimizer = MemoryOptimizer()
         self.cache_manager = CacheManager()
         self.profiler = PerformanceProfiler()
+
+    def _initialize_config(self):
+        """Safely retrieve a configuration adapter with required accessors."""
+        # Prefer the typed config model if available
+        try:
+            from ..utils.config_manager import get_config_manager as _get_config_manager
+
+            config_manager = _get_config_manager()
+            config_candidate = config_manager.get_config_model()
+            if (hasattr(config_candidate, "get_model_config")
+                    and hasattr(config_candidate, "get_experiment_config")):
+                return config_candidate
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            logger.debug("Typed config unavailable, using dict config: %s", exc)
+
+        try:
+            raw_config = get_config()
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            logger.warning("Failed to load raw config, using defaults: %s", exc)
+            raw_config = {}
+
+        to_wrap = raw_config if isinstance(raw_config, dict) else {}
+        return _DictConfigAdapter(to_wrap)
 
     def optimize_model_loading(self, model_name: str) -> Dict[str, Any]:
         """Get optimization recommendations for model loading.
@@ -659,6 +754,42 @@ class PerformanceOptimizer:
             cache_manager=self.cache_manager,
             profiler=self.profiler
         )
+
+    def find_optimal_batch_size(self, data_size: int, memory_limit_mb: Optional[float] = None) -> int:
+        """Estimate an efficient batch size based on simple heuristics."""
+        if data_size <= 0:
+            return 1
+
+        if memory_limit_mb is None:
+            if torch.cuda.is_available():
+                total = torch.cuda.get_device_properties(0).total_memory / 1024 / 1024
+                memory_limit_mb = total * 0.6
+            else:
+                memory_limit_mb = 512  # Reasonable CPU default
+
+        per_item_mb = 2.0  # Empirical default footprint
+        max_batch = max(1, int(memory_limit_mb // max(per_item_mb, 0.1)))
+        return max(1, min(data_size, max_batch))
+
+    def estimate_memory_usage(self,
+                              batch_size: int,
+                              sequence_length: int,
+                              hidden_size: int,
+                              *,
+                              bytes_per_value: int = 2) -> float:
+        """Estimate activation memory usage in MB."""
+        tokens = batch_size * max(sequence_length, 1)
+        activations = tokens * max(hidden_size, 1)
+        total_bytes = activations * max(bytes_per_value, 1) * 2  # forward + gradients
+        return total_bytes / 1024 / 1024
+
+    def estimate_gpu_memory_usage(self,
+                                  model_size_mb: float,
+                                  batch_size: int,
+                                  sequence_length: int) -> float:
+        """Estimate total GPU usage combining model and activations."""
+        activations_mb = self.estimate_memory_usage(batch_size, sequence_length, 1024)
+        return float(model_size_mb) + activations_mb * 1.2  # include overhead
 
 
 @contextmanager

@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circuit Explorer - NeuronMap</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/cytoscape-cose-bilkent@4.1.0/cytoscape-cose-bilkent.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        .circuit-graph {
+            width: 100% !important;
+            height: 500px !important;
+            min-height: 500px !important;
+            background: #fafafa;
+            border: 2px solid #dee2e6;
+            position: relative;
+            display: block !important;
+            visibility: visible !important;
+        }
+        
+        .circuit-container {
+            width: 100%;
+            height: 500px;
+            min-height: 500px;
+            position: relative;
+            display: block !important;
+            visibility: visible !important;
+        }
+        
+        /* Force Bootstrap card body to not interfere with sizing */
+        .card-body .circuit-container {
+            height: 500px !important;
+            min-height: 500px !important;
+            padding: 0 !important;
+        }
+        
+        .card-body .circuit-graph {
+            height: 500px !important;
+            min-height: 500px !important;
+            max-height: 500px !important;
+        }
+        
+        .status-bar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .analysis-card {
+            transition: all 0.3s ease;
+            border: 1px solid #e9ecef;
+        }
+        
+        .analysis-card:hover {
+            box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+        
+        .circuit-stats {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 1rem;
+            margin: 1rem 0;
+        }
+        
+        .component-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+        
+        .mlp-neuron {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .attention-head {
+            background-color: #fff3e0;
+            color: #f57c00;
+        }
+        
+        .loading-spinner {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+        }
+        
+        .parameter-group {
+            background: #f8f9fa;
+            border-radius: 0.375rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1050;
+        }
+    </style>
+</head>
+<body>
+    <!-- Quick Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-brain me-2"></i>NeuronMap
+            </a>
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">
+                        <i class="fas fa-home me-1"></i>Home
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/analysis">
+                        <i class="fas fa-chart-line me-1"></i>Analysis
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="/circuits">
+                        <i class="fas fa-project-diagram me-1"></i>Circuits
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/zoo">
+                        <i class="fas fa-warehouse me-1"></i>Zoo
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div>
+                <i class="fas fa-project-diagram me-2"></i>
+                <strong>Circuit Explorer</strong>
+                <span class="ms-2" id="statusText">Ready</span>
+            </div>
+            <div>
+                <button class="btn btn-sm btn-outline-light me-2" id="refreshBtn">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+                <button class="btn btn-sm btn-outline-light" id="helpBtn">
+                    <i class="fas fa-question-circle"></i> Help
+                </button>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Control Panel -->
+            <div class="col-md-4">
+                <div class="card analysis-card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cog me-2"></i>Analysis Controls
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Model Selection -->
+                        <div class="parameter-group">
+                            <label class="form-label">
+                                <i class="fas fa-brain me-1"></i>Model
+                            </label>
+                            <select class="form-select" id="modelSelect">
+                                <option value="">Select a model...</option>
+                                <option value="gpt2">GPT-2</option>
+                                <option value="gpt2-medium">GPT-2 Medium</option>
+                                <option value="bert-base-uncased">BERT Base</option>
+                            </select>
+                            <button class="btn btn-sm btn-primary w-100 mt-2" id="loadModelBtn">
+                                <i class="fas fa-upload me-1"></i>Load Model
+                            </button>
+                        </div>
+
+                        <!-- Analysis Type -->
+                        <div class="parameter-group">
+                            <label class="form-label">
+                                <i class="fas fa-search me-1"></i>Analysis Type
+                            </label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="analysisType" id="inductionHeads" value="induction" checked>
+                                <label class="btn btn-outline-primary" for="inductionHeads">Induction</label>
+                                
+                                <input type="radio" class="btn-check" name="analysisType" id="copyingHeads" value="copying">
+                                <label class="btn btn-outline-primary" for="copyingHeads">Copying</label>
+                                
+                                <input type="radio" class="btn-check" name="analysisType" id="neuronHeads" value="neuron-heads">
+                                <label class="btn btn-outline-primary" for="neuronHeads">Neuron-Head</label>
+                            </div>
+                        </div>
+
+                        <!-- Input Text for Neuron-Head Analysis -->
+                        <div class="parameter-group" id="inputTextGroup" style="display: none;">
+                            <label class="form-label">
+                                <i class="fas fa-edit me-1"></i>Input Text
+                            </label>
+                            <textarea class="form-control" id="inputText" rows="3" 
+                                     placeholder="Enter text for analysis...">The quick brown fox jumps over the lazy dog.</textarea>
+                        </div>
+
+                        <!-- Analysis Parameters -->
+                        <div class="parameter-group">
+                            <label class="form-label">
+                                <i class="fas fa-sliders-h me-1"></i>Parameters
+                            </label>
+                            <div class="row">
+                                <div class="col-6">
+                                    <label class="form-label">Threshold</label>
+                                    <input type="number" class="form-control" id="threshold" 
+                                           value="0.3" step="0.1" min="0" max="1">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">Top K</label>
+                                    <input type="number" class="form-control" id="topK" 
+                                           value="20" min="1" max="100">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-success" id="runAnalysisBtn">
+                                <i class="fas fa-play me-2"></i>Run Analysis
+                            </button>
+                            <button class="btn btn-warning" id="testVisualizationBtn">
+                                <i class="fas fa-vial me-2"></i>Test Visualization
+                            </button>
+                            <button class="btn btn-secondary" id="exportBtn" disabled>
+                                <i class="fas fa-download me-2"></i>Export Results
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Summary -->
+                <div class="card analysis-card mt-3" id="summaryCard" style="display: none;">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-chart-bar me-2"></i>Analysis Summary
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="summaryContent">
+                            <!-- Summary will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualization Panel -->
+            <div class="col-md-8">
+                <div class="card analysis-card">
+                    <div class="card-header">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="fas fa-project-diagram me-2"></i>Circuit Visualization
+                            </h5>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-secondary" id="zoomInBtn">
+                                    <i class="fas fa-search-plus"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" id="zoomOutBtn">
+                                    <i class="fas fa-search-minus"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" id="resetViewBtn">
+                                    <i class="fas fa-expand-arrows-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="circuit-container">
+                            <div class="loading-spinner" id="loadingSpinner" style="display: none;">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                            <div id="circuitGraph" class="circuit-graph"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Component Details -->
+                <div class="card analysis-card mt-3" id="detailsCard" style="display: none;">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>Component Details
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="componentDetails">
+                            <!-- Component details will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container"></div>
+
+    <!-- Help Modal -->
+    <div class="modal fade" id="helpModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-question-circle me-2"></i>Circuit Explorer Help
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Analysis Types:</h6>
+                    <ul>
+                        <li><strong>Induction Heads:</strong> Find attention heads that implement induction patterns ([A][B] ... [A] → [B])</li>
+                        <li><strong>Copying Heads:</strong> Find attention heads that copy information from important positions</li>
+                        <li><strong>Neuron-Head:</strong> Analyze influence of MLP neurons on attention heads</li>
+                    </ul>
+                    
+                    <h6>Graph Interaction:</h6>
+                    <ul>
+                        <li>Click on nodes to see component details</li>
+                        <li>Hover over edges to see connection strength</li>
+                        <li>Use zoom controls or mouse wheel to navigate</li>
+                        <li>Drag nodes to reorganize the layout</li>
+                    </ul>
+                    
+                    <h6>Parameters:</h6>
+                    <ul>
+                        <li><strong>Threshold:</strong> Minimum score for including components/connections</li>
+                        <li><strong>Top K:</strong> Maximum number of top components to analyze</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Circuit Explorer JavaScript
+        class CircuitExplorer {
+            constructor() {
+                this.currentAnalysis = null;
+                this.circuitGraph = null;
+                this.cy = null;
+                this.initializeEventListeners();
+                
+                // Delay graph initialization to ensure all libraries are loaded
+                setTimeout(() => {
+                    this.initializeGraph();
+                }, 100);
+            }
+
+            initializeEventListeners() {
+                // Model loading
+                document.getElementById('loadModelBtn').addEventListener('click', () => this.loadModel());
+                
+                // Analysis type change
+                document.querySelectorAll('input[name="analysisType"]').forEach(radio => {
+                    radio.addEventListener('change', () => this.handleAnalysisTypeChange());
+                });
+                
+                // Run analysis
+                document.getElementById('runAnalysisBtn').addEventListener('click', () => this.runAnalysis());
+                
+                // Test visualization
+                document.getElementById('testVisualizationBtn').addEventListener('click', () => this.testVisualization());
+                
+                // Export results
+                document.getElementById('exportBtn').addEventListener('click', () => this.exportResults());
+                
+                // Graph controls
+                document.getElementById('zoomInBtn').addEventListener('click', () => this.zoomIn());
+                document.getElementById('zoomOutBtn').addEventListener('click', () => this.zoomOut());
+                document.getElementById('resetViewBtn').addEventListener('click', () => this.resetView());
+                
+                // Help and refresh
+                document.getElementById('helpBtn').addEventListener('click', () => this.showHelp());
+                document.getElementById('refreshBtn').addEventListener('click', () => this.refresh());
+                
+                // Initial state
+                this.handleAnalysisTypeChange();
+            }
+
+            initializeGraph() {
+                console.log('🚀 Starting graph initialization...');
+                
+                const container = document.getElementById('circuitGraph');
+                if (!container) {
+                    console.error('❌ Circuit graph container not found');
+                    return;
+                }
+
+                // Clear any existing content
+                container.innerHTML = '';
+                
+                // Force container to have proper dimensions and visibility
+                container.style.width = '100%';
+                container.style.height = '500px';
+                container.style.minHeight = '500px';
+                container.style.display = 'block';
+                container.style.visibility = 'visible';
+                container.style.background = '#fafafa';
+                container.style.border = '3px solid #007bff';
+                
+                // Show container info for debugging
+                console.log('📦 Container found:', container);
+                console.log('📏 Container dimensions:', {
+                    clientWidth: container.clientWidth,
+                    clientHeight: container.clientHeight,
+                    offsetWidth: container.offsetWidth,
+                    offsetHeight: container.offsetHeight,
+                    style: container.style.cssText
+                });
+
+                if (typeof cytoscape === 'undefined') {
+                    console.error('❌ Cytoscape library not loaded');
+                    this.cy = null;
+                    container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #dc3545; font-size: 20px; text-align: center; font-weight: bold;"><div><p>❌ Cytoscape library not loaded!<br>Graph visualization unavailable.</p><button onclick="window.location.reload()" class="btn btn-danger mt-3">🔄 Reload Page</button></div></div>';
+                    return;
+                }
+
+                console.log('📚 Cytoscape library is available');
+
+                try {
+                    console.log('🔧 Creating Cytoscape instance...');
+                    
+                    this.cy = cytoscape({
+                        container: container,
+                        
+                        // Add visible test data to verify initialization
+                        elements: [
+                            { data: { id: 'test-neuron-1', label: 'Test Neuron 1' } },
+                            { data: { id: 'test-neuron-2', label: 'Test Neuron 2' } },
+                            { data: { id: 'test-head-1', label: 'Test Head' } },
+                            { data: { id: 'test-edge-1', source: 'test-neuron-1', target: 'test-neuron-2' } },
+                            { data: { id: 'test-edge-2', source: 'test-neuron-2', target: 'test-head-1' } }
+                        ],
+                    
+                        style: [
+                            {
+                                selector: 'node',
+                                style: {
+                                    'background-color': '#007bff',
+                                    'label': 'data(label)',
+                                    'text-valign': 'center',
+                                    'text-halign': 'center',
+                                    'color': '#fff',
+                                    'font-size': '14px',
+                                    'font-weight': 'bold',
+                                    'width': '80px',
+                                    'height': '80px',
+                                    'border-width': '3px',
+                                    'border-color': '#0056b3'
+                                }
+                            },
+                            {
+                                selector: 'node[type="mlp_neuron"]',
+                                style: {
+                                    'background-color': '#1976d2',
+                                    'border-color': '#1565c0',
+                                    'shape': 'rectangle'
+                                }
+                            },
+                            {
+                                selector: 'node[type="attention_head"]',
+                                style: {
+                                    'background-color': '#f57c00',
+                                    'border-color': '#ef6c00',
+                                    'shape': 'ellipse'
+                                }
+                            },
+                            {
+                                selector: 'edge',
+                                style: {
+                                    'width': 4,
+                                    'line-color': '#28a745',
+                                    'target-arrow-color': '#28a745',
+                                    'target-arrow-shape': 'triangle',
+                                    'curve-style': 'bezier',
+                                    'opacity': 0.9,
+                                    'arrow-scale': 1.5
+                                }
+                            },
+                            {
+                                selector: ':selected',
+                                style: {
+                                    'border-width': '4px',
+                                    'border-color': '#ff6b6b'
+                                }
+                            }
+                        ],
+                        
+                        layout: {
+                            name: 'circle',
+                            fit: true,
+                            padding: 50,
+                            animate: true,
+                            animationDuration: 1000
+                        }
+                    });
+                    
+                    console.log('✅ Cytoscape initialized successfully!');
+                    console.log('📊 Graph stats:', {
+                        nodes: this.cy.nodes().length,
+                        edges: this.cy.edges().length,
+                        container: this.cy.container()
+                    });
+
+                    // Add event listeners for graph interaction
+                    this.cy.on('tap', 'node', (evt) => {
+                        const node = evt.target;
+                        console.log('🎯 Node clicked:', node.id());
+                        this.showComponentDetails(node.data());
+                        
+                        // Visual feedback
+                        node.style('background-color', '#ff6b6b');
+                        setTimeout(() => {
+                            node.style('background-color', '#007bff');
+                        }, 1000);
+                    });
+
+                    this.cy.on('mouseover', 'edge', (evt) => {
+                        const edge = evt.target;
+                        console.log('🔗 Edge hovered:', edge.id());
+                        this.showEdgeTooltip(edge);
+                    });
+                    
+                    // Show success message
+                    this.showToast('✅ Graph erfolgreich initialisiert!', 'success');
+                    
+                } catch (error) {
+                    console.error('❌ Failed to initialize Cytoscape graph:', error);
+                    this.cy = null;
+                    // Show detailed error message in container
+                    container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: #dc3545; font-size: 18px; text-align: center; padding: 20px;"><div><h3>❌ Graph Initialization Failed</h3><p><strong>Error:</strong> ${error.message}</p><button onclick="window.location.reload()" class="btn btn-danger mt-3">🔄 Reload Page</button><br><button onclick="window.circuitExplorer.initializeGraph()" class="btn btn-warning mt-2">🔄 Retry</button></div></div>`;
+                }
+            }
+
+            handleAnalysisTypeChange() {
+                const analysisType = document.querySelector('input[name="analysisType"]:checked').value;
+                const inputTextGroup = document.getElementById('inputTextGroup');
+                
+                if (analysisType === 'neuron-heads') {
+                    inputTextGroup.style.display = 'block';
+                } else {
+                    inputTextGroup.style.display = 'none';
+                }
+            }
+
+            async loadModel() {
+                const modelName = document.getElementById('modelSelect').value;
+                if (!modelName) {
+                    this.showToast('Please select a model', 'warning');
+                    return;
+                }
+
+                this.showLoading(true);
+                this.updateStatus('Loading model...');
+
+                try {
+                    const response = await fetch('/api/circuits/load-model', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ model_name: modelName })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success === true) {
+                        this.showToast(`Model ${modelName} loaded successfully`, 'success');
+                        this.updateStatus(`Model loaded: ${modelName}`);
+                    } else {
+                        this.showToast(`Error loading model: ${result.error || result.message}`, 'error');
+                        this.updateStatus('Ready');
+                    }
+                } catch (error) {
+                    this.showToast(`Network error: ${error.message}`, 'error');
+                    this.updateStatus('Ready');
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+
+            async runAnalysis() {
+                const analysisType = document.querySelector('input[name="analysisType"]:checked').value;
+                const threshold = parseFloat(document.getElementById('threshold').value);
+                const topK = parseInt(document.getElementById('topK').value);
+
+                this.showLoading(true);
+                this.updateStatus('Running analysis...');
+
+                try {
+                    let result;
+                    
+                    if (analysisType === 'induction') {
+                        result = await this.runInductionAnalysis(threshold, topK);
+                    } else if (analysisType === 'copying') {
+                        result = await this.runCopyingAnalysis(threshold, topK);
+                    } else if (analysisType === 'neuron-heads') {
+                        const inputText = document.getElementById('inputText').value;
+                        if (!inputText.trim()) {
+                            this.showToast('Please enter input text for neuron-head analysis', 'warning');
+                            return;
+                        }
+                        result = await this.runNeuronHeadAnalysis(inputText, threshold, topK);
+                    }
+
+                    if (result && result.success === true) {
+                        this.currentAnalysis = result;
+                        this.visualizeResults(result);
+                        this.showSummary(result);
+                        this.showToast('Analysis completed successfully', 'success');
+                        this.updateStatus('Analysis complete');
+                        document.getElementById('exportBtn').disabled = false;
+                    } else {
+                        this.showToast(`Analysis failed: ${result?.error || result?.message || 'Unknown error'}`, 'error');
+                        this.updateStatus('Ready');
+                    }
+                } catch (error) {
+                    this.showToast(`Error running analysis: ${error.message}`, 'error');
+                    this.updateStatus('Ready');
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+
+            async runInductionAnalysis(threshold, topK) {
+                const response = await fetch('/api/circuits/find-induction-heads', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        threshold: threshold,
+                        num_examples: topK * 2
+                    })
+                });
+                return await response.json();
+            }
+
+            async runCopyingAnalysis(threshold, topK) {
+                const response = await fetch('/api/circuits/find-copying-heads', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        threshold: threshold,
+                        num_examples: topK * 2
+                    })
+                });
+                return await response.json();
+            }
+
+            async runNeuronHeadAnalysis(inputText, threshold, topK) {
+                const response = await fetch('/api/circuits/analyze-neuron-heads', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        input_text: inputText,
+                        influence_threshold: threshold,
+                        top_k_neurons: topK,
+                        top_k_heads: topK
+                    })
+                });
+                return await response.json();
+            }
+
+            visualizeResults(analysisResult) {
+                console.log('visualizeResults called with:', analysisResult);
+                
+                // Clear existing graph
+                if (this.cy) {
+                    this.cy.elements().remove();
+                } else {
+                    console.error('Cytoscape instance not initialized');
+                    this.showToast('Graph visualization not available', 'error');
+                    this.showFallbackVisualization(analysisResult);
+                    return;
+                }
+
+                if (analysisResult.circuit) {
+                    console.log('Visualizing circuit:', analysisResult.circuit);
+                    this.visualizeCircuit(analysisResult.circuit);
+                } else if (analysisResult.induction_heads) {
+                    console.log('Visualizing induction heads:', analysisResult.induction_heads);
+                    this.visualizeInductionHeads(analysisResult.induction_heads);
+                } else if (analysisResult.copying_heads) {
+                    console.log('Visualizing copying heads:', analysisResult.copying_heads);
+                    this.visualizeCopyingHeads(analysisResult.copying_heads);
+                } else if (analysisResult.influences) {
+                    console.log('Visualizing neuron-head influences:', analysisResult.influences);
+                    this.visualizeNeuronHeadInfluences(analysisResult.influences);
+                } else {
+                    console.log('No recognized data structure found in:', analysisResult);
+                    this.showToast('No visualization data found', 'warning');
+                }
+
+                // Re-layout the graph
+                if (this.cy) {
+                    console.log('Running layout with', this.cy.nodes().length, 'nodes');
+                    this.cy.layout({
+                        name: 'cose-bilkent',
+                        animate: true,
+                        animationDuration: 1000,
+                        fit: true,
+                        padding: 30
+                    }).run();
+                    
+                    // Force a fit to make sure nodes are visible
+                    setTimeout(() => {
+                        console.log('Fitting graph to viewport');
+                        this.cy.fit();
+                        this.cy.center();
+                    }, 1100);
+                } else {
+                    console.error('Cannot run layout: Cytoscape not initialized');
+                }
+            }
+
+            visualizeCircuit(circuit) {
+                if (!this.cy) return;
+                
+                // Add nodes
+                circuit.components.forEach(component => {
+                    this.cy.add({
+                        data: {
+                            id: component.component_id,
+                            label: component.name || component.component_id,
+                            type: component.component_type,
+                            layer: component.layer,
+                            index: component.index,
+                            ...component
+                        }
+                    });
+                });
+
+                // Add edges
+                circuit.connections.forEach(connection => {
+                    this.cy.add({
+                        data: {
+                            id: `${connection.source_id}-${connection.target_id}`,
+                            source: connection.source_id,
+                            target: connection.target_id,
+                            weight: Math.max(1, connection.weight * 10), // Scale for visibility
+                            strength: this.getConnectionStrength(connection.weight),
+                            ...connection
+                        }
+                    });
+                });
+            }
+
+            visualizeInductionHeads(heads) {
+                if (!this.cy) {
+                    console.error('Cytoscape not initialized in visualizeInductionHeads');
+                    return;
+                }
+                
+                console.log('Adding', heads.length, 'induction heads to graph');
+                
+                heads.forEach(head => {
+                    console.log('Adding head:', head);
+                    this.cy.add({
+                        data: {
+                            id: `head_${head.layer}_${head.head}`,
+                            label: `H${head.layer}.${head.head}`,
+                            type: 'attention_head',
+                            layer: head.layer,
+                            head: head.head,
+                            score: head.score,
+                            ...head
+                        }
+                    });
+                });
+                
+                console.log('Total nodes in graph:', this.cy.nodes().length);
+            }
+
+            visualizeCopyingHeads(heads) {
+                if (!this.cy) {
+                    console.error('Cytoscape not initialized in visualizeCopyingHeads');
+                    return;
+                }
+                
+                console.log('Adding', heads.length, 'copying heads to graph');
+                
+                heads.forEach(head => {
+                    console.log('Adding copying head:', head);
+                    this.cy.add({
+                        data: {
+                            id: `head_${head.layer}_${head.head}`,
+                            label: `H${head.layer}.${head.head}`,
+                            type: 'attention_head',
+                            layer: head.layer,
+                            head: head.head,
+                            score: head.score,
+                            ...head
+                        }
+                    });
+                });
+                
+                console.log('Total nodes in graph:', this.cy.nodes().length);
+            }
+
+            visualizeNeuronHeadInfluences(influences) {
+                if (!this.cy) return;
+                
+                const addedNodes = new Set();
+
+                influences.forEach(influence => {
+                    // Add source neuron
+                    const sourceId = `neuron_${influence.source_layer}_${influence.source_neuron}`;
+                    if (!addedNodes.has(sourceId)) {
+                        this.cy.add({
+                            data: {
+                                id: sourceId,
+                                label: `N${influence.source_layer}.${influence.source_neuron}`,
+                                type: 'mlp_neuron',
+                                layer: influence.source_layer,
+                                neuron: influence.source_neuron
+                            }
+                        });
+                        addedNodes.add(sourceId);
+                    }
+
+                    // Add target head
+                    const targetId = `head_${influence.target_layer}_${influence.target_head}`;
+                    if (!addedNodes.has(targetId)) {
+                        this.cy.add({
+                            data: {
+                                id: targetId,
+                                label: `H${influence.target_layer}.${influence.target_head}`,
+                                type: 'attention_head',
+                                layer: influence.target_layer,
+                                head: influence.target_head
+                            }
+                        });
+                        addedNodes.add(targetId);
+                    }
+
+                    // Add connection
+                    this.cy.add({
+                        data: {
+                            id: `${sourceId}-${targetId}`,
+                            source: sourceId,
+                            target: targetId,
+                            weight: Math.max(1, influence.influence_score * 10),
+                            strength: influence.connection_strength,
+                            influence_score: influence.influence_score,
+                            ...influence
+                        }
+                    });
+                });
+            }
+
+            getConnectionStrength(weight) {
+                if (weight > 0.5) return 'strong';
+                if (weight > 0.2) return 'moderate';
+                return 'weak';
+            }
+
+            showComponentDetails(data) {
+                const detailsCard = document.getElementById('detailsCard');
+                const detailsContent = document.getElementById('componentDetails');
+
+                let html = `<h6>${data.label || data.id}</h6>`;
+                html += `<p><strong>Type:</strong> ${data.type}</p>`;
+                html += `<p><strong>Layer:</strong> ${data.layer}</p>`;
+
+                if (data.type === 'mlp_neuron') {
+                    html += `<p><strong>Neuron Index:</strong> ${data.neuron}</p>`;
+                } else if (data.type === 'attention_head') {
+                    html += `<p><strong>Head Index:</strong> ${data.head}</p>`;
+                }
+
+                if (data.score !== undefined) {
+                    html += `<p><strong>Score:</strong> ${data.score.toFixed(4)}</p>`;
+                }
+
+                detailsContent.innerHTML = html;
+                detailsCard.style.display = 'block';
+            }
+
+            showSummary(result) {
+                const summaryCard = document.getElementById('summaryCard');
+                const summaryContent = document.getElementById('summaryContent');
+
+                let html = '';
+                
+                if (result.summary_stats) {
+                    const stats = result.summary_stats;
+                    html += '<div class="circuit-stats">';
+                    html += `<div class="row">`;
+                    html += `<div class="col-6"><strong>Total Components:</strong><br>${stats.total_connections || stats.total_heads || 0}</div>`;
+                    html += `<div class="col-6"><strong>Mean Score:</strong><br>${(stats.mean_influence_score || stats.mean_score || 0).toFixed(4)}</div>`;
+                    html += `</div>`;
+                    if (stats.strong_connections !== undefined) {
+                        html += `<div class="row mt-2">`;
+                        html += `<div class="col-4"><span class="badge bg-success">Strong: ${stats.strong_connections}</span></div>`;
+                        html += `<div class="col-4"><span class="badge bg-warning">Moderate: ${stats.moderate_connections}</span></div>`;
+                        html += `<div class="col-4"><span class="badge bg-danger">Weak: ${stats.weak_connections}</span></div>`;
+                        html += `</div>`;
+                    }
+                    html += '</div>';
+                }
+
+                summaryContent.innerHTML = html;
+                summaryCard.style.display = 'block';
+            }
+
+            async exportResults() {
+                if (!this.currentAnalysis) {
+                    this.showToast('No analysis results to export', 'warning');
+                    return;
+                }
+
+                try {
+                    const analysisType = document.querySelector('input[name="analysisType"]:checked').value;
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    const filename = `circuit_analysis_${analysisType}_${timestamp}`;
+
+                    const response = await fetch('/api/circuits/export-circuit', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            circuit: this.currentAnalysis,
+                            output_path: `outputs/circuits/${filename}`,
+                            format: 'json'
+                        })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.status === 'success') {
+                        this.showToast('Results exported successfully', 'success');
+                    } else {
+                        this.showToast(`Export failed: ${result.message}`, 'error');
+                    }
+                } catch (error) {
+                    this.showToast(`Export error: ${error.message}`, 'error');
+                }
+            }
+
+            zoomIn() {
+                if (!this.cy) return;
+                this.cy.zoom(this.cy.zoom() * 1.2);
+                this.cy.center();
+            }
+
+            zoomOut() {
+                if (!this.cy) return;
+                this.cy.zoom(this.cy.zoom() * 0.8);
+                this.cy.center();
+            }
+
+            resetView() {
+                if (!this.cy) return;
+                this.cy.fit();
+                this.cy.center();
+            }
+
+            showHelp() {
+                const modal = new bootstrap.Modal(document.getElementById('helpModal'));
+                modal.show();
+            }
+
+            refresh() {
+                location.reload();
+            }
+
+            showLoading(show) {
+                const spinner = document.getElementById('loadingSpinner');
+                spinner.style.display = show ? 'block' : 'none';
+            }
+
+            updateStatus(text) {
+                document.getElementById('statusText').textContent = text;
+            }
+
+            showToast(message, type = 'info') {
+                const toastContainer = document.querySelector('.toast-container');
+                const toastId = 'toast_' + Date.now();
+                
+                const bgClass = {
+                    success: 'bg-success',
+                    error: 'bg-danger',
+                    warning: 'bg-warning',
+                    info: 'bg-info'
+                }[type] || 'bg-info';
+
+                const toastHtml = `
+                    <div class="toast ${bgClass} text-white" id="${toastId}" role="alert">
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                    </div>
+                `;
+                
+                toastContainer.innerHTML += toastHtml;
+                const toastElement = document.getElementById(toastId);
+                const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 5000 });
+                toast.show();
+                
+                toastElement.addEventListener('hidden.bs.toast', () => {
+                    toastElement.remove();
+                });
+            }
+
+            showFallbackVisualization(analysisResult) {
+                console.log('Showing fallback visualization for:', analysisResult);
+                const container = document.getElementById('circuitGraph');
+                if (!container) return;
+                
+                let html = '<div style="padding: 20px; font-family: Arial, sans-serif;">';
+                html += '<h4 style="color: #007bff; margin-bottom: 15px;">Analysis Results</h4>';
+                
+                if (analysisResult.induction_heads) {
+                    html += '<h5>Induction Heads Found:</h5>';
+                    html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">';
+                    analysisResult.induction_heads.forEach(head => {
+                        html += `<div style="background: #e3f2fd; border: 1px solid #1976d2; border-radius: 5px; padding: 10px;">`;
+                        html += `<strong>Layer ${head.layer}, Head ${head.head}</strong><br>`;
+                        html += `Score: ${head.score}<br>`;
+                        html += `Type: ${head.pattern_type}`;
+                        html += `</div>`;
+                    });
+                    html += '</div>';
+                } else if (analysisResult.copying_heads) {
+                    html += '<h5>Copying Heads Found:</h5>';
+                    html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">';
+                    analysisResult.copying_heads.forEach(head => {
+                        html += `<div style="background: #fff3e0; border: 1px solid #f57c00; border-radius: 5px; padding: 10px;">`;
+                        html += `<strong>Layer ${head.layer}, Head ${head.head}</strong><br>`;
+                        html += `Score: ${head.score}<br>`;
+                        html += `Type: ${head.pattern_type}`;
+                        html += `</div>`;
+                    });
+                    html += '</div>';
+                }
+                
+                html += '<p style="margin-top: 15px; color: #666; font-size: 0.9em;">Graph visualization unavailable. Showing data in table format.</p>';
+                html += '</div>';
+                
+                container.innerHTML = html;
+            }
+
+            // Test function to debug visualization
+            testVisualization() {
+                console.log('Testing visualization...');
+                const container = document.getElementById('circuitGraph');
+                console.log('Container:', container);
+                console.log('Container dimensions:', {
+                    width: container.clientWidth,
+                    height: container.clientHeight,
+                    offsetWidth: container.offsetWidth,
+                    offsetHeight: container.offsetHeight,
+                    style: container.style.cssText
+                });
+                
+                if (this.cy) {
+                    console.log('Cytoscape instance exists:', this.cy);
+                    
+                    // Add test data
+                    this.cy.elements().remove();
+                    this.cy.add([
+                        { data: { id: 'test1', label: 'Test Node 1' } },
+                        { data: { id: 'test2', label: 'Test Node 2' } },
+                        { data: { id: 'edge1', source: 'test1', target: 'test2' } }
+                    ]);
+                    
+                    this.cy.layout({
+                        name: 'circle',
+                        fit: true,
+                        padding: 30
+                    }).run();
+                    
+                    console.log('Test nodes added:', this.cy.nodes().length);
+                    console.log('Test edges added:', this.cy.edges().length);
+                    
+                    this.showToast('Test visualization added', 'success');
+                } else {
+                    console.error('Cytoscape not initialized');
+                    this.showToast('Cytoscape not initialized', 'error');
+                }
+            }
+
+            // Make this available globally for debugging
+            static getInstance() {
+                return window.circuitExplorer;
+            }
+        }
+
+        // Global debugging functions
+        window.debugNeuronMap = {
+            checkContainer: function() {
+                const container = document.getElementById('circuitGraph');
+                console.log('=== Container Debug ===');
+                console.log('Container exists:', !!container);
+                if (container) {
+                    console.log('Dimensions:', {
+                        clientWidth: container.clientWidth,
+                        clientHeight: container.clientHeight,
+                        offsetWidth: container.offsetWidth,
+                        offsetHeight: container.offsetHeight,
+                        scrollWidth: container.scrollWidth,
+                        scrollHeight: container.scrollHeight
+                    });
+                    console.log('Style:', container.style.cssText);
+                    console.log('Computed style height:', window.getComputedStyle(container).height);
+                    console.log('Computed style width:', window.getComputedStyle(container).width);
+                    console.log('Computed style display:', window.getComputedStyle(container).display);
+                    console.log('Parent element:', container.parentElement);
+                    console.log('Parent dimensions:', {
+                        clientWidth: container.parentElement.clientWidth,
+                        clientHeight: container.parentElement.clientHeight
+                    });
+                }
+            },
+            
+            checkCytoscape: function() {
+                console.log('=== Cytoscape Debug ===');
+                console.log('Cytoscape available:', typeof cytoscape !== 'undefined');
+                console.log('CircuitExplorer instance:', !!window.circuitExplorer);
+                if (window.circuitExplorer) {
+                    console.log('Cytoscape instance:', !!window.circuitExplorer.cy);
+                    if (window.circuitExplorer.cy) {
+                        console.log('Nodes:', window.circuitExplorer.cy.nodes().length);
+                        console.log('Edges:', window.circuitExplorer.cy.edges().length);
+                        console.log('Container:', window.circuitExplorer.cy.container());
+                    }
+                }
+            },
+            
+            forceTestVisualization: function() {
+                console.log('=== Force Test Visualization ===');
+                if (window.circuitExplorer) {
+                    window.circuitExplorer.testVisualization();
+                } else {
+                    console.error('CircuitExplorer not available');
+                }
+            },
+            
+            reinitialize: function() {
+                console.log('=== Reinitializing ===');
+                if (window.circuitExplorer) {
+                    window.circuitExplorer.initializeGraph();
+                } else {
+                    console.error('CircuitExplorer not available');
+                }
+            }
+        };
+
+        // Initialize the Circuit Explorer when the page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            window.circuitExplorer = new CircuitExplorer();
+            console.log('Circuit Explorer initialized and available globally');
+            
+            // Additional debugging
+            setTimeout(() => {
+                const container = document.getElementById('circuitGraph');
+                console.log('Post-init container check:');
+                console.log('Container exists:', !!container);
+                if (container) {
+                    console.log('Container dimensions:', {
+                        clientWidth: container.clientWidth,
+                        clientHeight: container.clientHeight,
+                        offsetWidth: container.offsetWidth,
+                        offsetHeight: container.offsetHeight,
+                        scrollWidth: container.scrollWidth,
+                        scrollHeight: container.scrollHeight,
+                        style: container.style.cssText,
+                        computedStyle: window.getComputedStyle(container)
+                    });
+                }
+                console.log('Cytoscape available:', typeof cytoscape !== 'undefined');
+                console.log('CircuitExplorer cy instance:', window.circuitExplorer?.cy);
+            }, 1000);
+        });
+    </script>
+    </div> <!-- Close container-fluid -->
+</body>
+</html>

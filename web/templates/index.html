@@ -145,17 +145,22 @@
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
                         <button class="btn btn-primary w-100" onclick="quickAnalysis()">
                             <i class="fas fa-play me-2"></i>Quick Analysis
                         </button>
                     </div>
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
                         <a href="{{ url_for('results') }}" class="btn btn-outline-secondary w-100">
                             <i class="fas fa-folder-open me-2"></i>Browse Results
                         </a>
                     </div>
-                    <div class="col-md-4 mb-3">
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('analysis_zoo') }}" class="btn btn-outline-info w-100">
+                            <i class="fas fa-university me-2"></i>Analysis Zoo
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
                         <button class="btn btn-outline-info w-100" onclick="showSystemInfo()">
                             <i class="fas fa-info-circle me-2"></i>System Info
                         </button>

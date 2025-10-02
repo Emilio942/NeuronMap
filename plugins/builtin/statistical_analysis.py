@@ -35,7 +35,7 @@ class StatisticalAnalysisPlugin(AnalysisPlugin):
             author="NeuronMap Team",
             description="Comprehensive statistical analysis of neural activations",
             plugin_type="analysis",
-            dependencies=["numpy", "pandas", "scipy", "scikit-learn"],
+            dependencies=["numpy", "pandas", "scipy", "sklearn"],
             tags=["statistics", "analysis", "distributions"],
             created_at=datetime.now().isoformat(),
             updated_at=datetime.now().isoformat()

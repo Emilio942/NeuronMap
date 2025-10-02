@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NeuronMap - WORKING Visualization</title>
+    <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .graph-container {
+            width: 100%;
+            height: 600px;
+            border: 5px solid #007bff;
+            background: #f8f9fa;
+            position: relative;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        .status {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧠 NeuronMap - Circuit Explorer</h1>
+            <h2>✅ WORKING VISUALIZATION</h2>
+        </div>
+        
+        <div class="controls">
+            <button onclick="startDemo()">🚀 Start Demo</button>
+            <button onclick="addRandomNode()">➕ Add Node</button>
+            <button onclick="clearGraph()">🗑️ Clear</button>
+            <button onclick="testAnalysis()">🧪 Test Analysis</button>
+        </div>
+        
+        <div id="graph" class="graph-container"></div>
+        
+        <div id="status" class="status">Ready to start...</div>
+    </div>
+
+    <script>
+        let cy = null;
+        let nodeCounter = 0;
+
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('status');
+            const timestamp = new Date().toLocaleTimeString();
+            status.textContent = `[${timestamp}] ${message}`;
+            status.className = `status ${type}`;
+            console.log(message);
+        }
+
+        function initGraph() {
+            updateStatus('Initializing graph...');
+            
+            const container = document.getElementById('graph');
+            
+            if (!container) {
+                updateStatus('ERROR: Container not found!', 'error');
+                return false;
+            }
+            
+            if (typeof cytoscape === 'undefined') {
+                updateStatus('ERROR: Cytoscape not loaded!', 'error');
+                container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 24px; color: red;"><strong>❌ Cytoscape not loaded!</strong></div>';
+                return false;
+            }
+            
+            try {
+                cy = cytoscape({
+                    container: container,
+                    
+                    elements: [
+                        // Initial nodes
+                        { data: { id: 'neuron1', label: 'Input\nNeuron' } },
+                        { data: { id: 'neuron2', label: 'Hidden\nNeuron' } },
+                        { data: { id: 'head1', label: 'Attention\nHead' } },
+                        { data: { id: 'output', label: 'Output\nNeuron' } },
+                        
+                        // Connections
+                        { data: { id: 'e1', source: 'neuron1', target: 'neuron2' } },
+                        { data: { id: 'e2', source: 'neuron2', target: 'head1' } },
+                        { data: { id: 'e3', source: 'head1', target: 'output' } }
+                    ],
+                    
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'label': 'data(label)',
+                                'text-valign': 'center',
+                                'text-halign': 'center',
+                                'color': 'white',
+                                'background-color': '#007bff',
+                                'width': 120,
+                                'height': 120,
+                                'font-size': '16px',
+                                'font-weight': 'bold',
+                                'border-width': 4,
+                                'border-color': '#0056b3',
+                                'text-wrap': 'wrap',
+                                'text-max-width': '100px'
+                            }
+                        },
+                        {
+                            selector: 'node[id="head1"]',
+                            style: {
+                                'background-color': '#f57c00',
+                                'border-color': '#ef6c00',
+                                'shape': 'ellipse'
+                            }
+                        },
+                        {
+                            selector: 'node[id="output"]',
+                            style: {
+                                'background-color': '#28a745',
+                                'border-color': '#1e7e34'
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'width': 6,
+                                'line-color': '#28a745',
+                                'target-arrow-color': '#28a745',
+                                'target-arrow-shape': 'triangle',
+                                'curve-style': 'bezier',
+                                'arrow-scale': 2
+                            }
+                        }
+                    ],
+                    
+                    layout: {
+                        name: 'breadthfirst',
+                        directed: true,
+                        fit: true,
+                        padding: 50,
+                        spacingFactor: 1.5
+                    }
+                });
+                
+                // Add click events
+                cy.on('tap', 'node', function(evt) {
+                    const node = evt.target;
+                    updateStatus(`Clicked node: ${node.id()}`, 'success');
+                    
+                    // Flash effect
+                    node.style('background-color', '#ff6b6b');
+                    setTimeout(() => {
+                        if (node.id() === 'head1') {
+                            node.style('background-color', '#f57c00');
+                        } else if (node.id() === 'output') {
+                            node.style('background-color', '#28a745');
+                        } else {
+                            node.style('background-color', '#007bff');
+                        }
+                    }, 500);
+                });
+                
+                cy.on('tap', 'edge', function(evt) {
+                    const edge = evt.target;
+                    updateStatus(`Clicked edge: ${edge.id()}`, 'success');
+                });
+                
+                updateStatus(`Graph initialized successfully! Nodes: ${cy.nodes().length}, Edges: ${cy.edges().length}`, 'success');
+                return true;
+                
+            } catch (error) {
+                updateStatus(`ERROR: ${error.message}`, 'error');
+                container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%; font-size: 18px; color: red; text-align: center;"><div><strong>❌ Error:</strong><br>${error.message}</div></div>`;
+                return false;
+            }
+        }
+
+        function startDemo() {
+            updateStatus('Starting demo...');
+            
+            if (!cy) {
+                if (!initGraph()) {
+                    return;
+                }
+            }
+            
+            // Animate the layout
+            cy.layout({
+                name: 'circle',
+                fit: true,
+                padding: 80,
+                animate: true,
+                animationDuration: 2000
+            }).run();
+            
+            setTimeout(() => {
+                updateStatus('Demo complete! Click on nodes and edges to interact.', 'success');
+            }, 2500);
+        }
+
+        function addRandomNode() {
+            if (!cy) {
+                updateStatus('Graph not initialized. Starting demo first...', 'warning');
+                startDemo();
+                return;
+            }
+            
+            nodeCounter++;
+            const nodeId = `node${nodeCounter}`;
+            const nodeLabel = `Node\n${nodeCounter}`;
+            
+            // Add new node
+            cy.add({
+                data: { id: nodeId, label: nodeLabel }
+            });
+            
+            // Connect to random existing node
+            const existingNodes = cy.nodes().filter(node => node.id() !== nodeId);
+            if (existingNodes.length > 0) {
+                const randomNode = existingNodes[Math.floor(Math.random() * existingNodes.length)];
+                cy.add({
+                    data: {
+                        id: `edge_${nodeCounter}`,
+                        source: randomNode.id(),
+                        target: nodeId
+                    }
+                });
+            }
+            
+            // Re-layout
+            cy.layout({
+                name: 'circle',
+                fit: true,
+                padding: 50,
+                animate: true
+            }).run();
+            
+            updateStatus(`Added node: ${nodeLabel}`, 'success');
+        }
+
+        function clearGraph() {
+            if (!cy) {
+                updateStatus('Graph not initialized.', 'warning');
+                return;
+            }
+            
+            cy.elements().remove();
+            nodeCounter = 0;
+            updateStatus('Graph cleared.', 'success');
+        }
+
+        function testAnalysis() {
+            updateStatus('Running test analysis...');
+            
+            if (!cy) {
+                if (!initGraph()) {
+                    return;
+                }
+            }
+            
+            // Clear and add analysis data
+            cy.elements().remove();
+            
+            // Simulate induction heads analysis
+            const analysisData = [
+                { id: 'layer0_head0', label: 'Layer 0\nHead 0\n(0.95)', score: 0.95 },
+                { id: 'layer0_head1', label: 'Layer 0\nHead 1\n(0.87)', score: 0.87 },
+                { id: 'layer1_head0', label: 'Layer 1\nHead 0\n(0.73)', score: 0.73 },
+                { id: 'layer1_head2', label: 'Layer 1\nHead 2\n(0.68)', score: 0.68 },
+                { id: 'layer2_head1', label: 'Layer 2\nHead 1\n(0.54)', score: 0.54 }
+            ];
+            
+            // Add nodes
+            analysisData.forEach(head => {
+                cy.add({
+                    data: {
+                        id: head.id,
+                        label: head.label,
+                        score: head.score
+                    }
+                });
+            });
+            
+            // Add connections based on scores
+            for (let i = 0; i < analysisData.length - 1; i++) {
+                cy.add({
+                    data: {
+                        id: `connection_${i}`,
+                        source: analysisData[i].id,
+                        target: analysisData[i + 1].id
+                    }
+                });
+            }
+            
+            // Apply hierarchical layout
+            cy.layout({
+                name: 'breadthfirst',
+                directed: true,
+                fit: true,
+                padding: 60,
+                animate: true,
+                animationDuration: 1500
+            }).run();
+            
+            setTimeout(() => {
+                updateStatus(`Analysis complete! Found ${analysisData.length} induction heads.`, 'success');
+            }, 2000);
+        }
+
+        // Auto-start when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStatus('Page loaded. Click "Start Demo" to begin.');
+            
+            // Auto-start after 2 seconds
+            setTimeout(() => {
+                updateStatus('Auto-starting demo...');
+                startDemo();
+            }, 2000);
+        });
+
+        // Make functions available globally
+        window.neuronMap = {
+            start: startDemo,
+            add: addRandomNode,
+            clear: clearGraph,
+            analyze: testAnalysis,
+            cy: () => cy
+        };
+    </script>
+</body>
+</html>

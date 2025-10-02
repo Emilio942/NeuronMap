@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Causal Tracing - NeuronMap</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link href="/static/css/style.css" rel="stylesheet">
+    
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-brain me-2"></i>NeuronMap
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/model-surgery">Model Surgery</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/causal-tracing">Causal Tracing</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/circuit-explorer">Circuits</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/sae-explorer">SAE Explorer</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Main Content -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-gradient text-white">
+                        <h4 class="mb-0">
+                            <i class="fas fa-route me-2"></i>Causal Tracing & Path Patching Experiment
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <form id="causalTracingForm">
+                            <!-- Model Selection -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <label for="modelSelect" class="form-label">
+                                        <i class="fas fa-robot me-1"></i>Model
+                                    </label>
+                                    <select class="form-select" id="modelSelect" required>
+                                        <option value="">Select a model...</option>
+                                        <option value="gpt2">GPT-2 (124M)</option>
+                                        <option value="gpt2-medium">GPT-2 Medium (355M)</option>
+                                        <option value="gpt2-large">GPT-2 Large (774M)</option>
+                                        <option value="gpt2-xl">GPT-2 XL (1.5B)</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="experimentType" class="form-label">
+                                        <i class="fas fa-flask me-1"></i>Experiment Type
+                                    </label>
+                                    <select class="form-select" id="experimentType" required>
+                                        <option value="path_patching">Path Patching</option>
+                                        <option value="causal_tracing">Causal Tracing</option>
+                                        <option value="activation_patching">Activation Patching</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Prompts Section -->
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <label for="cleanPrompt" class="form-label">
+                                        <i class="fas fa-check-circle text-success me-1"></i>Clean Prompt
+                                    </label>
+                                    <div class="input-group">
+                                        <textarea class="form-control" id="cleanPrompt" rows="3" 
+                                                placeholder="Enter the clean/correct prompt..." required></textarea>
+                                        <button class="btn btn-outline-secondary" type="button" id="loadExampleClean">
+                                            <i class="fas fa-lightbulb"></i>
+                                        </button>
+                                    </div>
+                                    <small class="form-text text-muted">The baseline prompt that produces the correct output</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="corruptedPrompt" class="form-label">
+                                        <i class="fas fa-times-circle text-danger me-1"></i>Corrupted Prompt
+                                    </label>
+                                    <div class="input-group">
+                                        <textarea class="form-control" id="corruptedPrompt" rows="3" 
+                                                placeholder="Enter the corrupted/incorrect prompt..." required></textarea>
+                                        <button class="btn btn-outline-secondary" type="button" id="loadExampleCorrupted">
+                                            <i class="fas fa-lightbulb"></i>
+                                        </button>
+                                    </div>
+                                    <small class="form-text text-muted">The modified prompt that produces incorrect output</small>
+                                </div>
+                            </div>
+
+                            <!-- Target Configuration -->
+                            <div class="card mb-4 border-primary">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-crosshairs me-1"></i>Intervention Targets
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <label for="targetLayers" class="form-label">Target Layers</label>
+                                            <input type="text" class="form-control" id="targetLayers" 
+                                                   placeholder="e.g., 0-11 or 5,7,9" 
+                                                   value="0-11">
+                                            <small class="form-text text-muted">Layer range or specific layers</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="componentType" class="form-label">Component Type</label>
+                                            <select class="form-select" id="componentType">
+                                                <option value="all">All Components</option>
+                                                <option value="attention">Attention Heads</option>
+                                                <option value="mlp">MLP Neurons</option>
+                                                <option value="residual">Residual Stream</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="tokenPositions" class="form-label">Token Positions</label>
+                                            <input type="text" class="form-control" id="tokenPositions" 
+                                                   placeholder="e.g., -1 or 0,1,2"
+                                                   value="-1">
+                                            <small class="form-text text-muted">-1 for last token, comma-separated for multiple</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Advanced Options -->
+                            <div class="accordion mb-4" id="advancedOptions">
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="advancedHeading">
+                                        <button class="accordion-button collapsed" type="button" 
+                                                data-bs-toggle="collapse" data-bs-target="#advancedCollapse">
+                                            <i class="fas fa-cog me-2"></i>Advanced Options
+                                        </button>
+                                    </h2>
+                                    <div id="advancedCollapse" class="accordion-collapse collapse" 
+                                         data-bs-parent="#advancedOptions">
+                                        <div class="accordion-body">
+                                            <div class="row">
+                                                <div class="col-md-4">
+                                                    <label for="numSamples" class="form-label">Number of Samples</label>
+                                                    <input type="number" class="form-control" id="numSamples" 
+                                                           value="1" min="1" max="100">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label for="metricType" class="form-label">Causal Metric</label>
+                                                    <select class="form-select" id="metricType">
+                                                        <option value="logit_diff">Logit Difference</option>
+                                                        <option value="probability">Probability</option>
+                                                        <option value="kl_divergence">KL Divergence</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label for="threshold" class="form-label">Significance Threshold</label>
+                                                    <input type="number" class="form-control" id="threshold" 
+                                                           value="0.01" step="0.001" min="0" max="1">
+                                                </div>
+                                            </div>
+                                            <div class="row mt-3">
+                                                <div class="col-md-6">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" id="saveResults" checked>
+                                                        <label class="form-check-label" for="saveResults">
+                                                            Save Results to Cache
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" id="exportConfig">
+                                                        <label class="form-check-label" for="exportConfig">
+                                                            Export Configuration
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="d-flex gap-2 mb-3">
+                                <button type="submit" class="btn btn-primary btn-lg" id="runExperiment">
+                                    <i class="fas fa-play me-2"></i>Run Causal Tracing
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="validateConfig">
+                                    <i class="fas fa-check me-2"></i>Validate Configuration
+                                </button>
+                                <button type="button" class="btn btn-outline-info" id="loadConfig">
+                                    <i class="fas fa-upload me-2"></i>Load Config
+                                </button>
+                                <button type="button" class="btn btn-outline-success" id="saveConfig">
+                                    <i class="fas fa-download me-2"></i>Save Config
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div class="card shadow-sm mt-4" id="resultsCard" style="display: none;">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-line me-2"></i>Causal Tracing Results
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div id="causalHeatmap" style="height: 400px;"></div>
+                            </div>
+                            <div class="col-md-6">
+                                <div id="causalBarChart" style="height: 400px;"></div>
+                            </div>
+                        </div>
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <h6>Critical Path Summary</h6>
+                                <div id="criticalPathSummary" class="alert alert-info">
+                                    <!-- Will be populated with results -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <!-- Quick Examples -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-lightbulb me-1"></i>Quick Examples
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group list-group-flush">
+                            <button class="list-group-item list-group-item-action" 
+                                    onclick="loadExample('indirect_object')">
+                                <strong>Indirect Object Identification</strong>
+                                <small class="text-muted d-block">Classic causal tracing example</small>
+                            </button>
+                            <button class="list-group-item list-group-item-action" 
+                                    onclick="loadExample('factual_recall')">
+                                <strong>Factual Recall</strong>
+                                <small class="text-muted d-block">Knowledge retrieval pathways</small>
+                            </button>
+                            <button class="list-group-item list-group-item-action" 
+                                    onclick="loadExample('arithmetic')">
+                                <strong>Arithmetic Reasoning</strong>
+                                <small class="text-muted d-block">Numerical computation paths</small>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Monitor -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-heartbeat me-1"></i>Experiment Status
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="statusIndicator">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="status-dot bg-secondary me-2"></div>
+                                <span>Ready</span>
+                            </div>
+                        </div>
+                        <div class="progress mb-2" style="display: none;" id="progressBar">
+                            <div class="progress-bar" role="progressbar" style="width: 0%">0%</div>
+                        </div>
+                        <small class="text-muted" id="statusText">Configure experiment parameters</small>
+                    </div>
+                </div>
+
+                <!-- Recent Experiments -->
+                <div class="card shadow-sm">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-history me-1"></i>Recent Experiments
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="recentExperiments">
+                            <small class="text-muted">No recent experiments</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Modal -->
+    <div class="modal fade" id="configModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Experiment Configuration</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <pre id="configPreview" class="bg-light p-3 rounded"></pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="downloadConfig">Download Config</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Causal Tracing Interface Logic
+        class CausalTracingInterface {
+            constructor() {
+                this.initializeEventListeners();
+                this.examples = this.loadExamples();
+            }
+
+            initializeEventListeners() {
+                document.getElementById('causalTracingForm').addEventListener('submit', this.handleSubmit.bind(this));
+                document.getElementById('validateConfig').addEventListener('click', this.validateConfiguration.bind(this));
+                document.getElementById('loadConfig').addEventListener('click', this.loadConfiguration.bind(this));
+                document.getElementById('saveConfig').addEventListener('click', this.saveConfiguration.bind(this));
+                document.getElementById('loadExampleClean').addEventListener('click', () => this.loadExamplePrompt('clean'));
+                document.getElementById('loadExampleCorrupted').addEventListener('click', () => this.loadExamplePrompt('corrupted'));
+            }
+
+            loadExamples() {
+                return {
+                    indirect_object: {
+                        clean: "When John and Mary went to the store, John gave a drink to",
+                        corrupted: "When John and Mary went to the store, Mary gave a drink to",
+                        description: "Tests indirect object identification capabilities"
+                    },
+                    factual_recall: {
+                        clean: "The capital of France is",
+                        corrupted: "The capital of Spain is",
+                        description: "Tests factual knowledge retrieval"
+                    },
+                    arithmetic: {
+                        clean: "2 + 2 =",
+                        corrupted: "2 + 3 =",
+                        description: "Tests arithmetic reasoning pathways"
+                    }
+                };
+            }
+
+            async handleSubmit(event) {
+                event.preventDefault();
+                
+                this.updateStatus('running', 'Running causal tracing experiment...');
+                this.showProgress(true);
+
+                try {
+                    const config = this.gatherConfiguration();
+                    const response = await this.runCausalTracing(config);
+                    
+                    this.displayResults(response);
+                    this.updateStatus('completed', 'Experiment completed successfully');
+                    this.addToRecentExperiments(config, response);
+                    
+                } catch (error) {
+                    console.error('Experiment failed:', error);
+                    this.updateStatus('error', `Experiment failed: ${error.message}`);
+                } finally {
+                    this.showProgress(false);
+                }
+            }
+
+            gatherConfiguration() {
+                return {
+                    model_name: document.getElementById('modelSelect').value,
+                    experiment_type: document.getElementById('experimentType').value,
+                    clean_prompt: document.getElementById('cleanPrompt').value,
+                    corrupted_prompt: document.getElementById('corruptedPrompt').value,
+                    target_layers: document.getElementById('targetLayers').value,
+                    component_type: document.getElementById('componentType').value,
+                    token_positions: document.getElementById('tokenPositions').value,
+                    num_samples: parseInt(document.getElementById('numSamples').value),
+                    metric_type: document.getElementById('metricType').value,
+                    threshold: parseFloat(document.getElementById('threshold').value),
+                    save_results: document.getElementById('saveResults').checked,
+                    export_config: document.getElementById('exportConfig').checked
+                };
+            }
+
+            async runCausalTracing(config) {
+                const response = await fetch('/api/interventions/patch', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                return await response.json();
+            }
+
+            displayResults(response) {
+                document.getElementById('resultsCard').style.display = 'block';
+                
+                // Create causal heatmap
+                this.createCausalHeatmap(response.causal_effects);
+                
+                // Create importance bar chart
+                this.createImportanceChart(response.component_importance);
+                
+                // Display critical path summary
+                this.displayCriticalPath(response.critical_path);
+                
+                // Scroll to results
+                document.getElementById('resultsCard').scrollIntoView({ behavior: 'smooth' });
+            }
+
+            createCausalHeatmap(causalEffects) {
+                const data = [{
+                    z: causalEffects.matrix,
+                    x: causalEffects.components,
+                    y: causalEffects.layers,
+                    type: 'heatmap',
+                    colorscale: 'RdBu',
+                    colorbar: {title: 'Causal Effect'},
+                    hoveringinfo: 'z'
+                }];
+
+                const layout = {
+                    title: 'Causal Effects Heatmap',
+                    xaxis: {title: 'Components'},
+                    yaxis: {title: 'Layers'},
+                    height: 400
+                };
+
+                Plotly.newPlot('causalHeatmap', data, layout, {responsive: true});
+            }
+
+            createImportanceChart(importance) {
+                const data = [{
+                    x: importance.scores,
+                    y: importance.components,
+                    type: 'bar',
+                    orientation: 'h',
+                    marker: {
+                        color: importance.scores.map(x => x > 0 ? 'rgba(55, 128, 191, 0.7)' : 'rgba(219, 64, 82, 0.7)')
+                    }
+                }];
+
+                const layout = {
+                    title: 'Component Importance',
+                    xaxis: {title: 'Causal Effect'},
+                    yaxis: {title: 'Components'},
+                    height: 400
+                };
+
+                Plotly.newPlot('causalBarChart', data, layout, {responsive: true});
+            }
+
+            displayCriticalPath(criticalPath) {
+                const summary = document.getElementById('criticalPathSummary');
+                
+                let html = `<h6>Critical Causal Path</h6>`;
+                html += `<ol>`;
+                
+                criticalPath.path.forEach((component, index) => {
+                    const effect = criticalPath.effects[index];
+                    const effectClass = effect > 0 ? 'text-success' : 'text-danger';
+                    html += `<li><strong>${component}</strong> - Effect: <span class="${effectClass}">${effect.toFixed(4)}</span></li>`;
+                });
+                
+                html += `</ol>`;
+                html += `<p><strong>Total Effect:</strong> <span class="badge bg-primary">${criticalPath.total_effect.toFixed(4)}</span></p>`;
+                
+                summary.innerHTML = html;
+            }
+
+            validateConfiguration() {
+                const config = this.gatherConfiguration();
+                
+                // Basic validation
+                const errors = [];
+                
+                if (!config.model_name) errors.push('Model selection is required');
+                if (!config.clean_prompt.trim()) errors.push('Clean prompt is required');
+                if (!config.corrupted_prompt.trim()) errors.push('Corrupted prompt is required');
+                if (config.clean_prompt === config.corrupted_prompt) errors.push('Clean and corrupted prompts must be different');
+                
+                if (errors.length > 0) {
+                    alert('Configuration errors:\n' + errors.join('\n'));
+                    return false;
+                }
+                
+                alert('Configuration is valid!');
+                return true;
+            }
+
+            saveConfiguration() {
+                const config = this.gatherConfiguration();
+                const modal = new bootstrap.Modal(document.getElementById('configModal'));
+                
+                document.getElementById('configPreview').textContent = JSON.stringify(config, null, 2);
+                modal.show();
+                
+                document.getElementById('downloadConfig').onclick = () => {
+                    const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'});
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `causal_tracing_config_${Date.now()}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                };
+            }
+
+            loadConfiguration() {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json';
+                input.onchange = (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            try {
+                                const config = JSON.parse(e.target.result);
+                                this.applyConfiguration(config);
+                                alert('Configuration loaded successfully!');
+                            } catch (error) {
+                                alert('Error loading configuration: ' + error.message);
+                            }
+                        };
+                        reader.readAsText(file);
+                    }
+                };
+                input.click();
+            }
+
+            applyConfiguration(config) {
+                // Apply configuration to form fields
+                const fieldMap = {
+                    'modelSelect': 'model_name',
+                    'experimentType': 'experiment_type',
+                    'cleanPrompt': 'clean_prompt',
+                    'corruptedPrompt': 'corrupted_prompt',
+                    'targetLayers': 'target_layers',
+                    'componentType': 'component_type',
+                    'tokenPositions': 'token_positions',
+                    'numSamples': 'num_samples',
+                    'metricType': 'metric_type',
+                    'threshold': 'threshold',
+                    'saveResults': 'save_results',
+                    'exportConfig': 'export_config'
+                };
+
+                Object.entries(fieldMap).forEach(([fieldId, configKey]) => {
+                    const field = document.getElementById(fieldId);
+                    if (field && config[configKey] !== undefined) {
+                        if (field.type === 'checkbox') {
+                            field.checked = config[configKey];
+                        } else {
+                            field.value = config[configKey];
+                        }
+                    }
+                });
+            }
+
+            loadExamplePrompt(type) {
+                // For demo purposes, load the first example
+                const example = this.examples.indirect_object;
+                if (type === 'clean') {
+                    document.getElementById('cleanPrompt').value = example.clean;
+                } else {
+                    document.getElementById('corruptedPrompt').value = example.corrupted;
+                }
+            }
+
+            updateStatus(status, message) {
+                const indicator = document.getElementById('statusIndicator');
+                const statusText = document.getElementById('statusText');
+                
+                const statusConfig = {
+                    ready: { color: 'bg-secondary', text: 'Ready' },
+                    running: { color: 'bg-warning', text: 'Running' },
+                    completed: { color: 'bg-success', text: 'Completed' },
+                    error: { color: 'bg-danger', text: 'Error' }
+                };
+                
+                const config = statusConfig[status] || statusConfig.ready;
+                
+                indicator.innerHTML = `
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="status-dot ${config.color} me-2"></div>
+                        <span>${config.text}</span>
+                    </div>
+                `;
+                
+                statusText.textContent = message;
+            }
+
+            showProgress(show) {
+                const progressBar = document.getElementById('progressBar');
+                progressBar.style.display = show ? 'block' : 'none';
+                
+                if (show) {
+                    // Simulate progress for demo
+                    let progress = 0;
+                    const interval = setInterval(() => {
+                        progress += Math.random() * 20;
+                        if (progress >= 100) {
+                            progress = 100;
+                            clearInterval(interval);
+                        }
+                        const bar = progressBar.querySelector('.progress-bar');
+                        bar.style.width = progress + '%';
+                        bar.textContent = Math.round(progress) + '%';
+                    }, 500);
+                }
+            }
+
+            addToRecentExperiments(config, response) {
+                const container = document.getElementById('recentExperiments');
+                const timestamp = new Date().toLocaleString();
+                
+                const experimentHtml = `
+                    <div class="border rounded p-2 mb-2 bg-light">
+                        <small class="fw-bold">${config.experiment_type}</small>
+                        <br><small class="text-muted">${timestamp}</small>
+                        <br><small>Model: ${config.model_name}</small>
+                    </div>
+                `;
+                
+                container.innerHTML = experimentHtml + container.innerHTML;
+            }
+        }
+
+        // Global function for example loading
+        function loadExample(exampleKey) {
+            const examples = {
+                indirect_object: {
+                    clean: "When John and Mary went to the store, John gave a drink to",
+                    corrupted: "When John and Mary went to the store, Mary gave a drink to"
+                },
+                factual_recall: {
+                    clean: "The capital of France is",
+                    corrupted: "The capital of Spain is"
+                },
+                arithmetic: {
+                    clean: "2 + 2 =",
+                    corrupted: "2 + 3 ="
+                }
+            };
+            
+            const example = examples[exampleKey];
+            if (example) {
+                document.getElementById('cleanPrompt').value = example.clean;
+                document.getElementById('corruptedPrompt').value = example.corrupted;
+                document.getElementById('modelSelect').value = 'gpt2';
+            }
+        }
+
+        // Initialize the interface when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            window.causalTracingInterface = new CausalTracingInterface();
+            console.log('🚀 Causal Tracing Interface initialized');
+        });
+    </script>
+
+    <style>
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .card-header.bg-gradient {
+            background: linear-gradient(135deg, #007bff, #0056b3) !important;
+        }
+        
+        .progress {
+            height: 8px;
+        }
+        
+        .list-group-item-action:hover {
+            background-color: #f8f9fa;
+        }
+        
+        #configPreview {
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 0.875rem;
+        }
+    </style>
+</body>
+</html>

@@ -46,6 +46,7 @@ setup(
             "black>=22.0.0",
             "flake8>=5.0.0",
             "mypy>=1.0.0",
+            "coverage>=7.0.0",
         ],
         "docs": [
             "sphinx>=5.0.0",

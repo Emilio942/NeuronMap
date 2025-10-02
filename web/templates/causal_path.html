@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Causal Path Visualization - NeuronMap</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link href="/static/css/style.css" rel="stylesheet">
+    
+    <!-- Cytoscape.js for graph visualization -->
+    <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+    <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+    
+    <!-- D3.js for additional visualizations -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    
+    <!-- Plotly -->
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-brain me-2"></i>NeuronMap
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/model-surgery">Model Surgery</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/causal-tracing">Causal Tracing</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/causal-path">Causal Path</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/circuit-explorer">Circuits</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/sae-explorer">SAE Explorer</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4">
+        <div class="row">
+            <!-- Main Visualization Area -->
+            <div class="col-lg-9">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-gradient text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h4 class="mb-0">
+                                <i class="fas fa-project-diagram me-2"></i>Causal Path Visualization
+                            </h4>
+                            <div class="btn-group">
+                                <button class="btn btn-outline-light btn-sm" id="resetView">
+                                    <i class="fas fa-home"></i> Reset View
+                                </button>
+                                <button class="btn btn-outline-light btn-sm" id="exportGraph">
+                                    <i class="fas fa-download"></i> Export
+                                </button>
+                                <button class="btn btn-outline-light btn-sm" id="fullscreenBtn">
+                                    <i class="fas fa-expand"></i> Fullscreen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0 position-relative">
+                        <!-- Model Architecture Graph -->
+                        <div id="causalPathGraph" class="graph-container"></div>
+                        
+                        <!-- Graph Controls Overlay -->
+                        <div class="position-absolute top-0 end-0 m-3">
+                            <div class="card bg-dark bg-opacity-75 text-white">
+                                <div class="card-body p-2">
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">Layout:</label>
+                                        <select id="layoutSelect" class="form-select form-select-sm">
+                                            <option value="dagre">Hierarchical</option>
+                                            <option value="circle">Circular</option>
+                                            <option value="grid">Grid</option>
+                                            <option value="breadthfirst">Breadth-First</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">Filter:</label>
+                                        <select id="effectFilter" class="form-select form-select-sm">
+                                            <option value="all">All Effects</option>
+                                            <option value="positive">Positive Only</option>
+                                            <option value="negative">Negative Only</option>
+                                            <option value="significant">Significant (>0.01)</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small mb-1">Highlight:</label>
+                                        <select id="highlightMode" class="form-select form-select-sm">
+                                            <option value="none">None</option>
+                                            <option value="critical_path">Critical Path</option>
+                                            <option value="strongest_effects">Strongest Effects</option>
+                                            <option value="layer_by_layer">Layer by Layer</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Loading Overlay -->
+                        <div id="loadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center bg-white bg-opacity-75" style="display: none !important;">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary mb-3" role="status"></div>
+                                <div class="fw-bold">Loading Model Architecture...</div>
+                                <small class="text-muted">Building causal graph</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Token Flow Visualization -->
+                <div class="card shadow-sm mt-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-stream me-1"></i>Token Flow Through Critical Path
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="tokenFlowViz" class="token-flow-container"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="col-lg-3">
+                <!-- Path Analysis -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-route me-1"></i>Path Analysis
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="pathAnalysis">
+                            <p class="text-muted">Select a model and prompt to analyze causal paths</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Model & Prompt Config -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-cog me-1"></i>Configuration
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="modelSelectSidebar" class="form-label">Model</label>
+                            <select class="form-select form-select-sm" id="modelSelectSidebar">
+                                <option value="gpt2">GPT-2 (124M)</option>
+                                <option value="gpt2-medium">GPT-2 Medium (355M)</option>
+                                <option value="gpt2-large">GPT-2 Large (774M)</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="promptInput" class="form-label">Prompt</label>
+                            <textarea class="form-control form-control-sm" id="promptInput" rows="3" placeholder="Enter prompt to analyze...">The capital of France is</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="tokenSelect" class="form-label">Target Token</label>
+                            <select class="form-select form-select-sm" id="tokenSelect">
+                                <option value="-1">Last Token</option>
+                                <option value="0">First Token</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary btn-sm w-100" id="analyzePathBtn">
+                            <i class="fas fa-play me-1"></i>Analyze Path
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Component Details -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-info-circle me-1"></i>Component Details
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="componentDetails">
+                            <p class="text-muted small">Click on a node to see details</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="card shadow-sm">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-map me-1"></i>Legend
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="legend-container">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="legend-node attention me-2"></div>
+                                <small>Attention Head</small>
+                            </div>
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="legend-node mlp me-2"></div>
+                                <small>MLP Neuron</small>
+                            </div>
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="legend-node residual me-2"></div>
+                                <small>Residual Stream</small>
+                            </div>
+                            <hr class="my-2">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="legend-edge positive me-2"></div>
+                                <small>Positive Effect</small>
+                            </div>
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="legend-edge negative me-2"></div>
+                                <small>Negative Effect</small>
+                            </div>
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="legend-edge critical me-2"></div>
+                                <small>Critical Path</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Causal Path Visualization Interface
+        class CausalPathVisualizer {
+            constructor() {
+                this.cy = null;
+                this.currentModel = 'gpt2';
+                this.currentPrompt = 'The capital of France is';
+                this.causalData = null;
+                
+                this.initializeGraph();
+                this.initializeEventListeners();
+                this.loadSampleData();
+            }
+
+            initializeGraph() {
+                this.cy = cytoscape({
+                    container: document.getElementById('causalPathGraph'),
+                    style: this.getGraphStyle(),
+                    layout: {
+                        name: 'dagre',
+                        rankDir: 'TB',
+                        spacingFactor: 1.5,
+                        nodeSep: 30,
+                        rankSep: 80
+                    },
+                    elements: [],
+                    minZoom: 0.1,
+                    maxZoom: 3,
+                    wheelSensitivity: 0.2
+                });
+
+                // Add event listeners for node interactions
+                this.cy.on('tap', 'node', (evt) => {
+                    this.showComponentDetails(evt.target.data());
+                });
+
+                this.cy.on('mouseover', 'node', (evt) => {
+                    evt.target.addClass('highlighted');
+                });
+
+                this.cy.on('mouseout', 'node', (evt) => {
+                    evt.target.removeClass('highlighted');
+                });
+            }
+
+            getGraphStyle() {
+                return [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': 'data(color)',
+                            'label': 'data(label)',
+                            'width': 'data(size)',
+                            'height': 'data(size)',
+                            'text-valign': 'center',
+                            'text-halign': 'center',
+                            'font-size': '10px',
+                            'font-weight': 'bold',
+                            'color': '#ffffff',
+                            'text-outline-color': '#000000',
+                            'text-outline-width': 1,
+                            'border-width': 2,
+                            'border-color': '#ffffff',
+                            'border-opacity': 0.8
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 'data(weight)',
+                            'line-color': 'data(color)',
+                            'target-arrow-color': 'data(color)',
+                            'target-arrow-shape': 'triangle',
+                            'curve-style': 'bezier',
+                            'arrow-scale': 1.5,
+                            'opacity': 0.8
+                        }
+                    },
+                    {
+                        selector: '.attention',
+                        style: {
+                            'shape': 'ellipse',
+                            'background-color': '#3498db'
+                        }
+                    },
+                    {
+                        selector: '.mlp',
+                        style: {
+                            'shape': 'rectangle',
+                            'background-color': '#e74c3c'
+                        }
+                    },
+                    {
+                        selector: '.residual',
+                        style: {
+                            'shape': 'diamond',
+                            'background-color': '#2ecc71'
+                        }
+                    },
+                    {
+                        selector: '.critical-path',
+                        style: {
+                            'background-color': '#f39c12',
+                            'border-color': '#d68910',
+                            'border-width': 4
+                        }
+                    },
+                    {
+                        selector: '.highlighted',
+                        style: {
+                            'border-color': '#ffffff',
+                            'border-width': 6,
+                            'z-index': 999
+                        }
+                    },
+                    {
+                        selector: ':selected',
+                        style: {
+                            'border-color': '#ffff00',
+                            'border-width': 4
+                        }
+                    }
+                ];
+            }
+
+            initializeEventListeners() {
+                document.getElementById('layoutSelect').addEventListener('change', (e) => {
+                    this.updateLayout(e.target.value);
+                });
+
+                document.getElementById('effectFilter').addEventListener('change', (e) => {
+                    this.applyEffectFilter(e.target.value);
+                });
+
+                document.getElementById('highlightMode').addEventListener('change', (e) => {
+                    this.applyHighlighting(e.target.value);
+                });
+
+                document.getElementById('analyzePathBtn').addEventListener('click', () => {
+                    this.analyzeCurrentPath();
+                });
+
+                document.getElementById('resetView').addEventListener('click', () => {
+                    this.cy.fit();
+                    this.cy.center();
+                });
+
+                document.getElementById('exportGraph').addEventListener('click', () => {
+                    this.exportGraph();
+                });
+
+                document.getElementById('fullscreenBtn').addEventListener('click', () => {
+                    this.toggleFullscreen();
+                });
+            }
+
+            loadSampleData() {
+                // Generate sample model architecture and causal data
+                this.causalData = this.generateSampleCausalData();
+                this.buildGraph(this.causalData);
+                this.updatePathAnalysis(this.causalData);
+                this.createTokenFlowVisualization(this.causalData);
+            }
+
+            generateSampleCausalData() {
+                const layers = 12;
+                const headsPerLayer = 12;
+                const mlpSize = 768;
+                
+                const nodes = [];
+                const edges = [];
+                const criticalPath = [];
+
+                // Generate nodes for each layer
+                for (let layer = 0; layer < layers; layer++) {
+                    // Attention heads
+                    for (let head = 0; head < headsPerLayer; head++) {
+                        const nodeId = `attn_${layer}_${head}`;
+                        const isCritical = layer > 5 && head < 4; // Some heads are on critical path
+                        
+                        nodes.push({
+                            data: {
+                                id: nodeId,
+                                label: `H${layer}.${head}`,
+                                layer: layer,
+                                component_type: 'attention',
+                                causal_effect: (Math.random() - 0.5) * 0.1,
+                                size: isCritical ? 40 : 25,
+                                color: isCritical ? '#f39c12' : '#3498db'
+                            },
+                            classes: isCritical ? 'attention critical-path' : 'attention'
+                        });
+
+                        if (isCritical) {
+                            criticalPath.push(nodeId);
+                        }
+                    }
+
+                    // MLP representation (simplified to a few nodes)
+                    for (let mlp = 0; mlp < 3; mlp++) {
+                        const nodeId = `mlp_${layer}_${mlp}`;
+                        const isCritical = layer > 7 && mlp === 1;
+                        
+                        nodes.push({
+                            data: {
+                                id: nodeId,
+                                label: `MLP${layer}.${mlp}`,
+                                layer: layer,
+                                component_type: 'mlp',
+                                causal_effect: (Math.random() - 0.5) * 0.08,
+                                size: isCritical ? 35 : 20,
+                                color: isCritical ? '#f39c12' : '#e74c3c'
+                            },
+                            classes: isCritical ? 'mlp critical-path' : 'mlp'
+                        });
+
+                        if (isCritical) {
+                            criticalPath.push(nodeId);
+                        }
+                    }
+
+                    // Residual stream connection
+                    if (layer > 0) {
+                        const nodeId = `res_${layer}`;
+                        nodes.push({
+                            data: {
+                                id: nodeId,
+                                label: `Res${layer}`,
+                                layer: layer,
+                                component_type: 'residual',
+                                causal_effect: 0.001,
+                                size: 15,
+                                color: '#2ecc71'
+                            },
+                            classes: 'residual'
+                        });
+                    }
+                }
+
+                // Generate edges based on causal relationships
+                for (let i = 0; i < nodes.length; i++) {
+                    const sourceNode = nodes[i];
+                    
+                    // Connect to nodes in next layers
+                    for (let j = i + 1; j < nodes.length; j++) {
+                        const targetNode = nodes[j];
+                        
+                        if (targetNode.data.layer === sourceNode.data.layer + 1) {
+                            const effect = (Math.random() - 0.5) * 0.05;
+                            const isSignificant = Math.abs(effect) > 0.01;
+                            
+                            if (isSignificant || Math.random() < 0.3) { // Show significant edges or random subset
+                                const isCritical = criticalPath.includes(sourceNode.data.id) && 
+                                                  criticalPath.includes(targetNode.data.id);
+                                
+                                edges.push({
+                                    data: {
+                                        id: `${sourceNode.data.id}_${targetNode.data.id}`,
+                                        source: sourceNode.data.id,
+                                        target: targetNode.data.id,
+                                        weight: Math.abs(effect) * 20 + 1,
+                                        effect: effect,
+                                        color: isCritical ? '#f39c12' : (effect > 0 ? '#27ae60' : '#e74c3c')
+                                    },
+                                    classes: isCritical ? 'critical-path' : ''
+                                });
+                            }
+                        }
+                    }
+                }
+
+                return {
+                    nodes: nodes,
+                    edges: edges,
+                    criticalPath: criticalPath,
+                    model: this.currentModel,
+                    prompt: this.currentPrompt,
+                    targetToken: 'Paris',
+                    totalEffect: 0.042,
+                    layerEffects: Array.from({length: layers}, (_, i) => ({
+                        layer: i,
+                        effect: (Math.random() - 0.5) * 0.02
+                    }))
+                };
+            }
+
+            buildGraph(data) {
+                this.cy.elements().remove();
+                this.cy.add(data.nodes);
+                this.cy.add(data.edges);
+                
+                // Apply layout
+                this.updateLayout('dagre');
+            }
+
+            updateLayout(layoutName) {
+                const layouts = {
+                    dagre: { name: 'dagre', rankDir: 'TB', spacingFactor: 1.5 },
+                    circle: { name: 'circle', radius: 300 },
+                    grid: { name: 'grid', rows: 12 },
+                    breadthfirst: { name: 'breadthfirst', directed: true }
+                };
+
+                const layout = this.cy.layout(layouts[layoutName] || layouts.dagre);
+                layout.run();
+            }
+
+            applyEffectFilter(filterType) {
+                this.cy.elements().style('display', 'element');
+
+                switch (filterType) {
+                    case 'positive':
+                        this.cy.edges().filter(edge => edge.data('effect') <= 0).style('display', 'none');
+                        break;
+                    case 'negative':
+                        this.cy.edges().filter(edge => edge.data('effect') >= 0).style('display', 'none');
+                        break;
+                    case 'significant':
+                        this.cy.edges().filter(edge => Math.abs(edge.data('effect')) < 0.01).style('display', 'none');
+                        break;
+                }
+            }
+
+            applyHighlighting(mode) {
+                this.cy.elements().removeClass('critical-path highlighted');
+
+                switch (mode) {
+                    case 'critical_path':
+                        this.causalData.criticalPath.forEach(nodeId => {
+                            this.cy.getElementById(nodeId).addClass('critical-path');
+                        });
+                        break;
+                    case 'strongest_effects':
+                        const strongestNodes = this.cy.nodes().filter(node => 
+                            Math.abs(node.data('causal_effect')) > 0.05
+                        );
+                        strongestNodes.addClass('highlighted');
+                        break;
+                    case 'layer_by_layer':
+                        this.animateLayerByLayer();
+                        break;
+                }
+            }
+
+            animateLayerByLayer() {
+                const layers = {};
+                this.cy.nodes().forEach(node => {
+                    const layer = node.data('layer');
+                    if (!layers[layer]) layers[layer] = [];
+                    layers[layer].push(node);
+                });
+
+                Object.keys(layers).forEach((layer, index) => {
+                    setTimeout(() => {
+                        layers[layer].forEach(node => node.addClass('highlighted'));
+                        if (index > 0) {
+                            layers[index - 1].forEach(node => node.removeClass('highlighted'));
+                        }
+                    }, index * 500);
+                });
+            }
+
+            showComponentDetails(nodeData) {
+                const detailsHtml = `
+                    <div class="component-details">
+                        <h6>${nodeData.label}</h6>
+                        <p><strong>Type:</strong> ${nodeData.component_type}</p>
+                        <p><strong>Layer:</strong> ${nodeData.layer}</p>
+                        <p><strong>Causal Effect:</strong> ${nodeData.causal_effect.toFixed(4)}</p>
+                        <div class="mt-2">
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar ${nodeData.causal_effect > 0 ? 'bg-success' : 'bg-danger'}" 
+                                     style="width: ${Math.abs(nodeData.causal_effect) * 1000}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('componentDetails').innerHTML = detailsHtml;
+            }
+
+            updatePathAnalysis(data) {
+                const analysisHtml = `
+                    <div class="path-summary">
+                        <div class="mb-3">
+                            <h6 class="text-primary">Critical Path Analysis</h6>
+                            <p class="small">Model: <strong>${data.model}</strong></p>
+                            <p class="small">Target: <strong>${data.targetToken}</strong></p>
+                            <p class="small">Total Effect: <span class="badge bg-primary">${data.totalEffect.toFixed(4)}</span></p>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <h6>Path Components:</h6>
+                            <div class="path-components">
+                                ${data.criticalPath.slice(0, 5).map(nodeId => {
+                                    const node = data.nodes.find(n => n.data.id === nodeId);
+                                    return `<span class="badge bg-secondary me-1 mb-1">${node.data.label}</span>`;
+                                }).join('')}
+                            </div>
+                        </div>
+
+                        <div>
+                            <h6>Layer Effects:</h6>
+                            ${data.layerEffects.slice(0, 6).map(layer => `
+                                <div class="d-flex justify-content-between small">
+                                    <span>Layer ${layer.layer}:</span>
+                                    <span class="${layer.effect > 0 ? 'text-success' : 'text-danger'}">
+                                        ${layer.effect.toFixed(4)}
+                                    </span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('pathAnalysis').innerHTML = analysisHtml;
+            }
+
+            createTokenFlowVisualization(data) {
+                const container = document.getElementById('tokenFlowViz');
+                container.innerHTML = '';
+
+                // Create a simplified token flow visualization using D3
+                const svg = d3.select(container)
+                    .append('svg')
+                    .attr('width', '100%')
+                    .attr('height', 200);
+
+                const width = container.clientWidth;
+                const height = 200;
+
+                // Sample token flow data
+                const tokens = ['The', 'capital', 'of', 'France', 'is', '[MASK]'];
+                const layers = Array.from({length: 8}, (_, i) => i);
+
+                // Create token flow paths
+                tokens.forEach((token, tokenIndex) => {
+                    const x = (tokenIndex + 1) * width / (tokens.length + 1);
+                    
+                    // Draw token label
+                    svg.append('text')
+                        .attr('x', x)
+                        .attr('y', 20)
+                        .attr('text-anchor', 'middle')
+                        .attr('font-size', '12px')
+                        .attr('font-weight', 'bold')
+                        .text(token);
+
+                    // Draw flow through layers
+                    layers.forEach((layer, layerIndex) => {
+                        const y = 40 + layerIndex * 20;
+                        const intensity = Math.random() * 0.8 + 0.2;
+                        
+                        svg.append('circle')
+                            .attr('cx', x)
+                            .attr('cy', y)
+                            .attr('r', 3)
+                            .attr('fill', `rgba(52, 152, 219, ${intensity})`)
+                            .attr('stroke', '#3498db')
+                            .attr('stroke-width', 1);
+
+                        if (layerIndex > 0) {
+                            svg.append('line')
+                                .attr('x1', x)
+                                .attr('y1', y - 20)
+                                .attr('x2', x)
+                                .attr('y2', y)
+                                .attr('stroke', `rgba(52, 152, 219, ${intensity * 0.5})`)
+                                .attr('stroke-width', 2);
+                        }
+                    });
+                });
+
+                // Add layer labels
+                layers.forEach((layer, layerIndex) => {
+                    const y = 40 + layerIndex * 20;
+                    svg.append('text')
+                        .attr('x', 10)
+                        .attr('y', y + 4)
+                        .attr('font-size', '10px')
+                        .attr('fill', '#666')
+                        .text(`L${layer}`);
+                });
+            }
+
+            analyzeCurrentPath() {
+                this.currentPrompt = document.getElementById('promptInput').value;
+                this.currentModel = document.getElementById('modelSelectSidebar').value;
+                
+                // Show loading state
+                this.showLoading(true);
+                
+                // Simulate analysis
+                setTimeout(() => {
+                    this.loadSampleData(); // Reload with new "analysis"
+                    this.showLoading(false);
+                }, 2000);
+            }
+
+            showLoading(show) {
+                const overlay = document.getElementById('loadingOverlay');
+                overlay.style.display = show ? 'flex' : 'none';
+            }
+
+            exportGraph() {
+                const png64 = this.cy.png({scale: 2, full: true});
+                const link = document.createElement('a');
+                link.download = 'causal_path_graph.png';
+                link.href = png64;
+                link.click();
+            }
+
+            toggleFullscreen() {
+                const container = document.getElementById('causalPathGraph').parentElement;
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                } else {
+                    container.requestFullscreen();
+                }
+            }
+        }
+
+        // Initialize the visualizer when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            window.causalPathVisualizer = new CausalPathVisualizer();
+            console.log('🚀 Causal Path Visualizer initialized');
+        });
+    </script>
+
+    <style>
+        .graph-container {
+            height: 600px;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+        }
+
+        .token-flow-container {
+            height: 200px;
+            border: 1px solid #dee2e6;
+            border-radius: 0.375rem;
+            background: #f8f9fa;
+        }
+
+        .card-header.bg-gradient {
+            background: linear-gradient(135deg, #007bff, #0056b3) !important;
+        }
+
+        .legend-node {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+        }
+
+        .legend-node.attention {
+            background-color: #3498db;
+        }
+
+        .legend-node.mlp {
+            background-color: #e74c3c;
+            border-radius: 2px;
+        }
+
+        .legend-node.residual {
+            background-color: #2ecc71;
+            transform: rotate(45deg);
+        }
+
+        .legend-edge {
+            width: 20px;
+            height: 3px;
+            border-radius: 1px;
+        }
+
+        .legend-edge.positive {
+            background-color: #27ae60;
+        }
+
+        .legend-edge.negative {
+            background-color: #e74c3c;
+        }
+
+        .legend-edge.critical {
+            background-color: #f39c12;
+        }
+
+        #causalPathGraph {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+
+        .component-details h6 {
+            color: #007bff;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 0.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .path-components .badge {
+            font-size: 0.7em;
+        }
+
+        /* Fullscreen styles */
+        .graph-container:-webkit-full-screen {
+            height: 100vh;
+        }
+
+        .graph-container:-moz-full-screen {
+            height: 100vh;
+        }
+
+        .graph-container:fullscreen {
+            height: 100vh;
+        }
+    </style>
+</body>
+</html>

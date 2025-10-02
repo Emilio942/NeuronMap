@@ -1,228 +1,288 @@
-"""Streaming data processor for large datasets."""
+"""Streaming and batch data processing utilities."""
 
+from __future__ import annotations
+
+import asyncio
+import hashlib
 import json
 import logging
-import time
-import asyncio
 import multiprocessing as mp
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
-from concurrent.futures import ThreadPoolExecutor
+import time
 import uuid
-import hashlib
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tuple
 
-try:
-    import h5py
+import numpy as np
+
+try:  # pragma: no cover - optional heavy dependencies
     import aiofiles
-except ImportError:
-    h5py = None
+    import h5py
+except ImportError:  # pragma: no cover - graceful degradation
     aiofiles = None
+    h5py = None
 
 from .quality_manager import DataQualityManager, QuestionMetadata
+from ..utils.batch_processor import BatchProcessor
 
 
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_STREAM_CONFIG: Dict[str, Any] = {
+    "batch_size": 64,
+    "buffer_size": 1024,
+    "num_workers": max(mp.cpu_count() // 2, 1),
+    "memory_limit_mb": None,
+}
+
+
 class StreamingDataProcessor:
-    """Process large datasets in streaming fashion."""
+    """Process large datasets either asynchronously or via lightweight helpers."""
 
-    def __init__(self, chunk_size: int = 1000, max_workers: int = None):
-        """Initialize streaming processor.
+    def __init__(
+        self,
+        config: Optional[Dict[str, Any]] = None,
+        chunk_size: int = 1000,
+        max_workers: Optional[int] = None,
+    ) -> None:
+        config_dict = dict(DEFAULT_STREAM_CONFIG)
+        if isinstance(config, dict):
+            config_dict.update(config)
 
-        Args:
-            chunk_size: Size of data chunks to process.
-            max_workers: Maximum number of worker threads.
-        """
-        self.chunk_size = chunk_size
-        self.max_workers = max_workers or mp.cpu_count()
+        if chunk_size != 1000 and "batch_size" not in config_dict:
+            config_dict["batch_size"] = chunk_size
+        if max_workers is not None:
+            config_dict["num_workers"] = max_workers
+
+        self.config = config_dict
+        self.batch_size = int(config_dict.get("batch_size", 64))
+        self.buffer_size = int(config_dict.get("buffer_size", max(self.batch_size * 2, 64)))
+        self.max_workers = int(config_dict.get("num_workers") or mp.cpu_count())
+        self.memory_limit_mb = config_dict.get("memory_limit_mb")
+        self.chunk_size = max(self.batch_size, chunk_size)
         self.quality_manager = DataQualityManager()
 
-    async def process_questions_stream(self, input_file: str, output_file: str,
-                                     validation: bool = True) -> Dict[str, Any]:
-        """Process questions in streaming fashion.
-
-        Args:
-            input_file: Input JSONL file with questions.
-            output_file: Output HDF5 file for processed data.
-            validation: Whether to perform quality validation.
-
-        Returns:
-            Processing statistics.
-        """
+    # ------------------------------------------------------------------
+    # Asynchronous question processing helpers used in the original API
+    # ------------------------------------------------------------------
+    async def process_questions_stream(
+        self,
+        input_file: str,
+        output_file: str,
+        validation: bool = True,
+    ) -> Dict[str, Any]:
         if h5py is None or aiofiles is None:
             raise ImportError("h5py and aiofiles required for streaming processing")
 
         stats = {
-            'total_processed': 0,
-            'valid_questions': 0,
-            'invalid_questions': 0,
-            'duplicates_found': 0,
-            'processing_time': 0
+            "total_processed": 0,
+            "valid_questions": 0,
+            "invalid_questions": 0,
+            "duplicates_found": 0,
+            "processing_time": 0,
         }
 
         start_time = time.time()
 
-        async with aiofiles.open(input_file, 'r') as f:
-            with h5py.File(output_file, 'w') as hf:
-                questions_group = hf.create_group('questions')
-                metadata_group = hf.create_group('metadata')
+        async with aiofiles.open(input_file, "r") as handle:
+            with h5py.File(output_file, "w") as hfile:
+                questions_group = hfile.create_group("questions")
+                metadata_group = hfile.create_group("metadata")
 
-                chunk_buffer = []
+                chunk: List[Tuple[int, Dict[str, Any]]] = []
                 question_index = 0
 
-                async for line in f:
+                async for line in handle:
                     try:
                         data = json.loads(line.strip())
-                        chunk_buffer.append((question_index, data))
-
-                        if len(chunk_buffer) >= self.chunk_size:
-                            await self._process_chunk(
-                                chunk_buffer, questions_group, metadata_group,
-                                stats, validation
-                            )
-                            chunk_buffer = []
-
+                    except json.JSONDecodeError as exc:
+                        logger.warning("Invalid JSON at line %d: %s", question_index, exc)
+                        stats["invalid_questions"] += 1
                         question_index += 1
+                        continue
 
-                    except json.JSONDecodeError as e:
-                        logger.warning(f"Invalid JSON at line {question_index}: {e}")
-                        stats['invalid_questions'] += 1
+                    chunk.append((question_index, data))
+                    question_index += 1
 
-                # Process remaining chunk
-                if chunk_buffer:
+                    if len(chunk) >= self.chunk_size:
+                        await self._process_chunk(
+                            chunk,
+                            questions_group,
+                            metadata_group,
+                            stats,
+                            validation,
+                        )
+                        chunk = []
+
+                if chunk:
                     await self._process_chunk(
-                        chunk_buffer, questions_group, metadata_group,
-                        stats, validation
+                        chunk,
+                        questions_group,
+                        metadata_group,
+                        stats,
+                        validation,
                     )
 
-        stats['processing_time'] = time.time() - start_time
+        stats["processing_time"] = time.time() - start_time
         return stats
 
-    async def _process_chunk(self, chunk: List[Tuple[int, Dict[str, Any]]],
-                           questions_group, metadata_group,
-                           stats: Dict[str, Any], validation: bool):
-        """Process a chunk of questions.
-
-        Args:
-            chunk: List of (index, question_data) tuples.
-            questions_group: HDF5 group for questions.
-            metadata_group: HDF5 group for metadata.
-            stats: Statistics dictionary to update.
-            validation: Whether to perform validation.
-        """
+    async def _process_chunk(
+        self,
+        chunk: Sequence[Tuple[int, Dict[str, Any]]],
+        questions_group,
+        metadata_group,
+        stats: Dict[str, Any],
+        validation: bool,
+    ) -> None:
         loop = asyncio.get_event_loop()
 
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            tasks = []
-
-            for idx, data in chunk:
-                task = loop.run_in_executor(
-                    executor, self._process_single_question,
-                    idx, data, validation
+            tasks = [
+                loop.run_in_executor(
+                    executor,
+                    self._process_single_question,
+                    idx,
+                    data,
+                    validation,
                 )
-                tasks.append(task)
-
+                for idx, data in chunk
+            ]
             results = await asyncio.gather(*tasks)
 
-            # Store results
-            for idx, data, validation_result in results:
-                if validation_result and validation_result['valid']:
-                    questions_group[f'question_{idx}'] = data['text'].encode('utf-8')
+        for idx, data, validation_result in results:
+            if validation_result and validation_result["valid"]:
+                questions_group[f"question_{idx}"] = data["text"].encode("utf-8")
+                metadata = QuestionMetadata(
+                    id=data.get("id", str(uuid.uuid4())),
+                    text=data["text"],
+                    category=data.get("category", "unknown"),
+                    difficulty=data.get("difficulty", 5),
+                    language=data.get("language", "en"),
+                    generation_time=data.get("generation_time", 0.0),
+                    model_used=data.get("model_used", "unknown"),
+                    prompt_template=data.get("prompt_template", ""),
+                    hash=hashlib.sha256(data["text"].encode()).hexdigest(),
+                    created_at=data.get("created_at", str(time.time())),
+                )
+                metadata_group[f"metadata_{idx}"] = json.dumps(metadata.to_dict()).encode("utf-8")
+                stats["valid_questions"] += 1
+            else:
+                stats["invalid_questions"] += 1
+            stats["total_processed"] += 1
 
-                    # Store metadata
-                    metadata = QuestionMetadata(
-                        id=data.get('id', str(uuid.uuid4())),
-                        text=data['text'],
-                        category=data.get('category', 'unknown'),
-                        difficulty=data.get('difficulty', 5),
-                        language=data.get('language', 'en'),
-                        generation_time=data.get('generation_time', 0.0),
-                        model_used=data.get('model_used', 'unknown'),
-                        prompt_template=data.get('prompt_template', ''),
-                        hash=hashlib.md5(data['text'].encode()).hexdigest(),
-                        created_at=data.get('created_at', str(time.time()))
-                    )
-
-                    metadata_group[f'metadata_{idx}'] = json.dumps(metadata.to_dict()).encode('utf-8')
-                    stats['valid_questions'] += 1
-                else:
-                    stats['invalid_questions'] += 1
-
-                stats['total_processed'] += 1
-
-    def _process_single_question(self, idx: int, data: Dict[str, Any],
-                                validation: bool) -> Tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]:
-        """Process a single question.
-
-        Args:
-            idx: Question index.
-            data: Question data.
-            validation: Whether to perform validation.
-
-        Returns:
-            Tuple of (index, data, validation_result).
-        """
+    def _process_single_question(
+        self,
+        idx: int,
+        data: Dict[str, Any],
+        validation: bool,
+    ) -> Tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]:
         validation_result = None
-
         if validation:
-            question_text = data.get('text', '')
-            validation_result = self.quality_manager.validate_question(question_text)
-
+            validation_result = self.quality_manager.validate_question(data.get("text", ""))
         return idx, data, validation_result
 
-    def process_questions_batch(self, input_file: str, output_file: str,
-                               validation: bool = True) -> Dict[str, Any]:
-        """Process questions in batch mode (synchronous).
-
-        Args:
-            input_file: Input JSONL file with questions.
-            output_file: Output file for processed data.
-            validation: Whether to perform quality validation.
-
-        Returns:
-            Processing statistics.
-        """
+    def process_questions_batch(
+        self,
+        input_file: str,
+        output_file: str,
+        validation: bool = True,
+    ) -> Dict[str, Any]:
         stats = {
-            'total_processed': 0,
-            'valid_questions': 0,
-            'invalid_questions': 0,
-            'processing_time': 0
+            "total_processed": 0,
+            "valid_questions": 0,
+            "invalid_questions": 0,
+            "processing_time": 0,
         }
 
         start_time = time.time()
+        valid_questions: List[Dict[str, Any]] = []
 
-        with open(input_file, 'r') as infile:
-            valid_questions = []
-
-            for line_num, line in enumerate(infile):
+        with open(input_file, "r", encoding="utf-8") as handle:
+            for line_num, line in enumerate(handle):
                 try:
                     data = json.loads(line.strip())
-                    question_text = data.get('text', '')
+                except json.JSONDecodeError as exc:
+                    logger.warning("Invalid JSON at line %d: %s", line_num, exc)
+                    stats["invalid_questions"] += 1
+                    continue
 
-                    if validation:
-                        validation_result = self.quality_manager.validate_question(question_text)
-                        if validation_result['valid']:
-                            valid_questions.append(data)
-                            stats['valid_questions'] += 1
-                        else:
-                            stats['invalid_questions'] += 1
-                    else:
+                if validation:
+                    if self.quality_manager.validate_question(data.get("text", "")).get("valid"):
                         valid_questions.append(data)
-                        stats['valid_questions'] += 1
+                        stats["valid_questions"] += 1
+                    else:
+                        stats["invalid_questions"] += 1
+                else:
+                    valid_questions.append(data)
+                    stats["valid_questions"] += 1
 
-                    stats['total_processed'] += 1
+                stats["total_processed"] += 1
 
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Invalid JSON at line {line_num}: {e}")
-                    stats['invalid_questions'] += 1
+        with open(output_file, "w", encoding="utf-8") as outfile:
+            for question in valid_questions:
+                outfile.write(json.dumps(question) + "\n")
 
-        # Save valid questions
-        with open(output_file, 'w') as outfile:
-            for question_data in valid_questions:
-                outfile.write(json.dumps(question_data) + '\n')
-
-        stats['processing_time'] = time.time() - start_time
-        logger.info(f"Processed {stats['total_processed']} questions in {stats['processing_time']:.2f}s")
-
+        stats["processing_time"] = time.time() - start_time
         return stats
+
+    # ------------------------------------------------------------------
+    # Lightweight helpers required by tests
+    # ------------------------------------------------------------------
+    def stream_data(self, file_path: str) -> Iterator[List[Dict[str, Any]]]:
+        batch_size = max(1, self.batch_size)
+        yield from self._iter_dataset(file_path, batch_size=batch_size)
+
+    def stream_data_memory_efficient(self, file_path: str) -> Iterator[List[Dict[str, Any]]]:
+        if self.memory_limit_mb is None:
+            yield from self.stream_data(file_path)
+            return
+
+        approx_item_kb = 4  # heuristic suitable for tests
+        max_items = max(1, int((self.memory_limit_mb * 1024) / approx_item_kb))
+        batch_size = max(1, min(self.batch_size, max_items))
+        yield from self._iter_dataset(file_path, batch_size=batch_size)
+
+    def _iter_dataset(self, file_path: str, batch_size: int) -> Iterator[List[Dict[str, Any]]]:
+        path = Path(file_path)
+        if not path.exists():
+            raise FileNotFoundError(file_path)
+
+        if path.suffix.lower() == ".jsonl":
+            batch: List[Dict[str, Any]] = []
+            with open(path, "r", encoding="utf-8") as handle:
+                for line in handle:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        logger.warning("Skipping invalid JSON line in %s", path)
+                        continue
+                    batch.append(self._normalise_stream_item(data))
+                    if len(batch) >= batch_size:
+                        yield batch
+                        batch = []
+            if batch:
+                yield batch
+            return
+
+        with open(path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+
+        items: Sequence[Any]
+        if isinstance(data, list):
+            items = data
+        else:
+            items = [data]
+
+        normalised = [self._normalise_stream_item(item) for item in items]
+        for index in range(0, len(normalised), batch_size):
+            yield normalised[index : index + batch_size]
+
+    def _normalise_stream_item(self, item: Any) -> Dict[str, Any]:
+        if isinstance(item, dict):
+            return item
+        return {"text": str(item)}
+

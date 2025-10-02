@@ -9,14 +9,12 @@ This module implements bias detection and fairness analysis for neural network a
 
 import logging
 import numpy as np
-import pandas as pd
 import torch
 import json
-from typing import Dict, List, Tuple, Optional, Any, Union
+from typing import Dict, List, Tuple, Optional, Any
 from pathlib import Path
 from dataclasses import dataclass, asdict
 from abc import ABC, abstractmethod
-from collections import defaultdict
 import warnings
 from datetime import datetime
 
@@ -67,8 +65,8 @@ class BiasDetector(ABC):
 
     @abstractmethod
     def detect_bias(self, activations: np.ndarray,
-                   groups: np.ndarray,
-                   labels: Optional[np.ndarray] = None) -> BiasMetrics:
+                    groups: np.ndarray,
+                    labels: Optional[np.ndarray] = None) -> BiasMetrics:
         """Detect bias in neural activations."""
         pass
 
@@ -85,8 +83,8 @@ class ActivationBiasDetector(BiasDetector):
         self.threshold = threshold
 
     def detect_bias(self, activations: np.ndarray,
-                   groups: np.ndarray,
-                   labels: Optional[np.ndarray] = None) -> BiasMetrics:
+                    groups: np.ndarray,
+                    labels: Optional[np.ndarray] = None) -> BiasMetrics:
         """Detect bias in neural activations.
 
         Args:
@@ -144,7 +142,7 @@ class ActivationBiasDetector(BiasDetector):
         )
 
     def _calculate_bias_scores(self, group_stats: Dict,
-                              groups: np.ndarray) -> Dict[str, float]:
+                               groups: np.ndarray) -> Dict[str, float]:
         """Calculate bias scores between groups."""
         bias_scores = {}
 
@@ -170,20 +168,26 @@ class ActivationBiasDetector(BiasDetector):
         return bias_scores
 
     def _calculate_fairness_metrics(self, activations: np.ndarray,
-                                   groups: np.ndarray,
-                                   labels: Optional[np.ndarray]) -> Dict[str, float]:
+                                    groups: np.ndarray,
+                                    labels: Optional[np.ndarray]) -> Dict[str, float]:
         """Calculate fairness metrics."""
         metrics = {}
 
         # Demographic Parity (equal representation in high-activation regions)
-        high_activation_mask = np.mean(activations, axis=1) > np.median(np.mean(activations, axis=1))
+        high_activation_mask = np.mean(
+            activations,
+            axis=1) > np.median(
+            np.mean(
+                activations,
+                axis=1))
         group_representation = {}
 
         for group in np.unique(groups):
             group_mask = groups == group
             group_high_activation = np.sum(high_activation_mask & group_mask)
             group_total = np.sum(group_mask)
-            group_representation[group] = group_high_activation / group_total if group_total > 0 else 0
+            group_representation[group] = group_high_activation / \
+                group_total if group_total > 0 else 0
 
         # Calculate demographic parity as standard deviation of representation rates
         metrics['demographic_parity'] = np.std(list(group_representation.values()))
@@ -209,11 +213,16 @@ class ActivationBiasDetector(BiasDetector):
         return metrics
 
     def _calculate_equalized_odds(self, activations: np.ndarray,
-                                 groups: np.ndarray,
-                                 labels: np.ndarray) -> float:
+                                  groups: np.ndarray,
+                                  labels: np.ndarray) -> float:
         """Calculate equalized odds metric."""
         # Use activation threshold as proxy for model predictions
-        predictions = np.mean(activations, axis=1) > np.median(np.mean(activations, axis=1))
+        predictions = np.mean(
+            activations,
+            axis=1) > np.median(
+            np.mean(
+                activations,
+                axis=1))
 
         group_tpr = {}
         group_fpr = {}
@@ -245,10 +254,15 @@ class ActivationBiasDetector(BiasDetector):
         return (tpr_diff + fpr_diff) / 2
 
     def _calculate_equal_opportunity(self, activations: np.ndarray,
-                                    groups: np.ndarray,
-                                    labels: np.ndarray) -> float:
+                                     groups: np.ndarray,
+                                     labels: np.ndarray) -> float:
         """Calculate equal opportunity metric."""
-        predictions = np.mean(activations, axis=1) > np.median(np.mean(activations, axis=1))
+        predictions = np.mean(
+            activations,
+            axis=1) > np.median(
+            np.mean(
+                activations,
+                axis=1))
 
         group_tpr = {}
 
@@ -271,9 +285,9 @@ class ActivationBiasDetector(BiasDetector):
         return np.std(list(group_tpr.values())) if group_tpr else 0
 
     def _bootstrap_confidence_interval(self, activations: np.ndarray,
-                                      groups: np.ndarray,
-                                      labels: Optional[np.ndarray],
-                                      n_bootstrap: int = 100) -> Tuple[float, float]:
+                                       groups: np.ndarray,
+                                       labels: Optional[np.ndarray],
+                                       n_bootstrap: int = 100) -> Tuple[float, float]:
         """Calculate confidence interval using bootstrap."""
         bootstrap_scores = []
 
@@ -288,9 +302,10 @@ class ActivationBiasDetector(BiasDetector):
 
             # Calculate bias metrics for bootstrap sample
             try:
-                bias_result = self.detect_bias(boot_activations, boot_groups, boot_labels)
+                bias_result = self.detect_bias(
+                    boot_activations, boot_groups, boot_labels)
                 bootstrap_scores.append(bias_result.bias_score)
-            except:
+            except BaseException:
                 continue
 
         if bootstrap_scores:
@@ -311,9 +326,9 @@ class FairnessAnalyzer:
         self.bias_detector = bias_detector or ActivationBiasDetector()
 
     def analyze_fairness(self, model, tokenizer, texts: List[str],
-                        groups: List[str],
-                        labels: Optional[List[int]] = None,
-                        layers: Optional[List[str]] = None) -> FairnessResult:
+                         groups: List[str],
+                         labels: Optional[List[int]] = None,
+                         layers: Optional[List[str]] = None) -> FairnessResult:
         """Comprehensive fairness analysis.
 
         Args:
@@ -353,7 +368,7 @@ class FairnessAnalyzer:
 
             # Use the worst layer for overall metrics
             if (overall_metrics is None or
-                bias_metrics.bias_score > overall_metrics.bias_score):
+                    bias_metrics.bias_score > overall_metrics.bias_score):
                 overall_metrics = bias_metrics
 
         # Generate recommendations
@@ -374,13 +389,17 @@ class FairnessAnalyzer:
             warnings=warnings_list
         )
 
-    def _extract_activations(self, model, tokenizer, texts: List[str],
-                           layers: Optional[List[str]] = None) -> Dict[str, np.ndarray]:
+    def _extract_activations(self,
+                             model,
+                             tokenizer,
+                             texts: List[str],
+                             layers: Optional[List[str]] = None) -> Dict[str,
+                                                                         np.ndarray]:
         """Extract activations from specified layers."""
         try:
             from ..analysis.activation_extractor import ActivationExtractor
 
-            extractor = ActivationExtractor(model, tokenizer)
+            # extractor = ActivationExtractor(model, tokenizer)
 
             # Get default layers if none specified
             if layers is None:
@@ -398,7 +417,7 @@ class FairnessAnalyzer:
                 for text in texts:
                     # Tokenize
                     inputs = tokenizer(text, return_tensors='pt',
-                                     padding=True, truncation=True, max_length=512)
+                                       padding=True, truncation=True, max_length=512)
 
                     # Extract activations
                     with torch.no_grad():
@@ -419,7 +438,8 @@ class FairnessAnalyzer:
             return activations
 
         except ImportError:
-            logger.warning("Could not import ActivationExtractor, using mock activations")
+            logger.warning(
+                "Could not import ActivationExtractor, using mock activations")
             # Return mock activations for testing
             return {
                 'layer_0': np.random.randn(len(texts), 768),
@@ -427,7 +447,7 @@ class FairnessAnalyzer:
             }
 
     def _generate_recommendations(self, metrics: BiasMetrics,
-                                layer_scores: Dict[str, float]) -> List[str]:
+                                  layer_scores: Dict[str, float]) -> List[str]:
         """Generate recommendations based on bias analysis."""
         recommendations = []
 
@@ -443,15 +463,16 @@ class FairnessAnalyzer:
 
         if metrics.affected_groups:
             recommendations.append(
-                f"Special attention needed for groups: {', '.join(metrics.affected_groups)}"
-            )
+                f"Special attention needed for groups: {
+                    ', '.join(
+                        metrics.affected_groups)}")
 
         # Layer-specific recommendations
         worst_layer = max(layer_scores.items(), key=lambda x: x[1])
         if worst_layer[1] > 0.4:
             recommendations.append(
-                f"Layer {worst_layer[0]} shows highest bias. Consider layer-specific interventions."
-            )
+                f"Layer {
+                    worst_layer[0]} shows highest bias. Consider layer-specific interventions.")
 
         if not recommendations:
             recommendations.append("Model shows acceptable fairness levels.")
@@ -459,18 +480,23 @@ class FairnessAnalyzer:
         return recommendations
 
     def _generate_warnings(self, metrics: BiasMetrics,
-                          layer_scores: Dict[str, float]) -> List[str]:
+                           layer_scores: Dict[str, float]) -> List[str]:
         """Generate warnings based on bias analysis."""
         warnings_list = []
 
         if metrics.bias_score > 0.5:
-            warnings_list.append("CRITICAL: Very high bias detected - model may be unsuitable for deployment")
+            warnings_list.append(
+                "CRITICAL: Very high bias detected - model may be unsuitable for deployment")
 
         if metrics.confidence_interval[1] - metrics.confidence_interval[0] > 0.3:
-            warnings_list.append("High uncertainty in bias estimates - collect more data")
+            warnings_list.append(
+                "High uncertainty in bias estimates - collect more data")
 
         if len(metrics.affected_groups) > 0:
-            warnings_list.append(f"Bias detected against groups: {', '.join(metrics.affected_groups)}")
+            warnings_list.append(
+                f"Bias detected against groups: {
+                    ', '.join(
+                        metrics.affected_groups)}")
 
         return warnings_list
 
@@ -495,9 +521,9 @@ class ModelCardGenerator:
         }
 
     def generate_card(self, model_name: str,
-                     fairness_result: FairnessResult,
-                     performance_metrics: Optional[Dict[str, float]] = None,
-                     **kwargs) -> ModelCard:
+                      fairness_result: FairnessResult,
+                      performance_metrics: Optional[Dict[str, float]] = None,
+                      **kwargs) -> ModelCard:
         """Generate a model card with bias assessment.
 
         Args:
@@ -662,7 +688,8 @@ def main():
     card_generator.save_card(card, Path("./model_card.json"))
     audit_trail.save_audit_log()
 
-    print(f"Bias analysis complete. Overall bias score: {mock_result.overall_bias_score:.3f}")
+    print(f"Bias analysis complete. Overall bias score: {
+          mock_result.overall_bias_score:.3f}")
     print(f"Recommendations: {mock_result.recommendations}")
 
 

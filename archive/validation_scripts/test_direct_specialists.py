@@ -7,7 +7,7 @@ import os
 sys.path.insert(0, '/home/emilio/Documents/ai/NeuronMap/src/data_generation')
 
 # Import directly from the domain_specialists.py file
-import domain_specialists
+from src.data_generation import core_specialists as domain_specialists
 
 def test_specialists():
     """Test direct creation and usage of specialists."""

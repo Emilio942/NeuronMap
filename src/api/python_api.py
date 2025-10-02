@@ -7,12 +7,11 @@ both locally and through the REST API.
 
 import asyncio
 import logging
-import json
 import time
-from typing import Dict, List, Optional, Any, Union, Iterator
+from typing import Dict, List, Optional, Any, Union
 from pathlib import Path
 import concurrent.futures
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 try:
     import requests
@@ -22,15 +21,13 @@ except ImportError:
     aiohttp = None
 
 # Internal imports
-import sys
-sys.path.append(str(Path(__file__).parent.parent))
-
 from core.neuron_map import NeuronMap
 from config.config_manager import ConfigManager
 from utils.error_handling import NeuronMapError
 from utils.monitoring import setup_monitoring
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class AnalysisResult:
@@ -42,6 +39,7 @@ class AnalysisResult:
     metadata: Dict[str, Any]
     created_at: str
 
+
 @dataclass
 class JobInfo:
     """Information about a background job."""
@@ -52,6 +50,7 @@ class JobInfo:
     error: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+
 
 class NeuronMapClient:
     """
@@ -299,7 +298,10 @@ class NeuronMapClient:
 
         return AnalysisResult(**data)
 
-    def _wait_for_job_completion(self, job_id: str, check_interval: float = 2.0) -> AnalysisResult:
+    def _wait_for_job_completion(
+            self,
+            job_id: str,
+            check_interval: float = 2.0) -> AnalysisResult:
         """Wait for a job to complete and return results."""
         while True:
             job_info = self.get_job_status(job_id)
@@ -497,6 +499,7 @@ class NeuronMapClient:
         """Context manager exit."""
         self.close()
 
+
 class AsyncNeuronMapClient:
     """
     Asynchronous version of the NeuronMap client.
@@ -642,6 +645,8 @@ class AsyncNeuronMapClient:
         return results
 
 # Convenience functions for quick usage
+
+
 def quick_analyze(
     text: str,
     model_name: str = "bert-base-uncased",
@@ -654,6 +659,7 @@ def quick_analyze(
             model_name=model_name,
             analysis_type=analysis_type
         )
+
 
 def remote_analyze(
     text: str,
@@ -669,6 +675,7 @@ def remote_analyze(
             model_name=model_name,
             analysis_type=analysis_type
         )
+
 
 # Example usage
 if __name__ == "__main__":

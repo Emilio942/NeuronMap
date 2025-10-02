@@ -8,7 +8,7 @@ import logging
 import json
 import numpy as np
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 import tempfile
 

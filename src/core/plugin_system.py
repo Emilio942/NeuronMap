@@ -7,15 +7,15 @@ and visualization components.
 """
 
 import importlib
-import importlib.util
 import inspect
 import logging
+import sys
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Type, Callable, Union
-import json
-import sys
+from typing import Dict, List, Optional, Any, Type, Callable
+import traceback
 from dataclasses import dataclass
+from enum import Enum
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -248,7 +248,7 @@ class PluginManager:
 
             # Look for plugin classes
             for name, obj in inspect.getmembers(module, inspect.isclass):
-                if issubclass(obj, PluginBase) and obj != PluginBase:
+                if inspect.isclass(obj) and issubclass(obj, PluginBase) and obj != PluginBase:
                     plugin_instance = obj()
                     self.register_plugin(f"{module_name}_{name}", plugin_instance)
 
@@ -364,7 +364,7 @@ class PluginManager:
             # Find plugin classes in the module
             plugin_classes = []
             for name, obj in inspect.getmembers(module):
-                if (inspect.isclass(obj) and
+                if (inspect.isclass(obj) and 
                     issubclass(obj, PluginBase) and
                     obj != PluginBase and
                     obj not in [AnalysisPlugin, ModelAdapterPlugin, VisualizationPlugin]):

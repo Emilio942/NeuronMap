@@ -1,0 +1,886 @@
+{% extends "base.html" %}
+
+{% block title %}Circuit Discovery - NeuronMap{% endblock %}
+
+{% block extra_head %}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<style>
+    .circuit-container {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px 0;
+    }
+    
+    .circuit-card {
+        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 15px;
+        color: white;
+        transition: transform 0.3s ease;
+    }
+    
+    .circuit-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .analysis-section {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        padding: 20px;
+        margin: 15px 0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .status-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 10px;
+        text-align: center;
+        z-index: 9999;
+        transition: all 0.3s ease;
+        transform: translateY(-100%);
+    }
+    
+    .status-bar.show {
+        transform: translateY(0);
+    }
+    
+    .status-bar.success {
+        background: rgba(76, 175, 80, 0.9);
+    }
+    
+    .status-bar.error {
+        background: rgba(244, 67, 54, 0.9);
+    }
+    
+    .status-bar.warning {
+        background: rgba(255, 193, 7, 0.9);
+    }
+    
+    .btn-circuit {
+        background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+        border: none;
+        border-radius: 25px;
+        color: white;
+        font-weight: 600;
+        padding: 12px 30px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px 0 rgba(31, 38, 135, 0.37);
+    }
+    
+    .btn-circuit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px 0 rgba(31, 38, 135, 0.37);
+        color: white;
+    }
+    
+    .btn-circuit:disabled {
+        opacity: 0.6;
+        transform: none;
+        cursor: not-allowed;
+    }
+    
+    .form-control, .form-select {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        border-radius: 10px;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: #4ECDC4;
+        box-shadow: 0 0 0 0.2rem rgba(78, 205, 196, 0.25);
+        color: white;
+    }
+    
+    .form-control::placeholder {
+        color: rgba(255, 255, 255, 0.7);
+    }
+    
+    .circuit-visualization {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .results-panel {
+        max-height: 400px;
+        overflow-y: auto;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 10px;
+        padding: 15px;
+    }
+    
+    .connection-item {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 10px;
+        margin: 5px 0;
+        border-left: 4px solid #4ECDC4;
+    }
+    
+    .loading-spinner {
+        border: 4px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top: 4px solid #4ECDC4;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .nav-tabs {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .nav-tabs .nav-link {
+        color: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.05);
+        margin-right: 5px;
+        border-radius: 10px 10px 0 0;
+    }
+    
+    .nav-tabs .nav-link.active {
+        color: white;
+        background: rgba(78, 205, 196, 0.3);
+        border-color: #4ECDC4;
+    }
+    
+    .tab-content {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 0 10px 10px 10px;
+        padding: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="circuit-container">
+    <!-- Status Bar -->
+    <div id="statusBar" class="status-bar">
+        <span id="statusMessage">Ready</span>
+    </div>
+
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <div class="circuit-card p-4 mb-4">
+                    <h1 class="text-center mb-4">🔍 Circuit Discovery & Analysis</h1>
+                    <p class="text-center text-light">
+                        Discover and analyze neural circuits in transformer models including 
+                        induction heads, copying heads, and neuron-head connections.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Control Panel -->
+            <div class="col-lg-4">
+                <div class="circuit-card p-4">
+                    <h3>🎛️ Analysis Controls</h3>
+                    
+                    <!-- Model Selection -->
+                    <div class="analysis-section">
+                        <h5>Model Configuration</h5>
+                        <div class="mb-3">
+                            <label for="modelSelect" class="form-label">Select Model</label>
+                            <select class="form-select" id="modelSelect">
+                                <option value="">Choose a model...</option>
+                                <option value="gpt2">GPT-2</option>
+                                <option value="gpt2-medium">GPT-2 Medium</option>
+                                <option value="bert-base-uncased">BERT Base</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-circuit w-100" id="loadModelBtn">
+                            📥 Load Model
+                        </button>
+                        <div id="modelInfo" class="mt-3" style="display: none;">
+                            <small class="text-light">Model loaded successfully!</small>
+                        </div>
+                    </div>
+
+                    <!-- Analysis Type Tabs -->
+                    <div class="analysis-section">
+                        <ul class="nav nav-tabs" id="analysisTypeTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="induction-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#induction" type="button" role="tab">
+                                    Induction
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="copying-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#copying" type="button" role="tab">
+                                    Copying
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="composition-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#composition" type="button" role="tab">
+                                    Composition
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="neuron-head-tab" data-bs-toggle="tab" 
+                                        data-bs-target="#neuronHead" type="button" role="tab">
+                                    Neuron-Head
+                                </button>
+                            </li>
+                        </ul>
+                        
+                        <div class="tab-content" id="analysisTypeTabContent">
+                            <!-- Induction Head Analysis -->
+                            <div class="tab-pane fade show active" id="induction" role="tabpanel">
+                                <div class="mb-3">
+                                    <label for="inductionThreshold" class="form-label">Threshold</label>
+                                    <input type="range" class="form-range" id="inductionThreshold" 
+                                           min="0.1" max="1.0" step="0.1" value="0.3">
+                                    <small class="text-light">Value: <span id="inductionThresholdValue">0.3</span></small>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="patternLength" class="form-label">Pattern Length</label>
+                                    <input type="number" class="form-control" id="patternLength" 
+                                           value="10" min="5" max="50">
+                                </div>
+                                <button class="btn btn-circuit w-100" id="findInductionBtn">
+                                    🔍 Find Induction Heads
+                                </button>
+                            </div>
+                            
+                            <!-- Copying Head Analysis -->
+                            <div class="tab-pane fade" id="copying" role="tabpanel">
+                                <div class="mb-3">
+                                    <label for="copyingThreshold" class="form-label">Threshold</label>
+                                    <input type="range" class="form-range" id="copyingThreshold" 
+                                           min="0.1" max="1.0" step="0.1" value="0.5">
+                                    <small class="text-light">Value: <span id="copyingThresholdValue">0.5</span></small>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="numExamples" class="form-label">Number of Examples</label>
+                                    <input type="number" class="form-control" id="numExamples" 
+                                           value="100" min="10" max="500">
+                                </div>
+                                <button class="btn btn-circuit w-100" id="findCopyingBtn">
+                                    📋 Find Copying Heads
+                                </button>
+                            </div>
+                            
+                            <!-- Composition Analysis -->
+                            <div class="tab-pane fade" id="composition" role="tabpanel">
+                                <div class="mb-3">
+                                    <label for="compositionThreshold" class="form-label">Composition Threshold</label>
+                                    <input type="range" class="form-range" id="compositionThreshold" 
+                                           min="0.05" max="0.5" step="0.05" value="0.1">
+                                    <small class="text-light">Value: <span id="compositionThresholdValue">0.1</span></small>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="topKPairs" class="form-label">Top K Pairs</label>
+                                    <input type="number" class="form-control" id="topKPairs" 
+                                           value="20" min="5" max="100">
+                                </div>
+                                <button class="btn btn-circuit w-100" id="analyzeCompositionBtn">
+                                    🔗 Analyze Composition
+                                </button>
+                            </div>
+                            
+                            <!-- Neuron-Head Analysis -->
+                            <div class="tab-pane fade" id="neuronHead" role="tabpanel">
+                                <div class="mb-3">
+                                    <label for="inputText" class="form-label">Input Text</label>
+                                    <textarea class="form-control" id="inputText" rows="3" 
+                                              placeholder="Enter text for analysis...">The cat sat on the mat.</textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="influenceThreshold" class="form-label">Influence Threshold</label>
+                                    <input type="range" class="form-range" id="influenceThreshold" 
+                                           min="0.05" max="0.5" step="0.05" value="0.1">
+                                    <small class="text-light">Value: <span id="influenceThresholdValue">0.1</span></small>
+                                </div>
+                                <button class="btn btn-circuit w-100 mb-2" id="analyzeNeuronHeadBtn">
+                                    🧠 Analyze Neuron-Head Influence
+                                </button>
+                                <button class="btn btn-circuit w-100" id="findCriticalPathsBtn">
+                                    🛤️ Find Critical Paths
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visualization Panel -->
+            <div class="col-lg-8">
+                <div class="circuit-card p-4">
+                    <h3>📊 Circuit Visualization</h3>
+                    
+                    <!-- Circuit Graph -->
+                    <div class="analysis-section">
+                        <h5>Circuit Graph</h5>
+                        <div id="circuitGraph" class="circuit-visualization" style="height: 400px;">
+                            <div class="d-flex justify-content-center align-items-center h-100 text-light">
+                                <div class="text-center">
+                                    <i class="fas fa-project-diagram fa-3x mb-3"></i>
+                                    <p>Circuit visualization will appear here</p>
+                                    <small class="text-muted">Run an analysis to see the circuit graph</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Results Panel -->
+                    <div class="analysis-section">
+                        <h5>Analysis Results</h5>
+                        <div id="resultsPanel" class="results-panel">
+                            <div class="text-center text-light">
+                                <i class="fas fa-chart-bar fa-2x mb-3"></i>
+                                <p>Analysis results will appear here</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Statistics -->
+                    <div class="analysis-section">
+                        <h5>Statistics</h5>
+                        <div class="row" id="statisticsRow">
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-primary mb-0" id="totalConnections">-</h4>
+                                    <small class="text-light">Total Connections</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-success mb-0" id="strongConnections">-</h4>
+                                    <small class="text-light">Strong</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-warning mb-0" id="moderateConnections">-</h4>
+                                    <small class="text-light">Moderate</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h4 class="text-info mb-0" id="weakConnections">-</h4>
+                                    <small class="text-light">Weak</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-body text-center p-4">
+                <div class="loading-spinner mb-3"></div>
+                <h5 id="loadingMessage">Processing...</h5>
+                <p class="text-muted" id="loadingDetails">Please wait while we analyze the circuit.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+class CircuitAnalysisUI {
+    constructor() {
+        this.currentModel = null;
+        this.currentCircuit = null;
+        this.loadingModal = null;
+        this.init();
+    }
+
+    init() {
+        this.bindEvents();
+        this.initializeSliders();
+        this.loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+    }
+
+    bindEvents() {
+        // Model loading
+        document.getElementById('loadModelBtn').addEventListener('click', () => this.loadModel());
+        
+        // Analysis buttons
+        document.getElementById('findInductionBtn').addEventListener('click', () => this.findInductionHeads());
+        document.getElementById('findCopyingBtn').addEventListener('click', () => this.findCopyingHeads());
+        document.getElementById('analyzeCompositionBtn').addEventListener('click', () => this.analyzeComposition());
+        document.getElementById('analyzeNeuronHeadBtn').addEventListener('click', () => this.analyzeNeuronHeads());
+        document.getElementById('findCriticalPathsBtn').addEventListener('click', () => this.findCriticalPaths());
+    }
+
+    initializeSliders() {
+        // Initialize range sliders with value display
+        const sliders = [
+            { id: 'inductionThreshold', valueId: 'inductionThresholdValue' },
+            { id: 'copyingThreshold', valueId: 'copyingThresholdValue' },
+            { id: 'compositionThreshold', valueId: 'compositionThresholdValue' },
+            { id: 'influenceThreshold', valueId: 'influenceThresholdValue' }
+        ];
+
+        sliders.forEach(slider => {
+            const element = document.getElementById(slider.id);
+            const valueElement = document.getElementById(slider.valueId);
+            
+            element.addEventListener('input', (e) => {
+                valueElement.textContent = e.target.value;
+            });
+        });
+    }
+
+    async loadModel() {
+        const modelSelect = document.getElementById('modelSelect');
+        const modelName = modelSelect.value;
+        
+        if (!modelName) {
+            this.showStatus('Please select a model', 'warning');
+            return;
+        }
+
+        this.showLoading('Loading Model', 'Initializing model and preparing for analysis...');
+        
+        try {
+            const response = await fetch('/api/circuits/load-model', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ model_name: modelName })
+            });
+
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                this.currentModel = modelName;
+                this.showStatus(`Model ${modelName} loaded successfully`, 'success');
+                this.updateModelInfo(data.model_info);
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            this.showStatus(`Error loading model: ${error.message}`, 'error');
+            console.error('Error loading model:', error);
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async findInductionHeads() {
+        if (!this.currentModel) {
+            this.showStatus('Please load a model first', 'warning');
+            return;
+        }
+
+        const threshold = parseFloat(document.getElementById('inductionThreshold').value);
+        const patternLength = parseInt(document.getElementById('patternLength').value);
+
+        this.showLoading('Finding Induction Heads', 'Analyzing attention patterns...');
+
+        try {
+            const response = await fetch('/api/circuits/find-induction-heads', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    threshold: threshold,
+                    pattern_length: patternLength,
+                    num_examples: 50
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                this.displayResults(data.result, 'Induction Heads');
+                this.showStatus('Induction head analysis completed', 'success');
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            this.showStatus(`Error finding induction heads: ${error.message}`, 'error');
+            console.error('Error finding induction heads:', error);
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async findCopyingHeads() {
+        if (!this.currentModel) {
+            this.showStatus('Please load a model first', 'warning');
+            return;
+        }
+
+        const threshold = parseFloat(document.getElementById('copyingThreshold').value);
+        const numExamples = parseInt(document.getElementById('numExamples').value);
+
+        this.showLoading('Finding Copying Heads', 'Analyzing copying patterns...');
+
+        try {
+            const response = await fetch('/api/circuits/find-copying-heads', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    threshold: threshold,
+                    num_examples: numExamples
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                this.displayResults(data.result, 'Copying Heads');
+                this.showStatus('Copying head analysis completed', 'success');
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            this.showStatus(`Error finding copying heads: ${error.message}`, 'error');
+            console.error('Error finding copying heads:', error);
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async analyzeComposition() {
+        if (!this.currentModel) {
+            this.showStatus('Please load a model first', 'warning');
+            return;
+        }
+
+        const threshold = parseFloat(document.getElementById('compositionThreshold').value);
+        const topKPairs = parseInt(document.getElementById('topKPairs').value);
+
+        this.showLoading('Analyzing Composition', 'Computing head composition patterns...');
+
+        try {
+            const response = await fetch('/api/circuits/analyze-composition', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    composition_threshold: threshold,
+                    top_k_pairs: topKPairs
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                this.displayResults(data.result, 'Composition Analysis');
+                this.showStatus('Composition analysis completed', 'success');
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            this.showStatus(`Error analyzing composition: ${error.message}`, 'error');
+            console.error('Error analyzing composition:', error);
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async analyzeNeuronHeads() {
+        if (!this.currentModel) {
+            this.showStatus('Please load a model first', 'warning');
+            return;
+        }
+
+        const inputText = document.getElementById('inputText').value.trim();
+        const threshold = parseFloat(document.getElementById('influenceThreshold').value);
+
+        if (!inputText) {
+            this.showStatus('Please enter input text', 'warning');
+            return;
+        }
+
+        this.showLoading('Analyzing Neuron-Head Influence', 'Computing influence patterns...');
+
+        try {
+            const response = await fetch('/api/circuits/analyze-neuron-heads', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    input_text: inputText,
+                    influence_threshold: threshold,
+                    top_k_neurons: 50,
+                    top_k_heads: 20
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                this.displayResults(data.result, 'Neuron-Head Influence');
+                this.showStatus('Neuron-head analysis completed', 'success');
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            this.showStatus(`Error analyzing neuron-head influence: ${error.message}`, 'error');
+            console.error('Error analyzing neuron-head influence:', error);
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    async findCriticalPaths() {
+        if (!this.currentModel) {
+            this.showStatus('Please load a model first', 'warning');
+            return;
+        }
+
+        const inputText = document.getElementById('inputText').value.trim();
+
+        if (!inputText) {
+            this.showStatus('Please enter input text', 'warning');
+            return;
+        }
+
+        this.showLoading('Finding Critical Paths', 'Tracing information flow paths...');
+
+        try {
+            const response = await fetch('/api/circuits/find-critical-paths', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    input_text: inputText,
+                    min_path_length: 2,
+                    max_path_length: 5,
+                    influence_threshold: 0.2
+                })
+            });
+
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                this.displayPathResults(data);
+                this.showStatus('Critical path analysis completed', 'success');
+            } else {
+                throw new Error(data.message);
+            }
+        } catch (error) {
+            this.showStatus(`Error finding critical paths: ${error.message}`, 'error');
+            console.error('Error finding critical paths:', error);
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    displayResults(result, analysisType) {
+        // Update statistics
+        if (result.summary_stats) {
+            this.updateStatistics(result.summary_stats);
+        }
+
+        // Display results in panel
+        const resultsPanel = document.getElementById('resultsPanel');
+        resultsPanel.innerHTML = `
+            <h6>${analysisType} Results</h6>
+            <div class="small text-light">
+                <strong>Model:</strong> ${result.model_name}<br>
+                <strong>Analysis Type:</strong> ${result.analysis_type}<br>
+                <strong>Results:</strong> ${result.influences ? result.influences.length : 'N/A'} connections found
+            </div>
+        `;
+
+        // Display connections
+        if (result.influences && result.influences.length > 0) {
+            const connectionsHtml = result.influences.slice(0, 10).map(influence => `
+                <div class="connection-item">
+                    <strong>Layer ${influence.source_layer} → Layer ${influence.target_layer}</strong><br>
+                    <small>Score: ${influence.influence_score.toFixed(4)} | Strength: ${influence.connection_strength}</small>
+                </div>
+            `).join('');
+            
+            resultsPanel.innerHTML += `
+                <div class="mt-3">
+                    <h6>Top Connections</h6>
+                    ${connectionsHtml}
+                    ${result.influences.length > 10 ? `<small class="text-muted">... and ${result.influences.length - 10} more</small>` : ''}
+                </div>
+            `;
+        }
+
+        // Visualize circuit if available
+        if (result.circuit) {
+            this.visualizeCircuit(result.circuit);
+        }
+    }
+
+    displayPathResults(data) {
+        const resultsPanel = document.getElementById('resultsPanel');
+        resultsPanel.innerHTML = `
+            <h6>Critical Paths Results</h6>
+            <div class="small text-light">
+                <strong>Model:</strong> ${data.model_name || this.currentModel}<br>
+                <strong>Paths Found:</strong> ${data.num_paths}<br>
+                <strong>Input Text:</strong> "${data.input_text || 'N/A'}"
+            </div>
+        `;
+
+        if (data.critical_paths && data.critical_paths.length > 0) {
+            const pathsHtml = data.critical_paths.slice(0, 5).map((path, index) => `
+                <div class="connection-item">
+                    <strong>Path ${index + 1}</strong><br>
+                    <small>${path.join(' → ')}</small>
+                </div>
+            `).join('');
+            
+            resultsPanel.innerHTML += `
+                <div class="mt-3">
+                    <h6>Top Critical Paths</h6>
+                    ${pathsHtml}
+                    ${data.critical_paths.length > 5 ? `<small class="text-muted">... and ${data.critical_paths.length - 5} more</small>` : ''}
+                </div>
+            `;
+        }
+    }
+
+    visualizeCircuit(circuit) {
+        // Create a simple network visualization using vis-network
+        const container = document.getElementById('circuitGraph');
+        container.innerHTML = '';
+
+        if (!circuit.components || circuit.components.length === 0) {
+            container.innerHTML = '<div class="text-center text-light p-4">No circuit components to visualize</div>';
+            return;
+        }
+
+        // Prepare nodes and edges for vis-network
+        const nodes = circuit.components.map(component => ({
+            id: component.component_id,
+            label: `${component.component_type}\nL${component.layer}:${component.index}`,
+            color: this.getNodeColor(component.component_type),
+            font: { color: 'white' }
+        }));
+
+        const edges = circuit.connections.map(connection => ({
+            from: connection.source_id,
+            to: connection.target_id,
+            width: Math.max(1, connection.weight * 5),
+            color: { color: this.getEdgeColor(connection.weight) }
+        }));
+
+        const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+        const options = {
+            nodes: {
+                shape: 'box',
+                margin: 10,
+                font: { size: 12 }
+            },
+            edges: {
+                arrows: { to: true },
+                smooth: { type: 'continuous' }
+            },
+            physics: {
+                enabled: true,
+                stabilization: { iterations: 100 }
+            },
+            layout: {
+                hierarchical: {
+                    enabled: true,
+                    direction: 'LR',
+                    sortMethod: 'directed'
+                }
+            }
+        };
+
+        new vis.Network(container, data, options);
+    }
+
+    getNodeColor(componentType) {
+        const colors = {
+            'attention_head': '#4ECDC4',
+            'mlp_neuron': '#FF6B6B',
+            'embedding': '#45B7D1',
+            'output': '#96CEB4'
+        };
+        return colors[componentType] || '#888888';
+    }
+
+    getEdgeColor(weight) {
+        const intensity = Math.min(1, Math.max(0, weight));
+        return `rgba(255, 255, 255, ${0.3 + intensity * 0.7})`;
+    }
+
+    updateStatistics(stats) {
+        document.getElementById('totalConnections').textContent = stats.total_connections || '-';
+        document.getElementById('strongConnections').textContent = stats.strong_connections || '-';
+        document.getElementById('moderateConnections').textContent = stats.moderate_connections || '-';
+        document.getElementById('weakConnections').textContent = stats.weak_connections || '-';
+    }
+
+    updateModelInfo(modelInfo) {
+        const modelInfoDiv = document.getElementById('modelInfo');
+        modelInfoDiv.innerHTML = `
+            <small class="text-light">
+                <strong>Layers:</strong> ${modelInfo.num_layers}<br>
+                <strong>Attention Heads:</strong> ${modelInfo.num_attention_heads}<br>
+                <strong>Hidden Size:</strong> ${modelInfo.hidden_size}
+            </small>
+        `;
+        modelInfoDiv.style.display = 'block';
+    }
+
+    showStatus(message, type = 'info') {
+        const statusBar = document.getElementById('statusBar');
+        const statusMessage = document.getElementById('statusMessage');
+        
+        statusMessage.textContent = message;
+        statusBar.className = `status-bar show ${type}`;
+        
+        setTimeout(() => {
+            statusBar.classList.remove('show');
+        }, 3000);
+    }
+
+    showLoading(title, message) {
+        document.getElementById('loadingMessage').textContent = title;
+        document.getElementById('loadingDetails').textContent = message;
+        this.loadingModal.show();
+    }
+
+    hideLoading() {
+        this.loadingModal.hide();
+    }
+}
+
+// Initialize the UI when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    new CircuitAnalysisUI();
+});
+</script>
+{% endblock %}

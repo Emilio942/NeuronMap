@@ -8,7 +8,7 @@ import logging
 import json
 import numpy as np
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 import tempfile
 
@@ -22,9 +22,6 @@ except ImportError:
     TENSORBOARD_AVAILABLE = False
 
 # Internal imports
-import sys
-sys.path.append(str(Path(__file__).parent.parent))
-
 from utils.error_handling import NeuronMapError
 from utils.monitoring import setup_monitoring
 
@@ -312,6 +309,56 @@ class TensorBoardIntegration:
         except Exception as e:
             logger.error(f"Failed to log experiment metrics: {e}")
 
+    def _log_activations_to_tensorboard(self, activations: Dict[str, Any], model_name: str, step: Optional[int]):
+        if 'activations' in activations:
+            self.log_activation_statistics(
+                activations['activations'],
+                model_name,
+                step=step
+            )
+
+    def _log_attention_to_tensorboard(self, results: Dict[str, Any], model_name: str, step: Optional[int]):
+        if 'attention_weights' in results:
+            self.log_attention_patterns(
+                results['attention_weights'],
+                model_name,
+                step=step
+            )
+
+    def _log_layer_stats_to_tensorboard(self, results: Dict[str, Any], model_name: str, analysis_type: str, step: Optional[int]):
+        if 'layer_statistics' in results:
+            for layer, stats in results['layer_statistics'].items():
+                for stat_name, value in stats.items():
+                    if isinstance(value, (int, float)):
+                        self.writer.add_scalar(
+                            f"{model_name}/{analysis_type}/layer_{layer}/{stat_name}",
+                            value,
+                            step
+                        )
+
+    def _log_discriminative_neurons_to_tensorboard(self, results: Dict[str, Any], model_name: str, analysis_type: str, step: Optional[int]):
+        if 'discriminative_neurons' in results:
+            for layer, scores in results['discriminative_neurons'].items():
+                if scores:
+                    self.writer.add_histogram(
+                        f"{model_name}/{analysis_type}/discriminative_neurons/layer_{layer}",
+                        np.array(scores),
+                        step
+                    )
+
+    def _log_metadata_to_tensorboard(self, analysis_type: str, model_name: str, step: Optional[int]):
+        metadata = {
+            'analysis_type': analysis_type,
+            'model_name': model_name,
+            'timestamp': datetime.now().isoformat(),
+            'step': step
+        }
+        self.writer.add_text(
+            f"{model_name}/{analysis_type}/metadata",
+            json.dumps(metadata, indent=2),
+            step
+        )
+
     def log_analysis_results(
         self,
         results: Dict[str, Any],
@@ -319,66 +366,16 @@ class TensorBoardIntegration:
         model_name: str,
         step: Optional[int] = None
     ):
-        """
-        Log comprehensive analysis results to TensorBoard.
-
-        Args:
-            results: Analysis results dictionary
-            analysis_type: Type of analysis performed
-            model_name: Name of the analyzed model
-            step: Global step for logging
-        """
+        """Log comprehensive analysis results to TensorBoard."""
         if step is None:
             step = self.global_step
 
         try:
-            # Log different types of results
-            if 'activations' in results:
-                self.log_activation_statistics(
-                    results['activations'],
-                    model_name,
-                    step=step
-                )
-
-            if 'attention_weights' in results:
-                self.log_attention_patterns(
-                    results['attention_weights'],
-                    model_name,
-                    step=step
-                )
-
-            if 'layer_statistics' in results:
-                for layer, stats in results['layer_statistics'].items():
-                    for stat_name, value in stats.items():
-                        if isinstance(value, (int, float)):
-                            self.writer.add_scalar(
-                                f"{model_name}/{analysis_type}/layer_{layer}/{stat_name}",
-                                value,
-                                step
-                            )
-
-            if 'discriminative_neurons' in results:
-                for layer, scores in results['discriminative_neurons'].items():
-                    if scores:
-                        self.writer.add_histogram(
-                            f"{model_name}/{analysis_type}/discriminative_neurons/layer_{layer}",
-                            np.array(scores),
-                            step
-                        )
-
-            # Log metadata as text
-            metadata = {
-                'analysis_type': analysis_type,
-                'model_name': model_name,
-                'timestamp': datetime.now().isoformat(),
-                'step': step
-            }
-
-            self.writer.add_text(
-                f"{model_name}/{analysis_type}/metadata",
-                json.dumps(metadata, indent=2),
-                step
-            )
+            self._log_activations_to_tensorboard(results, model_name, step)
+            self._log_attention_to_tensorboard(results, model_name, step)
+            self._log_layer_stats_to_tensorboard(results, model_name, analysis_type, step)
+            self._log_discriminative_neurons_to_tensorboard(results, model_name, analysis_type, step)
+            self._log_metadata_to_tensorboard(analysis_type, model_name, step)
 
             logger.info(f"Logged analysis results for {analysis_type}")
 

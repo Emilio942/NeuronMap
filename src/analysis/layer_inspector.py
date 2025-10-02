@@ -8,7 +8,7 @@ including layer activation patterns, gradient flows, and structural analysis.
 
 import torch
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any, Union
+from typing import Dict, List, Optional, Tuple, Any
 import logging
 from pathlib import Path
 import json
@@ -197,7 +197,8 @@ class LayerInspector:
         self.activation_hooks.clear()
         logger.info("Cleared all activation hooks")
 
-    def analyze_layer_activations(self, inputs: torch.Tensor) -> Dict[str, LayerActivationStats]:
+    def analyze_layer_activations(
+            self, inputs: torch.Tensor) -> Dict[str, LayerActivationStats]:
         """
         Analyze activation patterns for all registered layers.
 
@@ -232,11 +233,16 @@ class LayerInspector:
             # Calculate dead neurons (consistently zero across batch)
             if len(activations.shape) > 2:
                 # For conv layers or attention, average over spatial/sequence dimensions
-                neuron_activations = activations.mean(dim=tuple(range(2, len(activations.shape))))
+                neuron_activations = activations.mean(
+                    dim=tuple(range(2, len(activations.shape))))
             else:
                 neuron_activations = activations
 
-            dead_neurons = int(torch.sum(torch.all(torch.abs(neuron_activations) < threshold, dim=0)))
+            dead_neurons = int(
+                torch.sum(
+                    torch.all(
+                        torch.abs(neuron_activations) < threshold,
+                        dim=0)))
 
             # Calculate average activation magnitude
             activation_magnitude = float(torch.mean(torch.abs(activations)))
@@ -254,8 +260,8 @@ class LayerInspector:
         return stats
 
     def find_critical_layers(self,
-                           inputs: torch.Tensor,
-                           metric: str = "gradient_norm") -> List[Tuple[str, float]]:
+                             inputs: torch.Tensor,
+                             metric: str = "gradient_norm") -> List[Tuple[str, float]]:
         """
         Find the most critical layers based on various metrics.
 
@@ -285,7 +291,8 @@ class LayerInspector:
 
         elif metric == "sparsity":
             stats = self.analyze_layer_activations(inputs)
-            scores = [(name, 100 - stat.sparsity) for name, stat in stats.items()]  # Higher score for less sparse
+            scores = [(name, 100 - stat.sparsity)
+                      for name, stat in stats.items()]  # Higher score for less sparse
 
         else:
             raise ValueError(f"Unknown metric: {metric}")
@@ -295,8 +302,8 @@ class LayerInspector:
         return scores
 
     def compare_layer_activations(self,
-                                inputs1: torch.Tensor,
-                                inputs2: torch.Tensor) -> Dict[str, float]:
+                                  inputs1: torch.Tensor,
+                                  inputs2: torch.Tensor) -> Dict[str, float]:
         """
         Compare activations between two different inputs.
 
@@ -333,13 +340,14 @@ class LayerInspector:
 
         return similarities
 
-    def export_layer_analysis(self, output_path: str, stats: Dict[str, LayerActivationStats]):
+    def export_layer_analysis(self, output_path: str,
+                              stats: Dict[str, LayerActivationStats]):
         """Export layer analysis results to JSON."""
         output_data = {
             "model_info": {
                 "total_layers": len(self.layer_info),
                 "layer_types": {lt.value: len(self.get_layers_by_type(lt))
-                              for lt in LayerType}
+                                for lt in LayerType}
             },
             "layer_details": {
                 name: {
@@ -374,8 +382,8 @@ class LayerInspector:
 
 
 def analyze_model_layers(model: torch.nn.Module,
-                        sample_input: torch.Tensor,
-                        output_dir: str = "data/outputs") -> LayerInspector:
+                         sample_input: torch.Tensor,
+                         output_dir: str = "data/outputs") -> LayerInspector:
     """
     Convenience function to perform comprehensive layer analysis.
 
@@ -412,7 +420,7 @@ def analyze_model_layers(model: torch.nn.Module,
     with open(output_path / "critical_layers.json", 'w') as f:
         json.dump({
             "ranking": [{"layer": name, "score": score}
-                       for name, score in critical_layers[:20]]  # Top 20
+                        for name, score in critical_layers[:20]]  # Top 20
         }, f, indent=2)
 
     logger.info(f"Layer analysis complete. Results saved to {output_dir}")

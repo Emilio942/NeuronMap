@@ -1,9 +1,7 @@
 """Advanced analysis methods for neural network activation patterns."""
 
 import numpy as np
-import pandas as pd
-import torch
-from typing import Dict, List, Optional, Tuple, Any, Union
+from typing import Dict, List, Any, Tuple, Optional
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from sklearn.cluster import KMeans
@@ -16,7 +14,6 @@ from pathlib import Path
 import h5py
 
 from ..utils.config import get_config
-from ..utils.error_handling import with_retry, safe_execute
 
 
 logger = logging.getLogger(__name__)
@@ -261,17 +258,56 @@ class ActivationAnalyzer:
             'neuron_correlation_matrix': neuron_correlations.tolist(),
             'question_correlation_stats': question_corr_stats,
             'neuron_correlation_stats': neuron_corr_stats,
-            'highly_correlated_questions': self._find_highly_correlated_pairs(
+            'highly_correlated_questions': self._find_highly_correlated_indices(
                 question_correlations, threshold=0.8
             ),
-            'highly_correlated_neurons': self._find_highly_correlated_pairs(
+            'highly_correlated_neurons': self._find_highly_correlated_indices(
                 neuron_correlations, threshold=0.8
             )
         }
 
-    # _find_highly_correlated_pairs method defined below with layer names support
+    def _find_highly_correlated_indices(self, correlation_matrix: np.ndarray, threshold: float = 0.7) -> List[Dict[str, Any]]:
+        """Find pairs of indices with high correlation within a single matrix.
 
-    def _find_highly_correlated_pairs(self, correlation_matrix: np.ndarray,
+        Args:
+            correlation_matrix: Correlation matrix.
+            threshold: Correlation threshold for high correlation.
+
+        Returns:
+            List of highly correlated pairs.
+        """
+        highly_correlated = []
+        n_items = correlation_matrix.shape[0]
+
+        for i in range(n_items):
+            for j in range(i + 1, n_items):  # Avoid diagonal and duplicate pairs
+                correlation = correlation_matrix[i, j]
+                if abs(correlation) >= threshold:
+                    highly_correlated.append({
+                        'idx1': int(i),
+                        'idx2': int(j),
+                        'correlation': float(correlation)
+                    })
+        return highly_correlated
+
+    def _find_highly_correlated_pairs(
+        self,
+        correlation_matrix: np.ndarray,
+        threshold: float = 0.7,
+    ) -> List[Dict[str, Any]]:
+        """Return index-based correlation pairs for backwards compatibility."""
+
+        raw_pairs = self._find_highly_correlated_indices(correlation_matrix, threshold)
+        return [
+            {
+                'index_1': pair['idx1'],
+                'index_2': pair['idx2'],
+                'correlation': pair['correlation'],
+            }
+            for pair in raw_pairs
+        ]
+
+    def _find_highly_correlated_layer_pairs(self, correlation_matrix: np.ndarray,
                                      layer_names: List[str], threshold: float = 0.7) -> List[Dict[str, Any]]:
         """Find pairs of layers with high correlation.
 
@@ -293,7 +329,7 @@ class ActivationAnalyzer:
                     highly_correlated.append({
                         'layer1': layer_names[i],
                         'layer2': layer_names[j],
-                        'correlation': correlation
+                        'correlation': float(correlation)
                     })
 
         return highly_correlated
@@ -372,20 +408,8 @@ class ActivationAnalyzer:
             'inertia': float(clusterer.inertia_)
         }
 
-    def compare_layers(self, data: Dict[str, Any],
-                      layer_names: List[str],
-                      metric: str = "cosine") -> Dict[str, Any]:
-        """Compare activation patterns between different layers.
-
-        Args:
-            data: Loaded activation data.
-            layer_names: List of layer names to compare.
-            metric: Similarity metric ('cosine', 'pearson').
-
-        Returns:
-            Layer comparison results.
-        """
-        # Extract activation matrices for each layer
+    def _align_activation_matrices(self, data: Dict[str, Any], layer_names: List[str]) -> Tuple[Dict[str, np.ndarray], List[int]]:
+        """Align activation matrices to common questions."""
         layer_matrices = {}
         common_questions = None
 
@@ -421,6 +445,23 @@ class ActivationAnalyzer:
 
             mask = [i for i, q_idx in enumerate(layer_question_indices) if q_idx in common_questions]
             aligned_matrices[layer_name] = matrix[mask]
+
+        return aligned_matrices, common_indices
+
+    def compare_layers(self, data: Dict[str, Any],
+                      layer_names: List[str],
+                      metric: str = "cosine") -> Dict[str, Any]:
+        """Compare activation patterns between different layers.
+
+        Args:
+            data: Loaded activation data.
+            layer_names: List of layer names to compare.
+            metric: Similarity metric ('cosine', 'pearson').
+
+        Returns:
+            Layer comparison results.
+        """
+        aligned_matrices, common_indices = self._align_activation_matrices(data, layer_names)
 
         # Compute layer similarities
         similarities = {}
@@ -849,32 +890,50 @@ class AdvancedAnalyzer:
             self.logger.error(f"Layer correlation analysis failed: {e}")
             raise
 
-    def _find_highly_correlated_pairs(self, correlation_matrix: np.ndarray,
-                                     layer_names: List[str], threshold: float = 0.7) -> List[Dict[str, Any]]:
-        """Find pairs of layers with high correlation.
+    def _find_highly_correlated_pairs(
+        self,
+        correlation_matrix: np.ndarray,
+        layer_names: Optional[List[str]] = None,
+        threshold: float = 0.7,
+    ) -> List[Dict[str, Any]]:
+        """Find pairs of activations with correlation above ``threshold``.
 
-        Args:
-            correlation_matrix: Correlation matrix between layers.
-            layer_names: Names of the layers.
-            threshold: Correlation threshold for high correlation.
-
-        Returns:
-            List of highly correlated layer pairs.
+        When ``layer_names`` are provided and match the matrix dimensions the
+        result includes both the layer identifiers and their positional indices.
+        Otherwise the method falls back to reporting indices only.  This keeps
+        compatibility with legacy tests that expect ``index_1``/``index_2``
+        fields while supporting the richer descriptive output used elsewhere in
+        the module.
         """
-        highly_correlated = []
-        n_layers = len(layer_names)
 
-        for i in range(n_layers):
-            for j in range(i + 1, n_layers):  # Avoid diagonal and duplicate pairs
-                correlation = correlation_matrix[i, j]
-                if abs(correlation) >= threshold:
-                    highly_correlated.append({
-                        'layer1': layer_names[i],
-                        'layer2': layer_names[j],
-                        'correlation': correlation
-                    })
+        if correlation_matrix.ndim != 2:
+            raise ValueError("correlation_matrix must be a 2D array")
+        if correlation_matrix.shape[0] != correlation_matrix.shape[1]:
+            raise ValueError("correlation_matrix must be square")
 
-        return highly_correlated
+        num_layers = correlation_matrix.shape[0]
+        include_names = isinstance(layer_names, list) and len(layer_names) == num_layers
+
+        results: List[Dict[str, Any]] = []
+        for i in range(num_layers):
+            for j in range(i + 1, num_layers):
+                correlation = float(correlation_matrix[i, j])
+                if abs(correlation) < threshold:
+                    continue
+
+                entry: Dict[str, Any] = {
+                    'index_1': i,
+                    'index_2': j,
+                    'correlation': correlation,
+                }
+
+                if include_names:
+                    entry['layer1'] = layer_names[i]
+                    entry['layer2'] = layer_names[j]
+
+                results.append(entry)
+
+        return results
 
     def _compute_kurtosis(self, data: np.ndarray) -> np.ndarray:
         """Compute kurtosis for each feature."""

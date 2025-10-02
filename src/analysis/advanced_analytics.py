@@ -8,20 +8,13 @@ gradient attribution, neuron importance, and cross-layer information flow.
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple, Union
-import pandas as pd
-from sklearn.cluster import KMeans, DBSCAN
+from typing import List, Dict, Any, Optional, Tuple
 from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-from sklearn.metrics import silhouette_score
-from scipy.stats import pearsonr, spearmanr
+from scipy.stats import pearsonr
 from scipy.spatial.distance import cosine
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +45,7 @@ class AttentionFlowAnalyzer:
                 inputs = self.model_adapter.prepare_inputs([text])
 
                 with torch.no_grad():
-                    outputs = self.model_adapter.model(**inputs, output_attentions=True)
+                    self.model_adapter.model(**inputs, output_attentions=True)
 
                 # Process attention patterns
                 for layer_name, attention_tensor in self.attention_cache.items():
@@ -237,17 +230,8 @@ class CrossLayerAnalyzer:
         self.model_adapter = model_adapter
         self.config = config
 
-    def analyze_information_flow(self, activations: Dict[str, np.ndarray]) -> Dict[str, Any]:
-        """Analyze information flow between layers."""
-        flow_analysis = {
-            'layer_similarities': {},
-            'information_bottlenecks': {},
-            'flow_patterns': {}
-        }
-
-        layer_names = sorted(activations.keys())
-
-        # Compute pairwise similarities between layers
+    def _compute_similarity_matrix(self, activations: Dict[str, np.ndarray], layer_names: List[str]) -> np.ndarray:
+        """Compute pairwise similarity matrix between layers."""
         similarity_matrix = np.zeros((len(layer_names), len(layer_names)))
 
         for i, layer1 in enumerate(layer_names):
@@ -271,24 +255,15 @@ class CrossLayerAnalyzer:
                         # Compute different similarity metrics
                         try:
                             cosine_sim = 1 - cosine(act1, act2)
-                            pearson_corr, _ = pearsonr(act1, act2)
-
                             similarity_matrix[i, j] = cosine_sim
-                            flow_analysis['layer_similarities'][f"{layer1}_{layer2}"] = {
-                                'cosine': float(cosine_sim) if not np.isnan(cosine_sim) else 0.0,
-                                'pearson': float(pearson_corr) if not np.isnan(pearson_corr) else 0.0
-                            }
                         except Exception as e:
                             logger.warning(f"Could not compute similarity between {layer1} and {layer2}: {e}")
-                            flow_analysis['layer_similarities'][f"{layer1}_{layer2}"] = {
-                                'cosine': 0.0,
-                                'pearson': 0.0
-                            }
+        return similarity_matrix
 
-        # Identify information bottlenecks
-        for i, layer_name in enumerate(layer_names):
-            activation = activations[layer_name]
-
+    def _identify_information_bottlenecks(self, activations: Dict[str, np.ndarray]) -> Dict[str, Any]:
+        """Identify information bottlenecks in the network."""
+        bottlenecks = {}
+        for layer_name, activation in activations.items():
             try:
                 # Ensure 2D shape for PCA
                 if activation.ndim == 1:
@@ -306,24 +281,44 @@ class CrossLayerAnalyzer:
                     n_components_95 = np.where(cumvar >= 0.95)[0]
                     n_components_95 = n_components_95[0] + 1 if len(n_components_95) > 0 else activation.shape[1]
 
-                    flow_analysis['information_bottlenecks'][layer_name] = {
+                    bottlenecks[layer_name] = {
                         'effective_dimensionality': int(n_components_95),
                         'total_dimensionality': int(activation.shape[-1]),
                         'compression_ratio': float(n_components_95 / activation.shape[-1])
                     }
                 else:
-                    flow_analysis['information_bottlenecks'][layer_name] = {
+                    bottlenecks[layer_name] = {
                         'effective_dimensionality': int(activation.shape[-1]),
                         'total_dimensionality': int(activation.shape[-1]),
                         'compression_ratio': 1.0
                     }
             except Exception as e:
                 logger.warning(f"Could not analyze information bottleneck for {layer_name}: {e}")
-                flow_analysis['information_bottlenecks'][layer_name] = {
+                bottlenecks[layer_name] = {
                     'effective_dimensionality': 'unknown',
                     'total_dimensionality': 'unknown',
                     'compression_ratio': 'unknown'
                 }
+        return bottlenecks
+
+    def analyze_information_flow(self, activations: Dict[str, np.ndarray]) -> Dict[str, Any]:
+        """Analyze information flow between layers."""
+        layer_names = sorted(activations.keys())
+        similarity_matrix = self._compute_similarity_matrix(activations, layer_names)
+        bottlenecks = self._identify_information_bottlenecks(activations)
+
+        flow_analysis = {
+            'layer_similarities': {},
+            'information_bottlenecks': bottlenecks,
+            'flow_patterns': {}
+        }
+
+        for i, layer1 in enumerate(layer_names):
+            for j, layer2 in enumerate(layer_names):
+                if i != j:
+                    flow_analysis['layer_similarities'][f"{layer1}_{layer2}"] = {
+                        'cosine': float(similarity_matrix[i, j]) if not np.isnan(similarity_matrix[i, j]) else 0.0
+                    }
 
         # Analyze flow patterns
         flow_analysis['flow_patterns'] = {

@@ -1,0 +1,752 @@
+{% extends "base.html" %}
+
+{% block title %}SAE Explorer - NeuronMap{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.23.0/cytoscape.min.js"></script>
+<style>
+    .status-bar {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 8px 0;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .control-panel {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    }
+    
+    .feature-card {
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        border-left: 4px solid #667eea;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    }
+    
+    .feature-examples {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 10px;
+        margin-top: 10px;
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    
+    .example-text {
+        background: white;
+        border-radius: 5px;
+        padding: 8px;
+        margin-bottom: 8px;
+        border-left: 3px solid #28a745;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+    }
+    
+    .activation-badge {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        border-radius: 20px;
+        padding: 4px 12px;
+        font-size: 0.8em;
+        font-weight: bold;
+    }
+    
+    .sae-model-card {
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        transition: transform 0.2s;
+        cursor: pointer;
+    }
+    
+    .sae-model-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    }
+    
+    .sae-model-card.selected {
+        border: 2px solid #667eea;
+        background: #f0f4ff;
+    }
+    
+    .loading-spinner {
+        display: none;
+        text-align: center;
+        padding: 20px;
+    }
+    
+    .error-alert {
+        display: none;
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .success-alert {
+        display: none;
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    #abstractionPlot {
+        background: white;
+        border-radius: 10px;
+        padding: 15px;
+        margin: 20px 0;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Status Bar -->
+<div class="status-bar">
+    <div class="container-fluid">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <span id="status-text">🧠 SAE Explorer Ready</span>
+            </div>
+            <div class="col-md-4 text-end">
+                <small id="last-update">Ready to explore</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <!-- Alerts -->
+    <div id="error-alert" class="error-alert">
+        <strong>Error:</strong> <span id="error-message"></span>
+    </div>
+    
+    <div id="success-alert" class="success-alert">
+        <strong>Success:</strong> <span id="success-message"></span>
+    </div>
+    
+    <!-- Loading Spinner -->
+    <div id="loading-spinner" class="loading-spinner">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Processing request...</p>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="row">
+        <!-- Left Sidebar - SAE Models and Controls -->
+        <div class="col-md-4">
+            <div class="control-panel">
+                <h4>🧠 SAE Models</h4>
+                <p class="text-muted">Select a trained SAE model to explore its features</p>
+                
+                <!-- Model Filters -->
+                <div class="mb-3">
+                    <label class="form-label">Filter by Model:</label>
+                    <select id="model-filter" class="form-select">
+                        <option value="">All Models</option>
+                        <option value="gpt2">GPT-2</option>
+                        <option value="llama">LLaMA</option>
+                        <option value="bert">BERT</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Filter by Layer:</label>
+                    <input type="number" id="layer-filter" class="form-control" placeholder="e.g., 8">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Filter by Component:</label>
+                    <select id="component-filter" class="form-select">
+                        <option value="">All Components</option>
+                        <option value="mlp">MLP</option>
+                        <option value="attention">Attention</option>
+                        <option value="residual">Residual</option>
+                    </select>
+                </div>
+                
+                <button id="refresh-models" class="btn btn-primary w-100 mb-3">
+                    <i class="fas fa-sync-alt"></i> Refresh Models
+                </button>
+                
+                <!-- SAE Models List -->
+                <div id="sae-models-list">
+                    <!-- Models will be loaded here -->
+                </div>
+            </div>
+            
+            <!-- Feature Analysis Controls -->
+            <div class="control-panel" id="analysis-controls" style="display: none;">
+                <h5>🔍 Feature Analysis</h5>
+                
+                <div class="mb-3">
+                    <label class="form-label">Top Features:</label>
+                    <input type="number" id="top-features" class="form-control" value="20" min="1" max="100">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Examples per Feature:</label>
+                    <input type="number" id="max-examples" class="form-control" value="5" min="1" max="20">
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Activation Threshold:</label>
+                    <input type="number" id="activation-threshold" class="form-control" value="0.5" step="0.1" min="0">
+                </div>
+                
+                <button id="analyze-features" class="btn btn-success w-100">
+                    <i class="fas fa-brain"></i> Analyze Features
+                </button>
+            </div>
+            
+            <!-- Abstraction Tracking -->
+            <div class="control-panel" id="abstraction-controls" style="display: none;">
+                <h5>📈 Abstraction Tracking</h5>
+                
+                <div class="mb-3">
+                    <label class="form-label">Input Text:</label>
+                    <textarea id="abstraction-text" class="form-control" rows="3" 
+                             placeholder="Enter text to analyze abstraction evolution...">The quick brown fox jumps over the lazy dog.</textarea>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Additional SAE Models:</label>
+                    <small class="text-muted">Select SAEs from other layers for comparison</small>
+                    <div id="additional-saes">
+                        <!-- Additional SAE selection will be here -->
+                    </div>
+                </div>
+                
+                <button id="track-abstractions" class="btn btn-warning w-100">
+                    <i class="fas fa-chart-line"></i> Track Abstractions
+                </button>
+            </div>
+        </div>
+        
+        <!-- Right Main Area - Feature Analysis Results -->
+        <div class="col-md-8">
+            <!-- SAE Info Panel -->
+            <div id="sae-info-panel" class="control-panel" style="display: none;">
+                <h4 id="sae-title">SAE Model Information</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Model:</strong> <span id="sae-model-name">-</span></p>
+                        <p><strong>Layer:</strong> <span id="sae-layer">-</span></p>
+                        <p><strong>Component:</strong> <span id="sae-component">-</span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Dictionary Size:</strong> <span id="sae-dict-size">-</span></p>
+                        <p><strong>Created:</strong> <span id="sae-created">-</span></p>
+                        <p><strong>Training Loss:</strong> <span id="sae-loss">-</span></p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Feature Analysis Results -->
+            <div id="features-results" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4>🎯 Feature Analysis Results</h4>
+                    <div>
+                        <button id="export-features" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Feature Statistics -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="text-center p-3 bg-light rounded">
+                            <h5 id="total-features" class="text-primary">0</h5>
+                            <small>Features Analyzed</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 bg-light rounded">
+                            <h5 id="active-features" class="text-success">0</h5>
+                            <small>Active Features</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 bg-light rounded">
+                            <h5 id="avg-activation" class="text-info">0.0</h5>
+                            <small>Avg Activation</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 bg-light rounded">
+                            <h5 id="max-activation" class="text-warning">0.0</h5>
+                            <small>Max Activation</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Features List -->
+                <div id="features-list">
+                    <!-- Features will be displayed here -->
+                </div>
+            </div>
+            
+            <!-- Abstraction Analysis Results -->
+            <div id="abstraction-results" style="display: none;">
+                <h4>📈 Abstraction Evolution</h4>
+                <div id="abstractionPlot"></div>
+                
+                <div class="mt-3">
+                    <h5>Layer Analysis</h5>
+                    <div id="layer-analysis">
+                        <!-- Layer-by-layer analysis will be here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// SAE Explorer JavaScript
+class SAEExplorer {
+    constructor() {
+        this.selectedSAE = null;
+        this.currentFeatures = [];
+        this.init();
+    }
+    
+    init() {
+        this.bindEvents();
+        this.loadSAEModels();
+    }
+    
+    bindEvents() {
+        // Model refresh
+        document.getElementById('refresh-models').addEventListener('click', () => {
+            this.loadSAEModels();
+        });
+        
+        // Feature analysis
+        document.getElementById('analyze-features').addEventListener('click', () => {
+            this.analyzeFeatures();
+        });
+        
+        // Abstraction tracking
+        document.getElementById('track-abstractions').addEventListener('click', () => {
+            this.trackAbstractions();
+        });
+        
+        // Export features
+        document.getElementById('export-features').addEventListener('click', () => {
+            this.exportFeatures();
+        });
+    }
+    
+    updateStatus(message, isError = false) {
+        const statusText = document.getElementById('status-text');
+        const lastUpdate = document.getElementById('last-update');
+        
+        statusText.textContent = message;
+        statusText.className = isError ? 'text-danger' : '';
+        lastUpdate.textContent = new Date().toLocaleTimeString();
+    }
+    
+    showError(message) {
+        const errorAlert = document.getElementById('error-alert');
+        const errorMessage = document.getElementById('error-message');
+        
+        errorMessage.textContent = message;
+        errorAlert.style.display = 'block';
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            errorAlert.style.display = 'none';
+        }, 5000);
+        
+        this.updateStatus(`❌ Error: ${message}`, true);
+    }
+    
+    showSuccess(message) {
+        const successAlert = document.getElementById('success-alert');
+        const successMessage = document.getElementById('success-message');
+        
+        successMessage.textContent = message;
+        successAlert.style.display = 'block';
+        
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+            successAlert.style.display = 'none';
+        }, 3000);
+        
+        this.updateStatus(`✅ ${message}`);
+    }
+    
+    showLoading(show = true) {
+        const spinner = document.getElementById('loading-spinner');
+        spinner.style.display = show ? 'block' : 'none';
+    }
+    
+    async loadSAEModels() {
+        try {
+            this.updateStatus('🔄 Loading SAE models...');
+            this.showLoading(true);
+            
+            // Get filter values
+            const modelFilter = document.getElementById('model-filter').value;
+            const layerFilter = document.getElementById('layer-filter').value;
+            const componentFilter = document.getElementById('component-filter').value;
+            
+            // Build query parameters
+            const params = new URLSearchParams();
+            if (modelFilter) params.append('model_filter', modelFilter);
+            if (layerFilter) params.append('layer_filter', layerFilter);
+            if (componentFilter) params.append('component_filter', componentFilter);
+            
+            const response = await fetch(`/api/sae/models?${params}`);
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                this.displaySAEModels(data.models);
+                this.showSuccess(`Loaded ${data.models.length} SAE models`);
+            } else {
+                throw new Error(data.message || 'Failed to load SAE models');
+            }
+        } catch (error) {
+            console.error('Error loading SAE models:', error);
+            this.showError(`Failed to load SAE models: ${error.message}`);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    displaySAEModels(models) {
+        const container = document.getElementById('sae-models-list');
+        
+        if (models.length === 0) {
+            container.innerHTML = '<p class="text-muted">No SAE models found. Try different filters or train a new SAE.</p>';
+            return;
+        }
+        
+        container.innerHTML = models.map(model => `
+            <div class="sae-model-card" data-sae-id="${model.id || model.name}">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-1">${model.original_model || model.model_name}</h6>
+                        <small class="text-muted">Layer ${model.layer} • ${model.component}</small>
+                    </div>
+                    <span class="badge bg-primary">${model.dict_size}</span>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">
+                        Created: ${new Date(model.created_at).toLocaleDateString()}
+                    </small>
+                </div>
+            </div>
+        `).join('');
+        
+        // Add click handlers
+        container.querySelectorAll('.sae-model-card').forEach(card => {
+            card.addEventListener('click', () => {
+                this.selectSAEModel(card);
+            });
+        });
+    }
+    
+    selectSAEModel(cardElement) {
+        // Remove previous selection
+        document.querySelectorAll('.sae-model-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+        
+        // Select new model
+        cardElement.classList.add('selected');
+        const saeId = cardElement.dataset.saeId;
+        
+        this.selectedSAE = {
+            id: saeId,
+            element: cardElement
+        };
+        
+        // Show analysis controls
+        document.getElementById('analysis-controls').style.display = 'block';
+        document.getElementById('abstraction-controls').style.display = 'block';
+        
+        // Display SAE info
+        this.displaySAEInfo();
+        
+        this.updateStatus(`🎯 Selected SAE: ${saeId}`);
+    }
+    
+    displaySAEInfo() {
+        if (!this.selectedSAE) return;
+        
+        const cardElement = this.selectedSAE.element;
+        const modelName = cardElement.querySelector('h6').textContent;
+        const layerText = cardElement.querySelector('small').textContent;
+        const dictSize = cardElement.querySelector('.badge').textContent;
+        const createdText = cardElement.querySelectorAll('small')[1].textContent;
+        
+        // Extract layer and component
+        const [layer, component] = layerText.split(' • ');
+        
+        document.getElementById('sae-model-name').textContent = modelName;
+        document.getElementById('sae-layer').textContent = layer.replace('Layer ', '');
+        document.getElementById('sae-component').textContent = component;
+        document.getElementById('sae-dict-size').textContent = dictSize;
+        document.getElementById('sae-created').textContent = createdText.replace('Created: ', '');
+        document.getElementById('sae-loss').textContent = 'N/A'; // Would come from actual data
+        
+        document.getElementById('sae-info-panel').style.display = 'block';
+    }
+    
+    async analyzeFeatures() {
+        if (!this.selectedSAE) {
+            this.showError('Please select an SAE model first');
+            return;
+        }
+        
+        try {
+            this.updateStatus('🔍 Analyzing SAE features...');
+            this.showLoading(true);
+            
+            const topFeatures = document.getElementById('top-features').value;
+            const maxExamples = document.getElementById('max-examples').value;
+            const threshold = document.getElementById('activation-threshold').value;
+            
+            const params = new URLSearchParams({
+                top_features: topFeatures,
+                max_examples: maxExamples,
+                threshold: threshold
+            });
+            
+            const response = await fetch(`/api/sae/models/${this.selectedSAE.id}/features?${params}`);
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                this.currentFeatures = data.features;
+                this.displayFeatures(data);
+                this.showSuccess(`Analyzed ${data.features.length} features`);
+            } else {
+                throw new Error(data.message || 'Feature analysis failed');
+            }
+        } catch (error) {
+            console.error('Error analyzing features:', error);
+            this.showError(`Feature analysis failed: ${error.message}`);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    displayFeatures(data) {
+        const features = data.features;
+        const metadata = data.metadata;
+        
+        // Update statistics
+        document.getElementById('total-features').textContent = features.length;
+        document.getElementById('active-features').textContent = features.filter(f => f.max_activation > 0).length;
+        
+        const avgActivation = features.reduce((sum, f) => sum + f.max_activation, 0) / features.length;
+        document.getElementById('avg-activation').textContent = avgActivation.toFixed(3);
+        
+        const maxActivation = Math.max(...features.map(f => f.max_activation));
+        document.getElementById('max-activation').textContent = maxActivation.toFixed(3);
+        
+        // Display features
+        const container = document.getElementById('features-list');
+        container.innerHTML = features.map(feature => `
+            <div class="feature-card">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h6>Feature ${feature.id}</h6>
+                    <span class="activation-badge">${feature.max_activation.toFixed(3)}</span>
+                </div>
+                
+                <div class="row mb-2">
+                    <div class="col-md-6">
+                        <small><strong>Examples:</strong> ${feature.num_examples}</small>
+                    </div>
+                    <div class="col-md-6">
+                        <small><strong>Max Activation:</strong> ${feature.max_activation.toFixed(3)}</small>
+                    </div>
+                </div>
+                
+                ${feature.examples && feature.examples.length > 0 ? `
+                <div class="feature-examples">
+                    <small><strong>Top Examples:</strong></small>
+                    ${feature.examples.slice(0, 3).map(example => `
+                        <div class="example-text">
+                            <span class="text-primary">[${example.activation?.toFixed(3) || 'N/A'}]</span>
+                            ${example.text || 'No text available'}
+                        </div>
+                    `).join('')}
+                    ${feature.examples.length > 3 ? `
+                        <small class="text-muted">... and ${feature.examples.length - 3} more examples</small>
+                    ` : ''}
+                </div>
+                ` : '<small class="text-muted">No examples found</small>'}
+            </div>
+        `).join('');
+        
+        document.getElementById('features-results').style.display = 'block';
+    }
+    
+    async trackAbstractions() {
+        if (!this.selectedSAE) {
+            this.showError('Please select an SAE model first');
+            return;
+        }
+        
+        try {
+            this.updateStatus('📈 Tracking abstractions...');
+            this.showLoading(true);
+            
+            const text = document.getElementById('abstraction-text').value;
+            
+            if (!text.trim()) {
+                throw new Error('Please enter text to analyze');
+            }
+            
+            // Get model name from selected SAE
+            const modelName = document.getElementById('sae-model-name').textContent;
+            
+            const requestData = {
+                model_name: modelName,
+                prompt: text,
+                sae_models: [this.selectedSAE.id], // For now, just use the selected SAE
+                layers: [parseInt(document.getElementById('sae-layer').textContent)],
+                threshold: parseFloat(document.getElementById('activation-threshold').value),
+                max_features_per_layer: 20
+            };
+            
+            const response = await fetch('/api/sae/abstraction/track', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                this.displayAbstractionResults(data.results);
+                this.showSuccess('Abstraction analysis completed');
+            } else {
+                throw new Error(data.message || 'Abstraction tracking failed');
+            }
+        } catch (error) {
+            console.error('Error tracking abstractions:', error);
+            this.showError(`Abstraction tracking failed: ${error.message}`);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+    
+    displayAbstractionResults(results) {
+        // Create abstraction evolution plot
+        const layers = results.layers.map(l => l.layer);
+        const activations = results.layers.map(l => l.average_activation);
+        
+        const trace = {
+            x: layers,
+            y: activations,
+            type: 'scatter',
+            mode: 'lines+markers',
+            name: 'Abstraction Level',
+            line: {
+                color: '#667eea',
+                width: 3
+            },
+            marker: {
+                size: 8,
+                color: '#764ba2'
+            }
+        };
+        
+        const layout = {
+            title: 'Abstraction Evolution Across Layers',
+            xaxis: { title: 'Layer' },
+            yaxis: { title: 'Average Activation' },
+            showlegend: false,
+            margin: { t: 50, r: 50, b: 50, l: 50 }
+        };
+        
+        Plotly.newPlot('abstractionPlot', [trace], layout, {responsive: true});
+        
+        // Display layer analysis
+        const layerContainer = document.getElementById('layer-analysis');
+        layerContainer.innerHTML = results.layers.map(layer => `
+            <div class="feature-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6>Layer ${layer.layer}</h6>
+                    <span class="activation-badge">${layer.average_activation.toFixed(3)}</span>
+                </div>
+                <p class="mb-1"><strong>Active Features:</strong> ${layer.active_features.length}</p>
+                <p class="mb-0"><strong>SAE:</strong> ${layer.sae_id}</p>
+            </div>
+        `).join('');
+        
+        document.getElementById('abstraction-results').style.display = 'block';
+    }
+    
+    async exportFeatures() {
+        if (!this.selectedSAE) {
+            this.showError('Please select an SAE model first');
+            return;
+        }
+        
+        try {
+            this.updateStatus('📤 Exporting features...');
+            
+            const response = await fetch(`/api/sae/export/${this.selectedSAE.id}?format=json&include_features=true`);
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${this.selectedSAE.id}_features.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                this.showSuccess('Features exported successfully');
+            } else {
+                throw new Error('Export failed');
+            }
+        } catch (error) {
+            console.error('Error exporting features:', error);
+            this.showError(`Export failed: ${error.message}`);
+        }
+    }
+}
+
+// Initialize SAE Explorer when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    window.saeExplorer = new SAEExplorer();
+});
+</script>
+{% endblock %}

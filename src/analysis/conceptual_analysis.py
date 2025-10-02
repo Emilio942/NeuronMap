@@ -11,15 +11,11 @@ import logging
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from typing import Dict, List, Tuple, Any, Optional, Union, Callable
+from typing import Dict, List, Tuple, Any, Optional, Union
 from dataclasses import dataclass, asdict
 import warnings
 from scipy import stats
 from scipy.spatial.distance import pdist, squareform
-from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
-from sklearn.decomposition import PCA, NMF
-from sklearn.manifold import TSNE
 
 # Optional dependencies with fallbacks
 try:
@@ -30,8 +26,7 @@ except ImportError:
     warnings.warn("UMAP not available. Install with: pip install umap-learn")
 
 try:
-    from sklearn.linear_model import LinearRegression, Ridge
-    from sklearn.metrics import accuracy_score, r2_score
+    from sklearn.decomposition import PCA, NMF
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
@@ -44,18 +39,14 @@ except ImportError:
     NETWORKX_AVAILABLE = False
     warnings.warn("NetworkX not available for circuit analysis")
 
-from pathlib import Path
-import pickle
 import json
 from datetime import datetime
 
-from ..utils.error_handling import log_error, with_retry, ValidationError
+from ..utils.error_handling import log_error
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-@dataclass
 @dataclass
 class ConceptVector:
     """Represents a concept as a vector in activation space."""
@@ -102,7 +93,6 @@ class Circuit:
             self.edges = []
 
 
-@dataclass
 @dataclass
 class KnowledgeTransferResult:
     """Results from knowledge transfer analysis."""
@@ -158,12 +148,13 @@ class ConceptualAnalyzer:
 
         # Extract config values with defaults for test compatibility
         self.concept_threshold = config.get('concept_threshold', 0.5)
+        self.circuit_threshold = config.get('circuit_threshold', 0.5)
+        self.causal_threshold = config.get('causal_threshold', 0.5)
 
-        # Initialize concepts storage for test compatibility
-        self.concepts = {}
-
-        # Initialize circuits storage for test compatibility
-        self.circuits = {}
+        # Initialize storage containers for downstream analyses
+        self.concepts: Dict[str, ConceptVector] = {}
+        self.circuits: Dict[str, Circuit] = {}
+        self.world_models: Dict[str, Dict[str, Any]] = {}
 
         logger.info(f"ConceptualAnalyzer initialized with device: {self.device}")
 
@@ -196,7 +187,11 @@ class ConceptualAnalyzer:
 
         logger.info(f"Extracting concepts using {method} method")
 
-        concepts = {}
+        # Reset stored concepts for this extraction run
+        self.concepts = {}
+
+        concepts_by_layer: Dict[str, List[ConceptVector]] = {}
+        flattened_concepts: Dict[str, ConceptVector] = {}
 
         for layer_name, layer_activations in activations.items():
             if layer_activations.size == 0:
@@ -220,20 +215,30 @@ class ConceptualAnalyzer:
             else:
                 raise ValueError(f"Unknown concept extraction method: {method}")
 
-            concepts[layer_name] = layer_concepts
-            logger.debug(f"Extracted {len(layer_concepts)} concepts from {layer_name}")
+            renamed_layer_concepts: List[ConceptVector] = []
+            for idx, concept in enumerate(layer_concepts):
+                original_name = concept.name
+                if method == "nmf":
+                    concept_name = f"{layer_name}_component_{idx}"
+                elif method == "ica":
+                    concept_name = f"{layer_name}_ica_{idx}"
+                else:
+                    concept_name = f"{layer_name}_concept_{idx}"
+
+                concept.metadata.setdefault("original_name", original_name)
+                concept.name = concept_name
+                self.concepts[concept_name] = concept
+                flattened_concepts[concept_name] = concept
+                renamed_layer_concepts.append(concept)
+
+            concepts_by_layer[layer_name] = renamed_layer_concepts
+            logger.debug(f"Extracted {len(renamed_layer_concepts)} concepts from {layer_name}")
 
         # If labels are provided, return flattened dict for test compatibility
         if labels is not None:
-            flattened_concepts = {}
-            concept_idx = 0
-            for layer_name, layer_concepts in concepts.items():
-                for i, concept in enumerate(layer_concepts):
-                    flattened_concepts[f"{layer_name}_concept_{i}"] = concept
-                    concept_idx += 1
             return flattened_concepts
 
-        return concepts
+        return concepts_by_layer
 
     def _extract_pca_concepts(
         self,
@@ -388,6 +393,8 @@ class ConceptualAnalyzer:
             result_vector = concept1.vector - concept2.vector
         elif operation == "multiply":
             result_vector = concept1.vector * concept2.vector
+        elif operation == "average":
+            result_vector = (concept1.vector + concept2.vector) / 2.0
         elif operation == "normalize":
             result_vector = concept1.vector / (np.linalg.norm(concept1.vector) + 1e-8)
         else:
@@ -532,30 +539,10 @@ class ConceptualAnalyzer:
             # New test signature: (activations, labels, task_name)
             return self._discover_circuits_new(activations, labels, task_name, threshold)
 
-    def _discover_circuits_old(
-        self,
-        model: nn.Module,
-        activations: Dict[str, np.ndarray],
-        concepts: Dict[str, List[ConceptVector]],
-        threshold: float = 0.1
-    ) -> List[Circuit]:
-        """Original circuit discovery implementation."""
-        if not NETWORKX_AVAILABLE:
-            logger.warning("NetworkX not available, cannot perform circuit discovery")
-            return []
-
-        logger.info("Discovering computational circuits")
-
-        circuits = []
-
-        # Build connectivity graph
-        G = nx.DiGraph()
-
-        # Add nodes for each concept
+    def _add_circuit_nodes(self, G: nx.DiGraph, concepts: Dict[str, Any]):
+        """Helper to add nodes to the circuit graph."""
         for layer_name, layer_concepts in concepts.items():
-            # Handle both list of concepts and single concept formats
             if isinstance(layer_concepts, list):
-                # Standard format: list of ConceptVectors
                 for i, concept in enumerate(layer_concepts):
                     node_id = f"{layer_name}_{i}"
                     G.add_node(node_id,
@@ -563,25 +550,21 @@ class ConceptualAnalyzer:
                               concept=concept.name,
                               confidence=concept.confidence)
             else:
-                # Flattened format: single ConceptVector (from test mode)
                 concept = layer_concepts
-                node_id = layer_name  # Use the full key as node_id
-                # Extract layer name from key if it follows pattern
+                node_id = layer_name
                 actual_layer = layer_name.split('_concept_')[0] if '_concept_' in layer_name else layer_name
                 G.add_node(node_id,
                           layer=actual_layer,
                           concept=concept.name,
                           confidence=concept.confidence)
 
-        # Add edges based on activation correlations
-        # Group concepts by actual layer for edge creation
+    def _add_circuit_edges(self, G: nx.DiGraph, activations: Dict[str, np.ndarray], concepts: Dict[str, Any], threshold: float):
+        """Helper to add edges to the circuit graph based on correlations."""
         layer_groups = {}
         for concept_key, concept_value in concepts.items():
             if isinstance(concept_value, list):
-                # Standard format
                 layer_groups[concept_key] = concept_value
             else:
-                # Flattened format - extract layer name
                 actual_layer = concept_key.split('_concept_')[0] if '_concept_' in concept_key else concept_key
                 if actual_layer not in layer_groups:
                     layer_groups[actual_layer] = []
@@ -598,19 +581,15 @@ class ConceptualAnalyzer:
                 current_acts = activations[current_layer]
                 next_acts = activations[next_layer]
 
-                # Compute correlations between concepts
                 for j, concept1 in enumerate(layer_groups[current_layer]):
                     for k, concept2 in enumerate(layer_groups[next_layer]):
                         if isinstance(concepts.get(f"{current_layer}_concept_{j}"), ConceptVector):
-                            # Flattened format
                             node1 = f"{current_layer}_concept_{j}"
                             node2 = f"{next_layer}_concept_{k}"
                         else:
-                            # Standard format
                             node1 = f"{current_layer}_{j}"
                             node2 = f"{next_layer}_{k}"
 
-                        # Compute correlation (simplified)
                         if (j < current_acts.shape[1] and
                             k < next_acts.shape[1]):
                             correlation = np.corrcoef(
@@ -622,10 +601,11 @@ class ConceptualAnalyzer:
                                 abs(correlation) > threshold):
                                 G.add_edge(node1, node2, weight=correlation)
 
-        # Extract circuits as connected components
+    def _extract_circuits_from_graph(self, G: nx.DiGraph) -> List[Circuit]:
+        """Helper to extract Circuit objects from a NetworkX graph."""
+        circuits = []
         for component in nx.weakly_connected_components(G):
-            if len(component) > 1:  # Require at least 2 nodes
-                # Create circuit from component
+            if len(component) > 1:
                 nodes = []
                 edges = []
 
@@ -654,6 +634,26 @@ class ConceptualAnalyzer:
                     components=[f"component_{len(circuits)}"]
                 )
                 circuits.append(circuit)
+        return circuits
+
+    def _discover_circuits_old(
+        self,
+        model: nn.Module,
+        activations: Dict[str, np.ndarray],
+        concepts: Dict[str, List[ConceptVector]],
+        threshold: float = 0.1
+    ) -> List[Circuit]:
+        """Original circuit discovery implementation."""
+        if not NETWORKX_AVAILABLE:
+            logger.warning("NetworkX not available, cannot perform circuit discovery")
+            return []
+
+        logger.info("Discovering computational circuits")
+
+        G = nx.DiGraph()
+        self._add_circuit_nodes(G, concepts)
+        self._add_circuit_edges(G, activations, concepts, threshold)
+        circuits = self._extract_circuits_from_graph(G)
 
         logger.info(f"Discovered {len(circuits)} circuits")
         return circuits
@@ -750,6 +750,57 @@ class ConceptualAnalyzer:
 
         logger.info(f"Computed causal scores for {len(causal_scores)} layers")
         return causal_scores
+
+    def trace_causal_effects(
+        self,
+        model: nn.Module,
+        input_data: torch.Tensor,
+        target_layer: str,
+        target_neurons: Optional[List[int]] = None,
+        min_effect: Optional[float] = None,
+        intervention_type: str = "noise"
+    ) -> Dict[str, Any]:
+        """Convenience wrapper that returns structured causal tracing results.
+
+        Args:
+            model: Neural network model under analysis.
+            input_data: Input tensor used for probing.
+            target_layer: Target layer whose activations we monitor.
+            target_neurons: Optional list of neuron indices to focus on.
+            min_effect: Minimum normalized effect size to retain in the
+                ``significant_effects`` mapping. Defaults to the configured
+                ``causal_threshold`` when not specified.
+            intervention_type: Intervention strategy passed through to
+                :meth:`causal_tracing`.
+
+        Returns:
+            Dictionary containing full effect scores, a filtered subset that
+            meets the minimum effect requirement, and convenience metadata.
+        """
+
+        scores = self.causal_tracing(
+            model,
+            input_data,
+            target_layer,
+            target_neurons,
+            intervention_type,
+        )
+
+        threshold = self.causal_threshold if min_effect is None else min_effect
+        significant = {
+            layer: value
+            for layer, value in scores.items()
+            if value >= threshold
+        }
+
+        summary = {
+            "effects": scores,
+            "significant_effects": significant,
+            "max_effect_layer": max(scores, key=scores.get) if scores else None,
+            "threshold": threshold,
+        }
+
+        return summary
 
     def _get_activations(self, model: nn.Module, input_data: torch.Tensor, target_layer: str) -> torch.Tensor:
         """Get activations from a specific layer."""
@@ -1029,7 +1080,7 @@ class ConceptualAnalyzer:
 
     def _get_sequence_activations(self, model: nn.Module, sequence: torch.Tensor) -> List[torch.Tensor]:
         """Get activations for each position in a sequence."""
-        activations = []
+
 
         # Get activations from the last layer before output
         target_layer = None
@@ -1049,10 +1100,11 @@ class ConceptualAnalyzer:
         # Get activations from target layer
         layer_activations = []
 
-        def hook_fn(module, input, output):
+        def hook_fn(module, input, output):  # pragma: no cover - simple hook
             layer_activations.append(output.detach())
 
         # Register hook
+        handle = None
         for name, module in model.named_modules():
             if name == target_layer:
                 handle = module.register_forward_hook(hook_fn)
@@ -1062,7 +1114,8 @@ class ConceptualAnalyzer:
         _ = model(sequence.unsqueeze(0))
 
         # Remove hook
-        handle.remove()
+        if handle is not None:
+            handle.remove()
 
         if layer_activations:
             # Extract activations for each sequence position
@@ -1104,6 +1157,69 @@ class ConceptualAnalyzer:
             model_activations_or_model1, stimuli_or_model2, input_data, layers1, layers2
         )
 
+    def _compute_similarity_matrices(self, model_activations: Dict[str, Dict[str, np.ndarray]], stimuli: List[str]) -> Dict[str, Any]:
+        """Compute similarity matrices for each model."""
+        similarity_matrices = {}
+        for model_name, activations in model_activations.items():
+            similarity_matrices[model_name] = {}
+            for layer_name, layer_acts in activations.items():
+                if layer_acts.shape[0] == len(stimuli):
+                    rdm = pdist(layer_acts, metric='correlation')
+                    rdm_matrix = squareform(rdm)
+                    similarity_matrices[model_name][layer_name] = {
+                        'rdm': rdm_matrix,
+                        'stimuli': stimuli,
+                        'layer': layer_name,
+                        'model': model_name
+                    }
+        return similarity_matrices
+
+    def _compare_rsa_models(self, model_activations: Dict[str, Dict[str, np.ndarray]], stimuli: List[str], model_names: List[str]) -> Dict[str, Any]:
+        """Compare models based on their RSA matrices."""
+        model_comparisons = {}
+        for i, model1 in enumerate(model_names):
+            for j, model2 in enumerate(model_names[i+1:], i+1):
+                comparison_key = f"{model1}_vs_{model2}"
+                model_comparisons[comparison_key] = {}
+                for layer1, acts1 in model_activations[model1].items():
+                    for layer2, acts2 in model_activations[model2].items():
+                        if acts1.shape == acts2.shape:
+                            rdm1 = pdist(acts1, metric='correlation')
+                            rdm2 = pdist(acts2, metric='correlation')
+                            if len(rdm1) > 1 and len(rdm2) > 1:
+                                correlation = np.corrcoef(rdm1, rdm2)[0, 1]
+                                if not np.isnan(correlation):
+                                    model_comparisons[comparison_key][f"{layer1}_vs_{layer2}"] = correlation
+        return model_comparisons
+
+    def _analyze_hierarchical_alignment(self, model_activations: Dict[str, Dict[str, np.ndarray]], model_names: List[str]) -> Dict[str, Any]:
+        """Analyze hierarchical alignment across models."""
+        hierarchical_alignment = {}
+        layer_names = set()
+        for model_acts in model_activations.values():
+            layer_names.update(model_acts.keys())
+
+        for layer in layer_names:
+            alignment_scores = []
+            for i, model1 in enumerate(model_names):
+                for j, model2 in enumerate(model_names[i+1:], i+1):
+                    if (layer in model_activations[model1] and
+                        layer in model_activations[model2]):
+                        acts1 = model_activations[model1][layer]
+                        acts2 = model_activations[model2][layer]
+                        if acts1.shape == acts2.shape:
+                            corr = np.corrcoef(acts1.flatten(), acts2.flatten())[0, 1]
+                            if not np.isnan(corr):
+                                alignment_scores.append(abs(corr))
+
+            if alignment_scores:
+                hierarchical_alignment[layer] = {
+                    'mean_alignment': np.mean(alignment_scores),
+                    'std_alignment': np.std(alignment_scores),
+                    'scores': alignment_scores
+                }
+        return hierarchical_alignment
+
     def _cross_model_rsa_test(
         self,
         model_activations: Dict[str, Dict[str, np.ndarray]],
@@ -1115,75 +1231,17 @@ class ConceptualAnalyzer:
         results = {
             'similarity_matrices': {},
             'model_comparisons': {},
-            'hierarchical_alignment': {},  # Added for test compatibility
+            'hierarchical_alignment': {},
             'stimuli': stimuli
         }
 
         model_names = list(model_activations.keys())
 
-        # Compute similarity matrices for each model
-        for model_name, activations in model_activations.items():
-            results['similarity_matrices'][model_name] = {}
-            for layer_name, layer_acts in activations.items():
-                # Compute RDM (Representational Dissimilarity Matrix)
-                if layer_acts.shape[0] == len(stimuli):
-                    rdm = pdist(layer_acts, metric='correlation')
-                    rdm_matrix = squareform(rdm)
+        results['similarity_matrices'] = self._compute_similarity_matrices(model_activations, stimuli)
 
-                    results['similarity_matrices'][model_name][layer_name] = {
-                        'rdm': rdm_matrix,
-                        'stimuli': stimuli,
-                        'layer': layer_name,
-                        'model': model_name
-                    }
-
-        # Compare models if we have multiple
         if len(model_names) > 1:
-            for i, model1 in enumerate(model_names):
-                for j, model2 in enumerate(model_names[i+1:], i+1):
-                    comparison_key = f"{model1}_vs_{model2}"
-                    results['model_comparisons'][comparison_key] = {}
-
-                    # Compare layers between models
-                    for layer1, acts1 in model_activations[model1].items():
-                        for layer2, acts2 in model_activations[model2].items():
-                            if acts1.shape == acts2.shape:
-                                # Compute correlation between RDMs
-                                rdm1 = pdist(acts1, metric='correlation')
-                                rdm2 = pdist(acts2, metric='correlation')
-
-                                if len(rdm1) > 1 and len(rdm2) > 1:
-                                    correlation = np.corrcoef(rdm1, rdm2)[0, 1]
-                                    if not np.isnan(correlation):
-                                        results['model_comparisons'][comparison_key][f"{layer1}_vs_{layer2}"] = correlation
-
-        # Add hierarchical alignment analysis
-        if len(model_names) > 1:
-            # Compute layer-wise alignment scores
-            layer_names = set()
-            for model_acts in model_activations.values():
-                layer_names.update(model_acts.keys())
-
-            for layer in layer_names:
-                alignment_scores = []
-                for i, model1 in enumerate(model_names):
-                    for j, model2 in enumerate(model_names[i+1:], i+1):
-                        if (layer in model_activations[model1] and
-                            layer in model_activations[model2]):
-                            acts1 = model_activations[model1][layer]
-                            acts2 = model_activations[model2][layer]
-                            if acts1.shape == acts2.shape:
-                                # Compute correlation
-                                corr = np.corrcoef(acts1.flatten(), acts2.flatten())[0, 1]
-                                if not np.isnan(corr):
-                                    alignment_scores.append(abs(corr))
-
-                if alignment_scores:
-                    results['hierarchical_alignment'][layer] = {
-                        'mean_alignment': np.mean(alignment_scores),
-                        'std_alignment': np.std(alignment_scores),
-                        'scores': alignment_scores
-                    }
+            results['model_comparisons'] = self._compare_rsa_models(model_activations, stimuli, model_names)
+            results['hierarchical_alignment'] = self._analyze_hierarchical_alignment(model_activations, model_names)
 
         return results
 
@@ -1336,126 +1394,195 @@ class ConceptualAnalyzer:
             emergent_concepts=emergent_concepts
         )
 
-    @log_error("analysis_operation")
+    def _analyze_spatial_representations(self, layer_acts: np.ndarray, stimuli_metadata: List[Dict[str, Any]]) -> Optional[float]:
+        spatial_positions = [meta.get('position', [0, 0]) for meta in stimuli_metadata]
+        if all(len(pos) == 2 for pos in spatial_positions):
+            spatial_positions = np.array(spatial_positions)
+            spatial_corr = []
+            for dim in range(min(layer_acts.shape[1], 10)):
+                corr_x = np.corrcoef(spatial_positions[:, 0], layer_acts[:, dim])[0, 1]
+                corr_y = np.corrcoef(spatial_positions[:, 1], layer_acts[:, dim])[0, 1]
+                if not (np.isnan(corr_x) or np.isnan(corr_y)):
+                    spatial_corr.append(max(abs(corr_x), abs(corr_y)))
+            if spatial_corr:
+                return np.mean(spatial_corr)
+        return None
+
+    def _analyze_temporal_representations(self, layer_acts: np.ndarray, stimuli_metadata: List[Dict[str, Any]]) -> Optional[float]:
+        temporal_sequences = [meta.get('sequence_id', meta.get('time', i)) for i, meta in enumerate(stimuli_metadata)]
+        if len(set(temporal_sequences)) > 1:
+            temporal_corr = []
+            for dim in range(min(layer_acts.shape[1], 10)):
+                corr_t = np.corrcoef(temporal_sequences, layer_acts[:, dim])[0, 1]
+                if not np.isnan(corr_t):
+                    temporal_corr.append(abs(corr_t))
+            if temporal_corr:
+                return np.mean(temporal_corr)
+        return 0.1  # Default if no temporal correlation found
+
+    def _analyze_object_representations(self, layer_acts: np.ndarray, stimuli_metadata: List[Dict[str, Any]]) -> Optional[float]:
+        objects = [meta.get('object', 'unknown') for meta in stimuli_metadata]
+        unique_objects = list(set(objects))
+        if len(unique_objects) > 1:
+            object_consistency = []
+            for obj in unique_objects:
+                obj_indices = [i for i, o in enumerate(objects) if o == obj]
+                if len(obj_indices) > 1:
+                    obj_acts = layer_acts[obj_indices]
+                    consistency = np.mean([
+                        np.corrcoef(obj_acts[i], obj_acts[j])[0, 1]
+                        for i in range(len(obj_acts))
+                        for j in range(i+1, len(obj_acts))
+                        if not np.isnan(np.corrcoef(obj_acts[i], obj_acts[j])[0, 1])
+                    ])
+                    if not np.isnan(consistency):
+                        object_consistency.append(consistency)
+            if object_consistency:
+                return np.mean(object_consistency)
+        return None
+
+    def _analyze_relational_representations(self, layer_acts: np.ndarray, stimuli_metadata: List[Dict[str, Any]]) -> Optional[float]:
+        relational_consistency = []
+        for i in range(len(stimuli_metadata)):
+            for j in range(i+1, len(stimuli_metadata)):
+                meta_i, meta_j = stimuli_metadata[i], stimuli_metadata[j]
+                pos_i, pos_j = meta_i.get('position', [0, 0]), meta_j.get('position', [0, 0])
+                obj_i, obj_j = meta_i.get('object', 'unknown'), meta_j.get('object', 'unknown')
+
+                spatial_dist = np.sqrt(sum((pi - pj) ** 2 for pi, pj in zip(pos_i, pos_j)))
+                act_dist = np.linalg.norm(layer_acts[i] - layer_acts[j])
+
+                same_object = obj_i == obj_j
+                if same_object:
+                    relational_consistency.append(1.0 / (1.0 + abs(spatial_dist - act_dist)))
+                else:
+                    relational_consistency.append(spatial_dist / (1.0 + act_dist))
+
+        if relational_consistency:
+            return np.mean(relational_consistency)
+        return 0.5  # Default value if no relations found
+
+    def _analyze_causal_representations(self, layer_acts: np.ndarray) -> Optional[float]:
+        """Estimate causal sensitivity based on temporal activation differences."""
+
+        if layer_acts.ndim < 2 or layer_acts.shape[0] < 2:
+            return 0.0
+
+        diffs = np.diff(layer_acts, axis=0)
+        magnitude = np.mean(np.abs(diffs))
+        if np.isnan(magnitude):
+            return None
+
+        score = 1.0 / (1.0 + magnitude)
+        return float(np.clip(score, 0.0, 1.0))
+
     def analyze_world_model(
         self,
         activations: Dict[str, np.ndarray],
         stimuli_metadata: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """Analyze world model representations in neural networks.
-
-        Args:
-            activations: Layer activations
-            stimuli_metadata: Metadata about input stimuli
-
-        Returns:
-            World model analysis results
-        """
-        logger.info("Analyzing world model representations")
+        """Analyze world model representations in neural networks."""
+        logger.info("Analyzing learned world model")
 
         results = {
             'spatial_representations': {},
             'temporal_representations': {},
             'object_representations': {},
             'relational_representations': {},
+            'causal_representations': {},
             'consistency_scores': {},
             'world_model_quality': 0.0
         }
 
-        # Extract spatial and object information from metadata
         for layer_name, layer_acts in activations.items():
             if len(stimuli_metadata) == layer_acts.shape[0]:
-                # Analyze spatial consistency
-                spatial_positions = [meta.get('position', [0, 0]) for meta in stimuli_metadata]
-                if all(len(pos) == 2 for pos in spatial_positions):
-                    spatial_positions = np.array(spatial_positions)
+                spatial_score = self._analyze_spatial_representations(layer_acts, stimuli_metadata)
+                if spatial_score is not None:
+                    results['spatial_representations'][layer_name] = spatial_score
 
-                    # Compute correlation between spatial positions and activations
-                    spatial_corr = []
-                    for dim in range(min(layer_acts.shape[1], 10)):  # Check first 10 dimensions
-                        corr_x = np.corrcoef(spatial_positions[:, 0], layer_acts[:, dim])[0, 1]
-                        corr_y = np.corrcoef(spatial_positions[:, 1], layer_acts[:, dim])[0, 1]
-                        if not (np.isnan(corr_x) or np.isnan(corr_y)):
-                            spatial_corr.append(max(abs(corr_x), abs(corr_y)))
+                temporal_score = self._analyze_temporal_representations(layer_acts, stimuli_metadata)
+                if temporal_score is not None:
+                    results['temporal_representations'][layer_name] = temporal_score
 
-                    if spatial_corr:
-                        results['spatial_representations'][layer_name] = np.mean(spatial_corr)
+                object_score = self._analyze_object_representations(layer_acts, stimuli_metadata)
+                if object_score is not None:
+                    results['object_representations'][layer_name] = object_score
 
-                # Analyze temporal consistency
-                temporal_sequences = [meta.get('sequence_id', meta.get('time', i)) for i, meta in enumerate(stimuli_metadata)]
-                if len(set(temporal_sequences)) > 1:  # If we have temporal variation
-                    temporal_corr = []
-                    for dim in range(min(layer_acts.shape[1], 10)):  # Check first 10 dimensions
-                        corr_t = np.corrcoef(temporal_sequences, layer_acts[:, dim])[0, 1]
-                        if not np.isnan(corr_t):
-                            temporal_corr.append(abs(corr_t))
+                relational_score = self._analyze_relational_representations(layer_acts, stimuli_metadata)
+                if relational_score is not None:
+                    results['relational_representations'][layer_name] = relational_score
 
-                    if temporal_corr:
-                        results['temporal_representations'][layer_name] = np.mean(temporal_corr)
-                    else:
-                        # If no temporal correlation found, assign a small positive value
-                        results['temporal_representations'][layer_name] = 0.1
+                causal_score = self._analyze_causal_representations(layer_acts)
+                if causal_score is not None:
+                    results['causal_representations'][layer_name] = causal_score
 
-                # Analyze object consistency
-                objects = [meta.get('object', 'unknown') for meta in stimuli_metadata]
-                unique_objects = list(set(objects))
-                if len(unique_objects) > 1:
-                    object_consistency = []
-                    for obj in unique_objects:
-                        obj_indices = [i for i, o in enumerate(objects) if o == obj]
-                        if len(obj_indices) > 1:
-                            obj_acts = layer_acts[obj_indices]
-                            # Compute within-object consistency
-                            consistency = np.mean([
-                                np.corrcoef(obj_acts[i], obj_acts[j])[0, 1]
-                                for i in range(len(obj_acts))
-                                for j in range(i+1, len(obj_acts))
-                                if not np.isnan(np.corrcoef(obj_acts[i], obj_acts[j])[0, 1])
-                            ])
-                            if not np.isnan(consistency):
-                                object_consistency.append(consistency)
-
-                    if object_consistency:
-                        results['object_representations'][layer_name] = np.mean(object_consistency)
-
-                # Analyze relational representations
-                # Look for relationships between objects and positions
-                relational_consistency = []
-                for i in range(len(stimuli_metadata)):
-                    for j in range(i+1, len(stimuli_metadata)):
-                        meta_i, meta_j = stimuli_metadata[i], stimuli_metadata[j]
-                        pos_i, pos_j = meta_i.get('position', [0, 0]), meta_j.get('position', [0, 0])
-                        obj_i, obj_j = meta_i.get('object', 'unknown'), meta_j.get('object', 'unknown')
-
-                        # Calculate spatial distance
-                        spatial_dist = np.sqrt(sum((pi - pj) ** 2 for pi, pj in zip(pos_i, pos_j)))
-
-                        # Calculate activation distance
-                        act_dist = np.linalg.norm(layer_acts[i] - layer_acts[j])
-
-                        # Check if same object type affects distance relationship
-                        same_object = obj_i == obj_j
-                        if same_object:
-                            relational_consistency.append(1.0 / (1.0 + abs(spatial_dist - act_dist)))
-                        else:
-                            relational_consistency.append(spatial_dist / (1.0 + act_dist))
-
-                if relational_consistency:
-                    results['relational_representations'][layer_name] = np.mean(relational_consistency)
-                else:
-                    # Default value if no relations found
-                    results['relational_representations'][layer_name] = 0.5
-
-        # Compute overall world model quality
         all_scores = []
         all_scores.extend(results['spatial_representations'].values())
         all_scores.extend(results['temporal_representations'].values())
         all_scores.extend(results['object_representations'].values())
         all_scores.extend(results['relational_representations'].values())
+        all_scores.extend(results['causal_representations'].values())
         if all_scores:
             results['world_model_quality'] = np.mean(all_scores)
 
+        self.world_models['latest'] = results
         return results
+
+    def _calculate_concept_confidence(
+        self,
+        concept_vector: np.ndarray,
+        all_vectors: np.ndarray,
+        positive_mask: np.ndarray
+    ) -> float:
+        """Estimate confidence that a vector captures a concept."""
+
+        if concept_vector.size == 0 or all_vectors.size == 0:
+            return 0.0
+
+        concept_norm = np.linalg.norm(concept_vector)
+        if concept_norm == 0:
+            return 0.0
+
+        normalized_concept = concept_vector / concept_norm
+        normalized_vectors = all_vectors / (np.linalg.norm(all_vectors, axis=1, keepdims=True) + 1e-8)
+        similarities = normalized_vectors @ normalized_concept
+
+        positives = similarities[positive_mask]
+        negatives = similarities[~positive_mask] if (~positive_mask).any() else np.array([0.0])
+
+        pos_mean = float(np.mean(positives)) if positives.size else 0.0
+        neg_mean = float(np.mean(negatives)) if negatives.size else 0.0
+
+        confidence = (pos_mean - neg_mean + 1.0) / 2.0
+        return float(np.clip(confidence, 0.0, 1.0))
+
+    def _calculate_representation_similarity(
+        self,
+        activations_a: np.ndarray,
+        activations_b: np.ndarray
+    ) -> float:
+        """Compute a normalized similarity score between two activation sets."""
+
+        if activations_a.shape != activations_b.shape or activations_a.size == 0:
+            return 0.0
+
+        flat_a = activations_a.reshape(activations_a.shape[0], -1)
+        flat_b = activations_b.reshape(activations_b.shape[0], -1)
+
+        similarities = []
+        for vec_a, vec_b in zip(flat_a, flat_b):
+            norm_a = np.linalg.norm(vec_a)
+            norm_b = np.linalg.norm(vec_b)
+            if norm_a == 0 or norm_b == 0:
+                continue
+            cosine = np.dot(vec_a, vec_b) / (norm_a * norm_b)
+            similarities.append(cosine)
+
+        if not similarities:
+            return 0.0
+
+        mean_cosine = float(np.clip(np.mean(similarities), -1.0, 1.0))
+        return (mean_cosine + 1.0) / 2.0
 
     @log_error("analysis_operation")
     def save_analysis_results(self, output_path: str) -> None:

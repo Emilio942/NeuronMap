@@ -325,7 +325,9 @@ class DomainSpecificQuestionGenerator(EnhancedQuestionGenerator):
         # Domain-specific configuration
         domain_config = self.gen_config.get("domain_targeting", {})
         self.domain_enabled = domain_config.get("enabled", False)
-        self.target_domains = [Domain(d) for d in domain_config.get("target_domains", [])]
+        self.target_domains = [
+            Domain(d) for d in domain_config.get(
+                "target_domains", [])]
         self.domain_balance = domain_config.get("domain_balance", "equal")
 
     def generate_domain_questions(
@@ -353,7 +355,8 @@ class DomainSpecificQuestionGenerator(EnhancedQuestionGenerator):
             logger.error(f"No template available for domain: {domain.value}")
             return []
 
-        prompt = self._create_domain_prompt(template, difficulty, category, num_questions, subdomain)
+        prompt = self._create_domain_prompt(
+            template, difficulty, category, num_questions, subdomain)
 
         try:
             response = self._generate_with_ollama(prompt)
@@ -365,19 +368,24 @@ class DomainSpecificQuestionGenerator(EnhancedQuestionGenerator):
 
             for question_text in raw_questions:
                 # Validate question quality
-                is_valid, quality_score, issues = self.quality_validator.validate_question(question_text)
+                is_valid, quality_score, issues = self.quality_validator.validate_question(
+                    question_text)
 
                 if not is_valid or quality_score < self.min_quality_score:
-                    logger.debug(f"Skipping low-quality domain question: {question_text[:50]}...")
+                    logger.debug(
+                        f"Skipping low-quality domain question: {question_text[:50]}...")
                     continue
 
                 # Analyze question properties
-                actual_difficulty, complexity_score = self.difficulty_analyzer.estimate_difficulty(question_text)
-                actual_category = self.difficulty_analyzer.categorize_question(question_text)
+                actual_difficulty, complexity_score = self.difficulty_analyzer.estimate_difficulty(
+                    question_text)
+                actual_category = self.difficulty_analyzer.categorize_question(
+                    question_text)
                 keywords = self.difficulty_analyzer.extract_keywords(question_text)
 
                 # Add domain-specific keywords
-                domain_keywords = [kw for kw in template.context_keywords if kw.lower() in question_text.lower()]
+                domain_keywords = [
+                    kw for kw in template.context_keywords if kw.lower() in question_text.lower()]
                 keywords.extend(domain_keywords)
 
                 # Create metadata with domain information
@@ -393,7 +401,8 @@ class DomainSpecificQuestionGenerator(EnhancedQuestionGenerator):
                     quality_score=quality_score,
                     validation_passed=True,
                     domain=domain.value,
-                    requires_reasoning_steps=self._estimate_reasoning_steps(question_text),
+                    requires_reasoning_steps=self._estimate_reasoning_steps(
+                        question_text),
                     has_specific_knowledge=True  # Domain questions typically require specific knowledge
                 )
 
@@ -453,23 +462,26 @@ class DomainSpecificQuestionGenerator(EnhancedQuestionGenerator):
 
         for i, domain in enumerate(domains):
             # Add remainder questions to first few domains
-            domain_questions = questions_per_domain + (1 if i < remaining_questions else 0)
+            domain_questions = questions_per_domain + \
+                (1 if i < remaining_questions else 0)
 
             if domain_questions == 0:
                 continue
 
-            logger.info(f"Generating {domain_questions} questions for {domain.value}...")
+            logger.info(
+                f"Generating {domain_questions} questions for {
+                    domain.value}...")
 
             # Generate questions for each difficulty/category combination
             for difficulty, diff_ratio in diff_dist.items():
                 for category, cat_ratio in cat_dist.items():
                     # Calculate number of questions for this combination
-                    combo_questions = max(1, int(domain_questions * diff_ratio * cat_ratio))
+                    combo_questions = max(
+                        1, int(domain_questions * diff_ratio * cat_ratio))
 
                     if combo_questions > 0:
                         questions = self.generate_domain_questions(
-                            domain, DifficultyLevel(difficulty), QuestionCategory(category), combo_questions
-                        )
+                            domain, DifficultyLevel(difficulty), QuestionCategory(category), combo_questions)
                         all_questions.extend(questions)
 
         # Shuffle and trim to exact target
@@ -500,7 +512,10 @@ class DomainSpecificQuestionGenerator(EnhancedQuestionGenerator):
             subdomain_text = f"\nFocus specifically on: {subdomain}"
         elif template.subdomain_areas:
             # Suggest random subdomain areas
-            suggested_areas = random.sample(template.subdomain_areas, min(3, len(template.subdomain_areas)))
+            suggested_areas = random.sample(
+                template.subdomain_areas, min(
+                    3, len(
+                        template.subdomain_areas)))
             subdomain_text = f"\nConsider these areas: {', '.join(suggested_areas)}"
 
         # Category-specific instructions
@@ -512,21 +527,19 @@ class DomainSpecificQuestionGenerator(EnhancedQuestionGenerator):
             QuestionCategory.MATHEMATICAL: "involving mathematical concepts, calculations, or quantitative reasoning",
             QuestionCategory.TECHNICAL: "related to technical procedures, methods, or specialized techniques",
             QuestionCategory.ANALYTICAL: "requiring analysis, comparison, evaluation, or critical thinking",
-            QuestionCategory.CONCEPTUAL: "exploring abstract concepts, theories, or fundamental principles"
-        }
+            QuestionCategory.CONCEPTUAL: "exploring abstract concepts, theories, or fundamental principles"}
 
         # Difficulty-specific instructions
         difficulty_instructions = {
             DifficultyLevel.BEGINNER: "accessible to newcomers with basic background knowledge",
             DifficultyLevel.INTERMEDIATE: "requiring moderate expertise and analytical thinking",
             DifficultyLevel.ADVANCED: "challenging for experts, requiring deep understanding and synthesis",
-            DifficultyLevel.EXPERT: "requiring specialized knowledge and sophisticated reasoning"
-        }
+            DifficultyLevel.EXPERT: "requiring specialized knowledge and sophisticated reasoning"}
 
-        prompt = f"""Generate {num_questions} high-quality questions in the field of {template.domain.value.replace('_', ' ').title()}.
+        prompt = f"""Generate {num_questions} high-quality questions in the field of {
+            template.domain.value.replace('_', ' ').title()}.
 
-Domain Focus: {template.instruction}
-{subdomain_text}
+Domain Focus: {template.instruction} {subdomain_text}
 
 Requirements:
 - Questions should be {difficulty_instructions[difficulty]}
@@ -546,7 +559,8 @@ Examples of {difficulty.value} level questions in this domain:"""
             for i, example in enumerate(examples[:3], 1):
                 prompt += f"\n{i}. {example}"
 
-        prompt += f"\n\nNow generate {num_questions} new questions following this style and difficulty level:"
+        prompt += f"\n\nNow generate {
+            num_questions} new questions following this style and difficulty level:"
 
         return prompt
 
@@ -581,8 +595,14 @@ Examples of {difficulty.value} level questions in this domain:"""
         quality_scores = [q.quality_score for q in questions]
         complexity_scores = [q.estimated_complexity_score for q in questions]
 
-        logger.info(f"  Average quality score: {sum(quality_scores)/len(quality_scores):.3f}")
-        logger.info(f"  Average complexity: {sum(complexity_scores)/len(complexity_scores):.3f}")
+        logger.info(
+            f"  Average quality score: {
+                sum(quality_scores) /
+                len(quality_scores):.3f}")
+        logger.info(
+            f"  Average complexity: {
+                sum(complexity_scores) /
+                len(complexity_scores):.3f}")
 
 
 def main():
@@ -592,15 +612,15 @@ def main():
     parser = argparse.ArgumentParser(description="Domain-specific question generation")
     parser.add_argument("--config", default="default", help="Configuration name to use")
     parser.add_argument("--domains", nargs="+", choices=[d.value for d in Domain],
-                       help="Target domains for question generation")
+                        help="Target domains for question generation")
     parser.add_argument("--num-questions", type=int, default=50,
-                       help="Total number of questions to generate")
+                        help="Total number of questions to generate")
     parser.add_argument("--output", default="domain_specific_questions.json",
-                       help="Output file path")
+                        help="Output file path")
     parser.add_argument("--difficulty", choices=[d.value for d in DifficultyLevel],
-                       help="Target specific difficulty level")
+                        help="Target specific difficulty level")
     parser.add_argument("--category", choices=[c.value for c in QuestionCategory],
-                       help="Target specific category")
+                        help="Target specific category")
     parser.add_argument("--subdomain", help="Focus on specific subdomain")
 
     args = parser.parse_args()
@@ -637,7 +657,9 @@ def main():
         if questions:
             success = generator.save_questions_with_metadata(questions, args.output)
             if success:
-                logger.info(f"Successfully generated {len(questions)} domain-specific questions")
+                logger.info(
+                    f"Successfully generated {
+                        len(questions)} domain-specific questions")
                 return 0
             else:
                 logger.error("Failed to save questions")

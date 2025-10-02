@@ -162,7 +162,7 @@ class ActivationAnalyzer:
 
             # Forward pass
             with torch.no_grad():
-                outputs = self.model_adapter.model(**inputs)
+                self.model_adapter.model(**inputs)
 
             # Convert cached activations to numpy
             activations = {}
@@ -308,6 +308,41 @@ class ActivationAnalyzer:
         stats['layer_statistics'] = layer_stats
         return stats
 
+    def _find_highly_correlated_pairs(
+        self,
+        correlation_matrix: np.ndarray,
+        layer_names: List[str],
+        threshold: float = 0.8,
+    ) -> List[Dict[str, Any]]:
+        """Identify pairs of layers whose correlation exceeds ``threshold``.
+
+        The method mirrors the helper available in :mod:`advanced_analysis` so
+        that the multi-model test-suite can exercise this analyser in
+        isolation.
+        """
+
+        if correlation_matrix.ndim != 2:
+            raise ValueError("correlation_matrix must be 2-dimensional")
+
+        if correlation_matrix.shape[0] != correlation_matrix.shape[1]:
+            raise ValueError("correlation_matrix must be square")
+
+        if len(layer_names) != correlation_matrix.shape[0]:
+            raise ValueError("layer_names length must match correlation_matrix dimensions")
+
+        pairs: List[Dict[str, Any]] = []
+        for i in range(len(layer_names)):
+            for j in range(i + 1, len(layer_names)):
+                value = float(correlation_matrix[i, j])
+                if abs(value) >= threshold:
+                    pairs.append({
+                        "layer1": layer_names[i],
+                        "layer2": layer_names[j],
+                        "correlation": value,
+                    })
+
+        return pairs
+
 
 def main():
     """Test the activation analyzer."""
@@ -316,7 +351,6 @@ def main():
     sys.path.insert(0, str(Path(__file__).parent.parent))
 
     from utils.config_manager import get_config
-    from data_processing.question_loader import QuestionLoader
 
     # Load configuration
     config = get_config()

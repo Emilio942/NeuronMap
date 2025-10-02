@@ -2,22 +2,20 @@
 
 import torch
 from transformers import (
-    AutoTokenizer, AutoModelForCausalLM, AutoModel,
-    GPT2Model, BertModel, T5Model, LlamaForCausalLM
+    AutoTokenizer, AutoModelForCausalLM, AutoModel
 )
 import pandas as pd
 import json
 import numpy as np
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any, Union
-from tqdm import tqdm
+from typing import Dict, List, Optional, Tuple, Any
 from collections import defaultdict
 import h5py
 
 from ..utils.config import get_config
-from ..utils.error_handling import with_retry, safe_execute
 from ..utils.monitoring import SystemMonitor
+from ..utils.error_handling import with_retry
 
 
 logger = logging.getLogger(__name__)
@@ -56,10 +54,13 @@ class ModelLayerMapper:
         elif "t5" in self.model_name.lower():
             return layer_patterns.get("t5", {})
         else:
-            logger.warning(f"Unknown model type for {self.model_name}, using generic patterns")
+            logger.warning(
+                f"Unknown model type for {
+                    self.model_name}, using generic patterns")
             return {"attention_patterns": [], "mlp_patterns": []}
 
-    def get_all_layers(self, layer_range: Optional[Tuple[int, int]] = None) -> List[str]:
+    def get_all_layers(
+            self, layer_range: Optional[Tuple[int, int]] = None) -> List[str]:
         """Get all layer names for the model.
 
         Args:
@@ -164,7 +165,9 @@ class MultiModelActivationExtractor:
         if torch.cuda.is_available():
             monitor = SystemMonitor()
             memory_info = monitor.get_system_metrics()
-            logger.info(f"GPU memory before loading: {memory_info.gpu_memory_percent}% used")
+            logger.info(
+                f"GPU memory before loading: {
+                    memory_info.gpu_memory_percent}% used")
 
         try:
             # Load tokenizer
@@ -208,7 +211,9 @@ class MultiModelActivationExtractor:
             if torch.cuda.is_available():
                 monitor = SystemMonitor()
                 memory_info = monitor.get_system_metrics()
-                logger.info(f"GPU memory after loading: {memory_info.gpu_memory_percent}% used")
+                logger.info(
+                    f"GPU memory after loading: {
+                        memory_info.gpu_memory_percent}% used")
 
             return True
 
@@ -264,7 +269,9 @@ class MultiModelActivationExtractor:
                 elif isinstance(output_tensor, tuple) and len(output_tensor) > 0:
                     tensor = output_tensor[0]
                 else:
-                    logger.warning(f"Unexpected output type from {layer_name}: {type(output_tensor)}")
+                    logger.warning(
+                        f"Unexpected output type from {layer_name}: {
+                            type(output_tensor)}")
                     return
 
                 # Move to CPU and detach
@@ -274,9 +281,11 @@ class MultiModelActivationExtractor:
                 if detached_tensor.ndim >= 3:  # (batch, seq_len, hidden)
                     # Aggregate over sequence dimension
                     if detached_tensor.shape[0] == 1:  # Single batch
-                        aggregated = detached_tensor[0].mean(dim=0)  # Mean over sequence
+                        aggregated = detached_tensor[0].mean(
+                            dim=0)  # Mean over sequence
                     else:
-                        aggregated = detached_tensor.mean(dim=(0, 1))  # Mean over batch and sequence
+                        aggregated = detached_tensor.mean(
+                            dim=(0, 1))  # Mean over batch and sequence
                 elif detached_tensor.ndim == 2:  # (batch, hidden) or (seq_len, hidden)
                     aggregated = detached_tensor.mean(dim=0)
                 else:
@@ -334,7 +343,8 @@ class MultiModelActivationExtractor:
         """Clear stored activations."""
         self.activation_storage.clear()
 
-    def process_batch(self, questions: List[str], target_layers: List[str]) -> List[Dict[str, Any]]:
+    def process_batch(
+            self, questions: List[str], target_layers: List[str]) -> List[Dict[str, Any]]:
         """Process a batch of questions and extract activations.
 
         Args:
@@ -384,7 +394,8 @@ class MultiModelActivationExtractor:
 
                     for layer_name in target_layers:
                         if layer_name in self.activation_storage and self.activation_storage[layer_name]:
-                            activation = self.activation_storage[layer_name][-1]  # Get latest activation
+                            # Get latest activation
+                            activation = self.activation_storage[layer_name][-1]
                             question_result['activations'][layer_name] = {
                                 'vector': activation.tolist(),
                                 'shape': activation.shape,
@@ -437,7 +448,8 @@ class MultiModelActivationExtractor:
                 question_group = activations_group.create_group(f'question_{i}')
 
                 for layer_name, layer_data in result['activations'].items():
-                    layer_group = question_group.create_group(layer_name.replace('.', '_'))
+                    layer_group = question_group.create_group(
+                        layer_name.replace('.', '_'))
                     layer_group.create_dataset('vector', data=layer_data['vector'])
                     layer_group.attrs['shape'] = layer_data['shape']
                     layer_group.attrs['stats'] = json.dumps(layer_data['stats'])
@@ -476,11 +488,11 @@ class MultiModelActivationExtractor:
         logger.info(f"Results saved to CSV: {output_path}")
 
     def run_multi_layer_extraction(self,
-                                  questions_file: Optional[str] = None,
-                                  target_layers: Optional[List[str]] = None,
-                                  layer_range: Optional[Tuple[int, int]] = None,
-                                  batch_size: int = 1,
-                                  output_format: str = "hdf5") -> bool:
+                                   questions_file: Optional[str] = None,
+                                   target_layers: Optional[List[str]] = None,
+                                   layer_range: Optional[Tuple[int, int]] = None,
+                                   batch_size: int = 1,
+                                   output_format: str = "hdf5") -> bool:
         """Run multi-layer activation extraction.
 
         Args:
@@ -529,10 +541,11 @@ class MultiModelActivationExtractor:
                 batch_results = self.process_batch(batch_questions, target_layers)
                 all_results.extend(batch_results)
 
-                logger.info(f"Processed batch {i//batch_size + 1}/{(len(questions) + batch_size - 1)//batch_size}")
+                logger.info(f"Processed batch {
+                            i // batch_size + 1}/{(len(questions) + batch_size - 1) // batch_size}")
 
             except Exception as e:
-                logger.error(f"Error processing batch {i//batch_size + 1}: {e}")
+                logger.error(f"Error processing batch {i // batch_size + 1}: {e}")
                 failed_count += len(batch_questions)
 
         # Save results
@@ -574,7 +587,8 @@ class MultiModelActivationExtractor:
                             if 'question' in data:
                                 questions.append(data['question'])
                             else:
-                                logger.warning(f"Line {line_num}: No 'question' field found")
+                                logger.warning(
+                                    f"Line {line_num}: No 'question' field found")
                         except json.JSONDecodeError as e:
                             logger.warning(f"Line {line_num}: Invalid JSON - {e}")
         except Exception as e:
@@ -594,10 +608,24 @@ def main():
     parser.add_argument("--model", help="Model configuration name to use")
     parser.add_argument("--questions-file", help="Path to questions file")
     parser.add_argument("--layers", nargs="+", help="Specific layers to extract from")
-    parser.add_argument("--layer-range", nargs=2, type=int, help="Layer range (start end)")
-    parser.add_argument("--batch-size", type=int, default=1, help="Batch size for processing")
-    parser.add_argument("--output-format", choices=["hdf5", "csv", "both"], default="hdf5",
-                        help="Output format")
+    parser.add_argument(
+        "--layer-range",
+        nargs=2,
+        type=int,
+        help="Layer range (start end)")
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="Batch size for processing")
+    parser.add_argument(
+        "--output-format",
+        choices=[
+            "hdf5",
+            "csv",
+            "both"],
+        default="hdf5",
+        help="Output format")
     parser.add_argument("--discover-layers", action="store_true",
                         help="Discover and list model layers")
 

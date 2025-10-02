@@ -7,17 +7,19 @@ for type checking and YAML/JSON support for flexible configuration files.
 """
 
 try:
-    from pydantic import BaseModel, field_validator, ConfigDict, Field, ValidationError
+    from pydantic import BaseModel, field_validator, ConfigDict, Field, ValidationError, PrivateAttr
 except ImportError:
     from pydantic import BaseModel, validator as field_validator, ValidationError
     # Fallback für ältere Pydantic Versionen
     ConfigDict = None
     Field = lambda default=None, **kwargs: default
+    PrivateAttr = lambda default=None: None
 
 import yaml
 import json
 import logging
 from pathlib import Path
+from copy import deepcopy
 from typing import Dict, Any, Optional, List, Union, Tuple
 from dataclasses import dataclass
 from datetime import datetime
@@ -261,6 +263,7 @@ class NeuronMapConfig(BaseModel):
     # Version and metadata
     version: str = Field(default="1.0.0", description="Configuration version")
     created_at: datetime = Field(default_factory=datetime.now, description="Configuration creation time")
+    config_dir: Path = Field(default_factory=lambda: Path("configs"), description="Configuration directory")
 
     # Component configurations
     model: ModelConfig = Field(default_factory=ModelConfig)
@@ -289,22 +292,74 @@ class NeuronMapConfig(BaseModel):
     prod: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Production config")
     experiments: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Experiments config")
 
+    _models_cache: Dict[str, Any] = PrivateAttr(default_factory=dict)
+    _experiments_cache: Dict[str, Any] = PrivateAttr(default_factory=dict)
+    _layer_patterns_cache: Dict[str, Any] = PrivateAttr(default_factory=dict)
+
+    def __init__(self, config_dir: Optional[Union[str, Path]] = None, **data: Any):
+        if config_dir is not None:
+            data['config_dir'] = Path(config_dir)
+        super().__init__(**data)
+        self.config_dir = Path(self.config_dir)
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+
+    def _read_yaml(self, filename: str) -> Dict[str, Any]:
+        path = self.config_dir / filename
+        if not path.exists():
+            return {}
+        with open(path, 'r', encoding='utf-8') as handle:
+            data = yaml.safe_load(handle) or {}
+            if not isinstance(data, dict):
+                raise ValueError(f"Configuration file {path} must contain a mapping at the top level")
+            return data
+
+    def load_models_config(self) -> Dict[str, Any]:
+        if not self._models_cache:
+            self._models_cache = self._read_yaml('models.yaml')
+            self._layer_patterns_cache = self._models_cache.get('layer_patterns', {})
+        return deepcopy(self._models_cache)
+
+    def load_experiments_config(self) -> Dict[str, Any]:
+        if not self._experiments_cache:
+            self._experiments_cache = self._read_yaml('experiments.yaml')
+        return deepcopy(self._experiments_cache)
+
+    def get_model_config(self, model_name: str) -> Dict[str, Any]:
+        models = self.load_models_config().get('models', {})
+        if model_name not in models:
+            raise KeyError(f"Model '{model_name}' not found in models.yaml")
+        return deepcopy(models[model_name])
+
     def get_experiment_config(self, experiment_name: str = "default") -> Dict[str, Any]:
         """Get experiment configuration by name."""
-        return {
-            'name': experiment_name,
-            'description': getattr(self.experiment, 'description', f'Experiment: {experiment_name}') if self.experiment else f'Default experiment: {experiment_name}',
-            'model': self.model.name,
-            'data': {
-                'input_file': self.data.input_file,
-                'output_file': self.data.output_file,
-                'batch_size': self.data.batch_size
-            },
-            'analysis': {
-                'target_layers': self.model.target_layers,
-                'max_length': self.model.max_length
-            }
-        }
+        experiments = self.load_experiments_config()
+
+        if experiment_name in experiments:
+            return deepcopy(experiments[experiment_name])
+
+        nested = experiments.get('experiments', {})
+        if experiment_name in nested:
+            return deepcopy(nested[experiment_name])
+
+        raise KeyError(f"Experiment '{experiment_name}' not found in experiments.yaml")
+
+    def resolve_layer_name(self, model_config: Dict[str, Any], layer_type: str, layer_index: int) -> str:
+        """Resolve a templated layer name for a given model configuration."""
+        layers = model_config.get('layers', {})
+        template = layers.get(layer_type)
+        if isinstance(template, str):
+            return template.format(layer=layer_index)
+
+        if layer_type in {'attention', 'mlp'}:
+            model_type = model_config.get('type')
+            patterns = self._layer_patterns_cache or self.load_models_config().get('layer_patterns', {})
+            if model_type in patterns:
+                key = 'attention_patterns' if layer_type == 'attention' else 'mlp_patterns'
+                options = patterns[model_type].get(key, [])
+                if options:
+                    return options[0].format(layer=layer_index)
+
+        raise KeyError(f"Layer type '{layer_type}' not defined for model '{model_config.get('name', model_config)}'")
 
     def load_config(self, config_path: Union[str, Path]) -> 'NeuronMapConfig':
         """Load configuration from file using ConfigManager."""
@@ -339,103 +394,177 @@ class NeuronMapConfig(BaseModel):
 
 
 class ConfigManager:
-    """Enhanced configuration manager with validation and multiple format support"""
+    """High-level configuration manager with YAML support and caching."""
 
     def __init__(self, config_dir: str = "configs"):
         self.config_dir = Path(config_dir)
-        self.config_dir.mkdir(exist_ok=True)
-        self._config: Optional[NeuronMapConfig] = None
+        if not self.config_dir.exists():
+            if config_dir == "configs":
+                self.config_dir.mkdir(parents=True, exist_ok=True)
+            else:
+                raise ConfigurationError("Config directory not found")
+        if not self.config_dir.is_dir():
+            raise ConfigurationError("Config directory not found")
+
         self._loaded_files: List[Path] = []
+        self._raw_config: Optional[Dict[str, Any]] = None
+        self._cached_dict: Optional[Dict[str, Any]] = None
+        self._config_model: Optional[NeuronMapConfig] = None
+        self._config: Optional[NeuronMapConfig] = None
+        self._validation_errors: List[Dict[str, Any]] = []
+        self._environment = self._determine_initial_environment()
+
+        self._models_config_cache: Optional[Dict[str, Any]] = None
+
+    def _determine_initial_environment(self) -> str:
+        env = os.getenv("NEURONMAP_CONFIG_ENV", "").strip().lower()
+        return env or "default"
+
+    @property
+    def current_environment(self) -> str:
+        """Return the active environment name."""
+        return self._environment
+
+    @property
+    def config(self) -> Dict[str, Any]:
+        """Dictionary view of the cached configuration."""
+        return self.get_config()
 
     def load_config(self, config_path: Optional[str] = None) -> NeuronMapConfig:
-        """Load configuration from file or create default"""
-        if config_path is None:
-            config_path = self._find_config_file()
-        else:
+        """Load configuration from disk and build a typed representation."""
+        if config_path:
             config_path = Path(config_path)
-
-        if config_path.exists():
-            self._config = self._load_from_file(config_path)
+            data = self._load_yaml_file(config_path)
+            self._loaded_files = [config_path]
         else:
-            logger.warning(f"Config file {config_path} not found, using defaults")
-            self._config = NeuronMapConfig()
+            data = self._load_config_files()
 
-        # Load environment-specific overrides
-        self._load_environment_overrides()
+        env_overrides = self._load_environment_overrides()
+        merged = self._merge_config_dict(data, env_overrides) if env_overrides else data
 
-        # Validate configuration
-        validation_errors = self.validate_config()
-        if validation_errors:
-            logger.warning(f"Configuration validation found {len(validation_errors)} issues")
-            for error in validation_errors:
-                logger.warning(f"  {error.field}: {error.message}")
-                if error.suggestion:
-                    logger.info(f"    Suggestion: {error.suggestion}")
+        self._raw_config = deepcopy(merged)
+        self._cached_dict = self._raw_config
 
-        return self._config
+        try:
+            self._config_model = NeuronMapConfig(config_dir=self.config_dir, **self._raw_config)
+            self._config = self._config_model
+            self._validation_errors = []
+        except ValidationError as exc:
+            logger.warning("Configuration validation produced warnings: %s", exc)
+            self._validation_errors = exc.errors() if hasattr(exc, "errors") else [{"msg": str(exc)}]
+            self._config_model = NeuronMapConfig(config_dir=self.config_dir)
+            self._config = self._config_model
 
-    def _find_config_file(self) -> Path:
-        """Find configuration file in standard locations"""
-        possible_files = [
-            self.config_dir / "config.yaml",
-            self.config_dir / "config.yml",
-            self.config_dir / "neuronmap.yaml",
-            Path("config.yaml"),
-            Path("neuronmap.yaml")
+        # Clear any cached derived data so future access reflects the refreshed configuration
+        self._models_config_cache = None
+
+        return self._config_model
+
+    def get_config(self) -> Dict[str, Any]:
+        """Return the configuration as a plain dictionary."""
+        if self._cached_dict is None or self._config is None:
+            self.load_config()
+        return self._cached_dict  # type: ignore[return-value]
+
+    def get_config_model(self) -> NeuronMapConfig:
+        """Return the typed configuration instance."""
+        if self._config is None:
+            self.load_config()
+        return self._config  # type: ignore[return-value]
+
+    def get_default_config(self) -> NeuronMapConfig:
+        """Convenience accessor used by legacy code paths."""
+        return self.get_config_model()
+
+    def _load_config_files(self) -> Dict[str, Any]:
+        """Load all baseline YAML configuration files from the directory."""
+        merged: Dict[str, Any] = {}
+        self._loaded_files = []
+
+        yaml_candidates = list(self.config_dir.glob("*.yml")) + list(self.config_dir.glob("*.yaml"))
+        seen: set[Path] = set()
+        yaml_files: List[Path] = []
+        for file_path in yaml_candidates:
+            if file_path not in seen:
+                yaml_files.append(file_path)
+                seen.add(file_path)
+
+        yaml_files.sort(key=self._config_file_priority)
+        for file_path in yaml_files:
+            if file_path.name.startswith("environment_") or file_path.name.startswith("config."):
+                # Environment-specific files are handled separately
+                continue
+            data = self._load_yaml_file(file_path)
+            if data:
+                merged = self._merge_config_dict(merged, data)
+                self._loaded_files.append(file_path)
+
+        return merged
+
+    def _config_file_priority(self, file_path: Path) -> Tuple[int, str]:
+        name = file_path.name.lower()
+        base_prefixes = ("config", "models", "analysis", "data", "system", "default")
+        priority = 0 if name.startswith(base_prefixes) else 1
+        return (priority, name)
+
+    def _load_yaml_file(self, path: Path) -> Dict[str, Any]:
+        if not path.exists():
+            return {}
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                data = yaml.safe_load(handle) or {}
+                if not isinstance(data, dict):
+                    raise ValueError("Configuration file must contain a JSON/YAML object")
+                return data
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.error("Failed to read configuration file %s: %s", path, exc)
+            raise ConfigurationError(f"Failed to load config from {path}: {exc}")
+
+    def _resolve_environment_file(self, environment: str) -> Optional[Path]:
+        if environment in ("", "default"):
+            return None
+
+        candidates = [
+            self.config_dir / f"environment_{environment}.yaml",
+            self.config_dir / f"environment_{environment}.yml",
+            self.config_dir / f"config.{environment}.yaml",
+            self.config_dir / f"config.{environment}.yml",
         ]
 
-        for config_file in possible_files:
-            if config_file.exists():
-                return config_file
+        aliases = {
+            "dev": ["development"],
+            "development": ["dev"],
+            "test": ["testing"],
+            "testing": ["test"],
+            "production": ["prod"],
+            "prod": ["production"],
+        }
 
-        return self.config_dir / "config.yaml"
+        for alias in aliases.get(environment, []):
+            candidates.extend([
+                self.config_dir / f"environment_{alias}.yaml",
+                self.config_dir / f"environment_{alias}.yml",
+                self.config_dir / f"config.{alias}.yaml",
+                self.config_dir / f"config.{alias}.yml",
+            ])
 
-    def _load_from_file(self, config_path: Path) -> NeuronMapConfig:
-        """Load configuration from YAML or JSON file"""
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                if config_path.suffix.lower() in ['.yaml', '.yml']:
-                    data = yaml.safe_load(f)
-                elif config_path.suffix.lower() == '.json':
-                    data = json.load(f)
-                else:
-                    raise ValueError(f"Unsupported config file format: {config_path.suffix}")
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        return None
 
-            self._loaded_files.append(config_path)
-            logger.info(f"Loaded configuration from {config_path}")
+    def _load_environment_overrides(self) -> Dict[str, Any]:
+        env_file = self._resolve_environment_file(self._environment)
+        if not env_file:
+            return {}
 
-            return NeuronMapConfig(**data)
+        overrides = self._load_yaml_file(env_file)
+        if overrides:
+            self._loaded_files.append(env_file)
+        return overrides
 
-        except Exception as e:
-            logger.error(f"Error loading config from {config_path}: {e}")
-            raise ValueError(f"Failed to load configuration: {e}")
-
-    def _load_environment_overrides(self):
-        """Load environment-specific configuration overrides"""
-        if not self._config:
-            return
-
-        env = self._config.system.environment
-        env_file = self.config_dir / f"config.{env.value}.yaml"
-
-        if env_file.exists():
-            try:
-                with open(env_file, 'r', encoding='utf-8') as f:
-                    env_data = yaml.safe_load(f)
-
-                # Merge environment overrides
-                merged_data = self._merge_config_dict(self._config.dict(), env_data)
-                self._config = NeuronMapConfig(**merged_data)
-
-                self._loaded_files.append(env_file)
-                logger.info(f"Applied environment overrides from {env_file}")
-
-            except Exception as e:
-                logger.warning(f"Error loading environment config {env_file}: {e}")
-
-    def _merge_config_dict(self, base: dict, override: dict) -> dict:
-        """Recursively merge configuration dictionaries"""
-        result = base.copy()
+    def _merge_config_dict(self, base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+        result = deepcopy(base)
         for key, value in override.items():
             if key in result and isinstance(result[key], dict) and isinstance(value, dict):
                 result[key] = self._merge_config_dict(result[key], value)
@@ -443,270 +572,536 @@ class ConfigManager:
                 result[key] = value
         return result
 
+    def set_environment(self, environment: Union[str, Environment]) -> None:
+        normalized = self._normalize_environment(environment)
+        if not normalized:
+            raise ConfigurationError("Environment name cannot be empty")
+
+        if normalized != "default" and not self._resolve_environment_file(normalized):
+            raise ConfigurationError(f"Environment config file not found for '{environment}'")
+
+        self._environment = normalized
+        self._raw_config = None
+        self._cached_dict = None
+        self._config_model = None
+        self._config = None
+        self._validation_errors = []
+        self._models_config_cache = None
+        self.load_config()
+
+    def _normalize_environment(self, environment: Union[str, Environment]) -> str:
+        if isinstance(environment, Environment):
+            return environment.value
+        if not environment:
+            raise ConfigurationError("Environment name cannot be empty")
+
+        env = environment.strip().lower()
+        aliases = {
+            "dev": "dev",
+            "development": "development",
+            "test": "test",
+            "testing": "testing",
+            "prod": "production",
+            "production": "production",
+            "default": "default",
+        }
+        return aliases.get(env, env)
+
+    def get_environment(self) -> str:
+        return self._environment
+
     def validate_config(self) -> List[ConfigValidationError]:
-        """Validate current configuration and return errors"""
-        errors = []
+        """Run lightweight validation checks returning structured errors."""
+        errors: List[ConfigValidationError] = []
+        if self._validation_errors:
+            for err in self._validation_errors:
+                loc = err.get("loc", []) if isinstance(err, dict) else []
+                field = ".".join(str(part) for part in loc) if loc else "config"
+                message = err.get("msg", str(err)) if isinstance(err, dict) else str(err)
+                value = err.get("input") if isinstance(err, dict) else None
+                errors.append(ConfigValidationError(field, message, value))
 
-        if not self._config:
-            errors.append(ConfigValidationError("config", "No configuration loaded", None))
-            return errors
+        config_model = self.get_config_model()
+        raw_config = self.get_config()
 
-        # Validate GPU availability if required
-        if self._config.system.enable_gpu:
+        analysis_section = raw_config.get("analysis", {}) if isinstance(raw_config, dict) else {}
+        if "batch_size" in analysis_section:
+            batch_size = analysis_section.get("batch_size")
+            if not isinstance(batch_size, int):
+                errors.append(ConfigValidationError(
+                    "analysis.batch_size",
+                    "Batch size must be an integer",
+                    batch_size,
+                    "Provide a positive integer value",
+                ))
+            elif batch_size <= 0:
+                errors.append(ConfigValidationError(
+                    "analysis.batch_size",
+                    "Batch size must be greater than zero",
+                    batch_size,
+                    "Use a positive integer",
+                ))
+
+        if "max_sequence_length" in analysis_section:
+            max_seq = analysis_section.get("max_sequence_length")
+            if not isinstance(max_seq, int):
+                errors.append(ConfigValidationError(
+                    "analysis.max_sequence_length",
+                    "Max sequence length must be an integer",
+                    max_seq,
+                    "Provide a positive integer value",
+                ))
+            elif max_seq <= 0:
+                errors.append(ConfigValidationError(
+                    "analysis.max_sequence_length",
+                    "Max sequence length must be greater than zero",
+                    max_seq,
+                    "Use a positive integer",
+                ))
+
+        if config_model.system.enable_gpu:
             try:
-                import torch
-                if not torch.cuda.is_available():
+                import torch  # type: ignore
+                if not torch.cuda.is_available():  # pragma: no cover - depends on hardware
                     errors.append(ConfigValidationError(
                         "system.enable_gpu",
                         "GPU enabled but CUDA not available",
                         True,
-                        "Set enable_gpu to false or install CUDA support"
+                        "Disable GPU or install CUDA-enabled PyTorch",
                     ))
             except ImportError:
                 errors.append(ConfigValidationError(
                     "system.enable_gpu",
-                    "GPU enabled but PyTorch not available",
+                    "GPU enabled but PyTorch is not installed",
                     True,
-                    "Install PyTorch with CUDA support"
+                    "Install torch with CUDA support",
                 ))
 
-        # Validate directories exist or can be created
-        for dir_attr in ['temp_directory', 'output_directory']:
+        for dir_attr in ("temp_directory", "output_directory"):
+            directory = Path(getattr(config_model.system, dir_attr))
             try:
-                directory = Path(getattr(self._config.system, dir_attr))
                 directory.mkdir(parents=True, exist_ok=True)
-            except Exception as e:
+            except Exception as exc:  # pragma: no cover - filesystem dependent
                 errors.append(ConfigValidationError(
                     f"system.{dir_attr}",
-                    f"Cannot create directory: {e}",
-                    getattr(self._config.system, dir_attr)
+                    f"Cannot create directory: {exc}",
+                    str(directory),
                 ))
-
-        # Validate model configurations
-        for model_name, model_config in self._config.models.items():
-            if model_config.attention_heads and model_config.hidden_size:
-                if model_config.hidden_size % model_config.attention_heads != 0:
-                    errors.append(ConfigValidationError(
-                        f"models.{model_name}.attention_heads",
-                        f"Hidden size {model_config.hidden_size} not divisible by attention heads {model_config.attention_heads}",
-                        model_config.attention_heads,
-                        f"Change attention_heads to {model_config.hidden_size // (model_config.hidden_size // model_config.attention_heads)}"
-                    ))
 
         return errors
 
-    def get_config(self) -> NeuronMapConfig:
-        """Get current configuration"""
-        if self._config is None:
-            self._config = self.load_config()
-        return self._config
-
-    def get_model_config(self, model_name: str) -> Optional[ModelConfig]:
-        """Get configuration for a specific model"""
-        config = self.get_config()
-        return config.models.get(model_name, config.model)
-
-    def add_model_config(self, model_name: str, model_config: ModelConfig):
-        """Add or update model configuration"""
-        config = self.get_config()
-        config.models[model_name] = model_config
-
-    def save_config(self, config_path: Optional[Path] = None) -> Path:
-        """Save current configuration to file"""
-        if not self._config:
-            raise ValueError("No configuration to save")
-
-        if config_path is None:
-            config_path = self.config_dir / "config.yaml"
-
-        try:
-            # Convert to dict and clean up
-            config_dict = self._config.dict()
-            config_dict.pop('created_at', None)  # Remove timestamp for cleaner file
-
-            with open(config_path, 'w', encoding='utf-8') as f:
-                yaml.dump(config_dict, f, default_flow_style=False, sort_keys=False, indent=2)
-
-            logger.info(f"Configuration saved to {config_path}")
-            return config_path
-
-        except Exception as e:
-            logger.error(f"Error saving config to {config_path}: {e}")
-            raise ValueError(f"Failed to save configuration: {e}")
-
-    def create_default_configs(self):
-        """Create default configuration files"""
-        # Main configuration with common models
-        default_config = NeuronMapConfig()
-
-        # Add common model configurations
-        default_config.models["gpt2"] = ModelConfig(
-            name="gpt2",
-            layer_count=12,
-            hidden_size=768,
-            attention_heads=12,
-            max_length=1024,
-            target_layers=["transformer.h.5.mlp.c_proj", "transformer.h.5.attn"]
-        )
-
-        default_config.models["bert-base-uncased"] = ModelConfig(
-            name="bert-base-uncased",
-            layer_count=12,
-            hidden_size=768,
-            attention_heads=12,
-            max_length=512,
-            target_layers=["encoder.layer.5.attention.self", "encoder.layer.5.output"]
-        )
-
-        default_config.models["distilgpt2"] = ModelConfig(
-            name="distilgpt2",
-            layer_count=6,
-            hidden_size=768,
-            attention_heads=12,
-            max_length=1024,
-            target_layers=["transformer.h.5.mlp.c_proj"]
-        )
-
-        self._config = default_config
-
-        # Save main config
-        self.save_config(self.config_dir / "config.yaml")
-
-        # Create environment-specific configs
-        for env in Environment:
-            env_config = {
-                "system": {
-                    "environment": env.value,
-                    "log_level": "DEBUG" if env == Environment.DEVELOPMENT else "INFO"
-                }
+    def validate_all_configs(self) -> Dict[str, Any]:
+        """Aggregate validation information for test assertions."""
+        errors = self.validate_config()
+        if errors:
+            return {
+                "status": "error",
+                "validation_results": [
+                    {"name": err.field, "valid": False, "errors": [err.message]} for err in errors
+                ],
             }
 
-            if env == Environment.PRODUCTION:
-                env_config["web"] = {
-                    "debug": False,
-                    "secret_key": "CHANGE-THIS-IN-PRODUCTION"
-                }
-                env_config["system"]["log_level"] = "WARNING"
+        return {
+            "status": "success",
+            "validation_results": [
+                {"name": "schema", "valid": True, "errors": []}
+            ],
+        }
 
-            env_file = self.config_dir / f"config.{env.value}.yaml"
-            with open(env_file, 'w', encoding='utf-8') as f:
-                yaml.dump(env_config, f, default_flow_style=False, indent=2)
+    def load_models_config(self) -> Dict[str, Dict[str, Any]]:
+        """Return mapping of model names to configuration dictionaries."""
+        if self._models_config_cache is None:
+            models: Dict[str, Dict[str, Any]] = {}
+            config_model = self.get_config_model()
 
-        logger.info("Created default configuration files")
+            # Prefer explicit models stored on the config model
+            if config_model.models:
+                for name, model in config_model.models.items():
+                    if hasattr(model, "model_dump"):
+                        models[name] = model.model_dump()
+                    else:
+                        models[name] = deepcopy(model)  # type: ignore[arg-type]
+
+            # Fallback to dedicated YAML file
+            try:
+                raw_models = config_model.load_models_config()
+            except Exception as exc:  # pragma: no cover - defensive path
+                logger.warning("Failed to load models.yaml: %s", exc)
+                raw_models = {}
+
+            if isinstance(raw_models, dict):
+                models_section = raw_models.get("models", raw_models)
+                if isinstance(models_section, dict):
+                    for name, model_data in models_section.items():
+                        if isinstance(model_data, dict):
+                            models.setdefault(name, deepcopy(model_data))
+
+            self._models_config_cache = deepcopy(models)
+
+        return deepcopy(self._models_config_cache)
+
+    def get_model_config(self, model_name: str) -> Dict[str, Any]:
+        models = self.load_models_config()
+        if model_name in models:
+            return deepcopy(models[model_name])
+        raise KeyError(f"Model '{model_name}' not found in configuration")
+
+    def get_analysis_config(self) -> AnalysisConfig:
+        """Return a deep copy of the analysis configuration."""
+        analysis = self.get_config_model().analysis
+        if hasattr(analysis, "model_copy"):
+            return analysis.model_copy(deep=True)  # type: ignore[attr-defined]
+        return deepcopy(analysis)
+
+    def get_visualization_config(self) -> VisualizationConfig:
+        """Return a deep copy of the visualization configuration."""
+        visualization = self.get_config_model().visualization
+        if hasattr(visualization, "model_copy"):
+            return visualization.model_copy(deep=True)  # type: ignore[attr-defined]
+        return deepcopy(visualization)
+
+    def get_environment_config(self) -> Dict[str, Any]:
+        """Return merged environment/system configuration as a plain dictionary."""
+        config_model = self.get_config_model()
+        environment_data: Dict[str, Any] = {}
+
+        if isinstance(config_model.environment, dict):
+            environment_data.update(deepcopy(config_model.environment))
+
+        system_config = config_model.system
+        if hasattr(system_config, "model_dump"):
+            environment_data.setdefault("system", system_config.model_dump())
+        else:
+            environment_data.setdefault("system", deepcopy(system_config))
+
+        environment_data.setdefault("environment", self.current_environment)
+        return environment_data
+
+    def resolve_layer_name(self, model_name: str, layer_type: str, layer_index: int) -> str:
+        """Resolve a templated layer name for a specific model."""
+        model_config = self.get_model_config(model_name)
+        return self.get_config_model().resolve_layer_name(model_config, layer_type, layer_index)
+
+    def validate_hardware_compatibility(self) -> List[str]:
+        """Check basic hardware compatibility against the active configuration."""
+        issues: List[str] = []
+        analysis_config = self.get_analysis_config()
+        env_config = self.get_environment_config()
+        system_config = self.get_config_model().system
+
+        device_pref = getattr(analysis_config, "device", "auto")
+        if hasattr(device_pref, "value"):
+            device_pref = device_pref.value  # type: ignore[attr-defined]
+        if not isinstance(device_pref, str):
+            device_pref = str(device_pref)
+
+        try:  # pragma: no cover - torch optional dependency
+            import torch  # type: ignore
+        except Exception:  # noqa: BLE001
+            torch = None  # type: ignore
+
+        cuda_requested = device_pref.startswith("cuda") or device_pref == "cuda" or device_pref == "auto"
+        if cuda_requested:
+            if torch is None or not torch.cuda.is_available():
+                if device_pref != "auto":
+                    issues.append("CUDA device requested but CUDA not available")
+            else:
+                try:
+                    gpu_props = torch.cuda.get_device_properties(0)
+                    gpu_total = gpu_props.total_memory / (1024 ** 3)
+                    memory_opt = getattr(analysis_config, "memory_optimization", {}) or {}
+                    if hasattr(memory_opt, "model_dump"):
+                        memory_opt = memory_opt.model_dump()  # type: ignore[attr-defined]
+                    required_gpu = None
+                    if isinstance(memory_opt, dict):
+                        required_gpu = memory_opt.get("max_memory_usage_gb") or memory_opt.get("gpu_memory_gb")
+                    if isinstance(required_gpu, (int, float)) and required_gpu > gpu_total:
+                        issues.append(
+                            f"Required GPU memory ({required_gpu}GB) exceeds available ({gpu_total:.1f}GB)"
+                        )
+                except Exception as exc:  # pragma: no cover - diagnostic only
+                    issues.append(f"Could not determine GPU memory: {exc}")
+
+        max_workers = env_config.get("max_workers")
+        if max_workers is None:
+            system_section = env_config.get("system", {})
+            if isinstance(system_section, dict):
+                max_workers = system_section.get("max_workers")
+        if max_workers is None and hasattr(system_config, "max_concurrent_jobs"):
+            max_workers = system_config.max_concurrent_jobs
+
+        try:
+            cpu_count = os.cpu_count() or 1
+            if isinstance(max_workers, int) and max_workers > cpu_count:
+                issues.append(
+                    f"Configured max workers ({max_workers}) exceeds available CPU cores ({cpu_count})"
+                )
+        except Exception:  # pragma: no cover - defensive
+            pass
+
+        memory_limit = env_config.get("memory_limit_gb")
+        if memory_limit is None:
+            system_section = env_config.get("system", {})
+            if isinstance(system_section, dict):
+                memory_limit = system_section.get("memory_limit_gb")
+
+        memory_opt_general = getattr(analysis_config, "memory_optimization", {}) or {}
+        if hasattr(memory_opt_general, "model_dump"):
+            memory_opt_general = memory_opt_general.model_dump()  # type: ignore[attr-defined]
+        required_memory = None
+        if isinstance(memory_opt_general, dict):
+            required_memory = memory_opt_general.get("max_memory_usage_gb") or memory_opt_general.get("required_memory_gb")
+
+        if isinstance(required_memory, (int, float)) and isinstance(memory_limit, (int, float)):
+            if required_memory > memory_limit:
+                issues.append(
+                    f"Required memory ({required_memory}GB) exceeds configured limit ({memory_limit}GB)"
+                )
+
+        return issues
+
+    def perform_startup_validation(self) -> Tuple[bool, List[str]]:
+        """Run comprehensive startup validation returning (is_valid, issues)."""
+        issues: List[str] = []
+        validation_summary = self.validate_all_configs()
+        if validation_summary.get("status") != "success":
+            for result in validation_summary.get("validation_results", []):
+                if not isinstance(result, dict):
+                    continue
+                if result.get("valid", True):
+                    continue
+                errors = result.get("errors", [])
+                if isinstance(errors, list):
+                    issues.extend(str(err) for err in errors)
+                elif errors:
+                    issues.append(str(errors))
+
+        issues.extend(self.validate_hardware_compatibility())
+
+        data_config = self.get_config_model().data
+        directory_attrs = [
+            "data_dir",
+            "raw_dir",
+            "processed_dir",
+            "outputs_dir",
+            "cache_dir",
+        ]
+        for attr in directory_attrs:
+            path_value = getattr(data_config, attr, None)
+            if not path_value:
+                continue
+            try:
+                Path(path_value).mkdir(parents=True, exist_ok=True)
+            except Exception as exc:  # pragma: no cover - filesystem dependent
+                issues.append(f"Directory setup failed for {path_value}: {exc}")
+
+        try:
+            output_directory = Path(self.get_config_model().system.output_directory)
+            output_directory.mkdir(parents=True, exist_ok=True)
+            test_file = output_directory / "config_write_test.tmp"
+            test_file.write_text("ok", encoding="utf-8")
+            test_file.unlink()
+        except Exception as exc:  # pragma: no cover - filesystem dependent
+            issues.append(f"Write permission check failed: {exc}")
+
+        return (len(issues) == 0, issues)
+
+    def setup_logging(self) -> None:
+        """Configure logging according to environment/system settings."""
+        env_config = self.get_environment_config()
+        level_name = env_config.get("log_level")
+        if level_name is None:
+            system_section = env_config.get("system", {})
+            if isinstance(system_section, dict):
+                level_name = system_section.get("log_level")
+        if not isinstance(level_name, str):
+            level_name = "INFO"
+
+        log_level = getattr(logging, level_name.upper(), logging.INFO)
+        logging.basicConfig(level=log_level)
+
+        log_to_file = env_config.get("log_to_file")
+        if log_to_file is None:
+            system_section = env_config.get("system", {})
+            if isinstance(system_section, dict):
+                log_to_file = system_section.get("log_to_file")
+
+        if log_to_file:
+            log_path = env_config.get("log_file_path") or env_config.get("system", {}).get("log_file_path")
+            if not log_path:
+                log_path = "logs/neuronmap.log"
+
+            log_path = Path(log_path)
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+
+            from logging.handlers import RotatingFileHandler
+
+            max_bytes = env_config.get("max_log_size_mb") or env_config.get("system", {}).get("max_log_size_mb")
+            if isinstance(max_bytes, (int, float)):
+                max_bytes = int(max_bytes * 1024 * 1024)
+            else:
+                max_bytes = 10 * 1024 * 1024
+
+            backup_count = env_config.get("backup_count") or env_config.get("system", {}).get("backup_count")
+            if not isinstance(backup_count, int):
+                backup_count = 5
+
+            handler = RotatingFileHandler(log_path, maxBytes=max_bytes, backupCount=backup_count)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            logging.getLogger().addHandler(handler)
+
+    def get_device(self, device_config: str | None = None):
+        """Return a torch.device inferred from configuration preferences."""
+        device_pref = device_config or getattr(self.get_analysis_config(), "device", "auto")
+        if hasattr(device_pref, "value"):
+            device_pref = device_pref.value  # type: ignore[attr-defined]
+        if not isinstance(device_pref, str):
+            device_pref = str(device_pref)
+
+        try:  # pragma: no cover - torch optional dependency
+            import torch  # type: ignore
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError("PyTorch is required to determine devices") from exc
+
+        if device_pref == "auto":
+            return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if device_pref.startswith("cuda"):
+            if not torch.cuda.is_available():
+                raise RuntimeError("CUDA requested but not available")
+            return torch.device(device_pref)
+        if device_pref == "cpu":
+            return torch.device("cpu")
+
+        raise ValueError(f"Invalid device configuration: {device_pref}")
+
+    def create_output_paths(self) -> Dict[str, Path]:
+        """Ensure standard output paths exist and return them."""
+        data_config = self.get_config_model().data
+        paths: Dict[str, Path] = {}
+
+        directory_fields = {
+            "data_dir": data_config.data_dir,
+            "raw_dir": data_config.raw_dir,
+            "processed_dir": data_config.processed_dir,
+            "outputs_dir": data_config.outputs_dir,
+        }
+
+        for key, value in directory_fields.items():
+            directory = Path(value)
+            directory.mkdir(parents=True, exist_ok=True)
+            paths[key] = directory
+
+        return paths
+
+    def switch_environment(self, environment: Union[str, Environment]) -> None:
+        """Compatibility wrapper for environment switching."""
+        self.set_environment(environment)
+
+    def is_valid(self) -> bool:
+        """Return True if configuration validates successfully."""
+        return self.validate_all_configs().get("status") == "success"
+
+    def get_validation_errors(self) -> List[str]:
+        """Return human-readable validation error messages."""
+        errors = []
+        for error in self.validate_config():
+            errors.append(f"{error.field}: {error.message}")
+        return errors
+
+
+    def add_model_config(self, model_name: str, model_config: Dict[str, Any]):
+        config_dict = self.get_config()
+        models = config_dict.setdefault("models", {})
+        models[model_name] = deepcopy(model_config)
+        self._raw_config = config_dict
+        self._cached_dict = config_dict
+        self._config_model = None
+        self._config = None
+
+    def save_config(self, config_path: Optional[Path] = None) -> Path:
+        if self._raw_config is None:
+            raise ValueError("No configuration to save")
+
+        target_path = config_path or (self.config_dir / "config.yaml")
+        with open(target_path, "w", encoding="utf-8") as handle:
+            yaml.dump(self._raw_config, handle, default_flow_style=False, sort_keys=False, indent=2)
+        logger.info("Configuration saved to %s", target_path)
+        return target_path
+
+    def create_default_configs(self):
+        """Generate default YAML configuration files in the config directory."""
+        default_config = NeuronMapConfig(config_dir=self.config_dir)
+        self._config_model = default_config
+        self._config = default_config
+        self._raw_config = default_config.model_dump()
+        self._cached_dict = self._raw_config
+        self._validation_errors = []
+        self.save_config(self.config_dir / "config.yaml")
 
     def validate_model_compatibility(self, model_name: str) -> List[ConfigValidationError]:
-        """Validate model compatibility with current system"""
-        errors = []
-        model_config = self.get_model_config(model_name)
-
-        if not model_config:
+        errors: List[ConfigValidationError] = []
+        try:
+            model_config = self.get_model_config(model_name)
+        except KeyError:
             errors.append(ConfigValidationError(
                 f"models.{model_name}",
                 "Model configuration not found",
                 None,
-                "Add model configuration or use a configured model"
+                "Add a model entry to models.yaml",
             ))
             return errors
 
-        # Check GPU requirements
-        if model_config.requires_gpu and not self._config.system.enable_gpu:
+        system_config = self.get_config_model().system
+        requires_gpu = model_config.get("requires_gpu", False)
+        if requires_gpu and not system_config.enable_gpu:
             errors.append(ConfigValidationError(
                 f"models.{model_name}.requires_gpu",
-                "Model requires GPU but system GPU is disabled",
+                "Model requires GPU but GPU usage is disabled in system configuration",
                 True,
-                "Enable GPU in system configuration or use CPU-compatible model"
+                "Enable GPU in system configuration",
             ))
-
-        # Check memory requirements
-        if model_config.max_memory_gb > 16:  # Warning for large models
-            logger.warning(f"Model {model_name} requires {model_config.max_memory_gb}GB memory")
 
         return errors
 
     def get_experiment_config(self, experiment_name: str = "default") -> Dict[str, Any]:
-        """Get experiment configuration by name."""
-        return {
-            'name': experiment_name,
-            'description': getattr(self.experiment, 'description', f'Experiment: {experiment_name}') if self.experiment else f'Default experiment: {experiment_name}',
-            'model': self.model.name,
-            'data': {
-                'input_file': self.data.input_file,
-                'output_file': self.data.output_file,
-                'batch_size': self.data.batch_size
-            },
-            'analysis': {
-                'target_layers': self.model.target_layers,
-                'max_length': self.model.max_length
-            }
-        }
+        experiments = NeuronMapConfig(self.config_dir).load_experiments_config()
 
-    def set_environment(self, environment: Union[str, Environment]) -> None:
-        """Set the runtime environment and reload configuration with environment-specific overrides"""
-        if isinstance(environment, str):
-            try:
-                # Handle test compatibility - accept shortened names
-                env_mapping = {
-                    'dev': 'development',
-                    'test': 'testing',
-                    'prod': 'production'
-                }
+        if experiment_name in experiments:
+            return deepcopy(experiments[experiment_name])
 
-                normalized_env = env_mapping.get(environment.lower(), environment.lower())
-                environment = Environment(normalized_env)
-            except ValueError:
-                raise ValueError(f"Invalid environment: {environment}. Must be one of {list(Environment)}")
+        nested = experiments.get("experiments", {})
+        if experiment_name in nested:
+            return deepcopy(nested[experiment_name])
 
-        if not self._config:
-            self._config = NeuronMapConfig()
-
-        # Update environment in system config
-        self._config.system.environment = environment
-
-        # Reload environment-specific overrides
-        self._load_environment_overrides()
-
-        logger.info(f"Environment set to: {environment.value}")
-
-    def get_environment(self) -> Environment:
-        """Get the current runtime environment"""
-        if not self._config:
-            return Environment.DEVELOPMENT
-        return self._config.system.environment
-
-    @property
-    def current_environment(self) -> str:
-        """Get current environment for test compatibility."""
-        return self.get_environment()
-
-    def validate_all_configs(self) -> Dict[str, Any]:
-        """Validate all configuration files - test compatibility method."""
-        validation_errors = self.validate_config()
-        return {
-            'valid': len(validation_errors) == 0,
-            'errors': validation_errors,
-            'total_files': len(self._loaded_files)
-        }
+        raise KeyError(f"Experiment '{experiment_name}' not found")
 
     def get_hardware_info(self) -> Dict[str, Any]:
-        """Get hardware information for test compatibility."""
+        """Collect lightweight hardware telemetry for diagnostics."""
         import platform
-        import psutil
+
+        info = {
+            "cpu": platform.processor(),
+            "cores": os.cpu_count() or 1,
+            "platform": platform.system(),
+            "architecture": platform.architecture()[0],
+        }
+
         try:
-            return {
-                'cpu': platform.processor(),
-                'cores': psutil.cpu_count(),
-                'memory': psutil.virtual_memory().total,
-                'platform': platform.system(),
-                'architecture': platform.architecture()[0]
-            }
+            import psutil  # type: ignore
+
+            info["total_memory_gb"] = int(psutil.virtual_memory().total / (1024 ** 3))
         except ImportError:
-            return {
-                'cpu': 'unknown',
-                'cores': 1,
-                'memory': 1000000000,  # 1GB fallback
-                'platform': platform.system(),
-                'architecture': 'unknown'
-            }
+            info["total_memory_gb"] = None
+
+        try:
+            import torch  # type: ignore
+
+            info["cuda_available"] = bool(torch.cuda.is_available())
+        except ImportError:
+            info["cuda_available"] = False
+
+        return info
 
 # Global config manager instance for convenience
 _global_config_manager: Optional[ConfigManager] = None
@@ -735,3 +1130,45 @@ def get_config_manager() -> ConfigManager:
     if _global_config_manager is None:
         _global_config_manager = ConfigManager()
     return _global_config_manager
+
+
+def reset_config_manager() -> None:
+    """Reset the global config manager instance."""
+    global _global_config_manager
+    _global_config_manager = None
+
+
+def setup_global_config(
+    config_dir: Optional[str] = None,
+    environment: Optional[Union[str, Environment]] = None,
+) -> ConfigManager:
+    """Initialize the global configuration manager with validation and logging.
+
+    Args:
+        config_dir: Optional path to the configuration directory.
+        environment: Optional environment name to activate.
+
+    Returns:
+        Configured ConfigManager instance.
+
+    Raises:
+        RuntimeError: If startup validation fails.
+    """
+
+    reset_config_manager()
+
+    manager = ConfigManager(config_dir=config_dir or "configs")
+    if environment:
+        manager.set_environment(environment)
+
+    is_valid, issues = manager.perform_startup_validation()
+    if not is_valid:
+        raise RuntimeError(
+            "Configuration validation failed: " + "; ".join(str(issue) for issue in issues)
+        )
+
+    manager.setup_logging()
+
+    global _global_config_manager
+    _global_config_manager = manager
+    return manager

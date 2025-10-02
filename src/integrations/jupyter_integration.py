@@ -7,7 +7,7 @@ Provides enhanced Jupyter notebook support with interactive widgets and visualiz
 import logging
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 import base64
 from io import BytesIO
 
@@ -36,9 +36,6 @@ except ImportError:
     PLOTLY_AVAILABLE = False
 
 # Internal imports
-import sys
-sys.path.append(str(Path(__file__).parent.parent))
-
 from utils.error_handling import NeuronMapError
 from utils.monitoring import setup_monitoring
 from core.neuron_map import NeuronMap

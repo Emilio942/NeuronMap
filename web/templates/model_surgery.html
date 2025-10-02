@@ -1,0 +1,1351 @@
+{% extends "base.html" %}
+
+{% block title %}Model Surgery - NeuronMap{% endblock %}
+
+{% block content %}
+<div class="container-fluid model-surgery-container">
+    <!-- Status Bar -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="card bg-light">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <small class="text-muted">Status:</small>
+                            <span id="systemStatus" class="badge bg-secondary ms-1">Initializing...</span>
+                        </div>
+                        <div>
+                            <small class="text-muted">Selected Model:</small>
+                            <span id="selectedModelStatus" class="badge bg-info ms-1">None</span>
+                        </div>
+                        <div>
+                            <small class="text-muted">Last Action:</small>
+                            <span id="lastActionStatus" class="badge bg-secondary ms-1">None</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fas fa-brain me-2 text-primary"></i>Interactive Model Surgery
+            </h2>
+            <p class="text-muted">Explore neural networks through interactive interventions and real-time analysis.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Model Selection & Configuration -->
+        <div class="col-lg-4">
+            <div class="card config-card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-cog me-2"></i>Configuration
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="surgeryConfigForm">
+                        <!-- Model Selection -->
+                        <div class="mb-3">
+                            <label for="modelSelect" class="form-label fw-bold">Model</label>
+                            <select class="form-select" id="modelSelect" name="model" required>
+                                <option value="">Loading models...</option>
+                            </select>
+                            <div class="form-text">Select the model to analyze</div>
+                        </div>
+                        
+                        <!-- Input Text -->
+                        <div class="mb-3">
+                            <label for="inputText" class="form-label fw-bold">Input Text</label>
+                            <textarea class="form-control" id="inputText" name="prompt" rows="3" 
+                                      placeholder="Enter text to analyze..."
+                                      required>The capital of France is</textarea>
+                        </div>
+                        
+                        <!-- Quick Actions -->
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Quick Actions</label>
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-model-info btn-intervention" onclick="loadModelInfo()">
+                                    <i class="fas fa-info-circle me-1"></i>Load Model Info
+                                </button>
+                                <button type="button" class="btn btn-generate-heatmap btn-intervention" onclick="generateHeatmap()">
+                                    <i class="fas fa-th me-1"></i>Generate Activation Heatmap
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Intervention Panel (W3) - Initially Hidden -->
+        <div class="card intervention-panel mt-3" id="interventionPanel" style="display: none;">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="fas fa-tools me-2"></i>Intervention Panel
+                </h5>
+                <button type="button" class="btn-close float-end" onclick="closeInterventionPanel()" aria-label="Close intervention panel"></button>
+            </div>
+            <div class="card-body">
+                <!-- Neuron Information -->
+                <div id="neuronInfo" class="neuron-info mb-3">
+                    <!-- Will be populated when neuron is selected -->
+                </div>
+                
+                <!-- Intervention Controls -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Available Interventions</label>
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-ablate btn-intervention" onclick="runIntervention('ablate')">
+                            <i class="fas fa-power-off me-1"></i>Ablate This Neuron
+                        </button>
+                        <button type="button" class="btn btn-noise btn-intervention" onclick="runIntervention('noise')">
+                            <i class="fas fa-random me-1"></i>Add Noise
+                        </button>
+                        <button type="button" class="btn btn-mean btn-intervention" onclick="runIntervention('mean')">
+                            <i class="fas fa-equals me-1"></i>Replace with Mean
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Intervention Options -->
+                <div class="mb-3">
+                    <label class="form-label">Options</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="showDiff" checked>
+                        <label class="form-check-label" for="showDiff">
+                            Show before/after comparison
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="autoVisualize" checked>
+                        <label class="form-check-label" for="autoVisualize">
+                            Auto-generate visualization
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Visualization Area -->
+    <div class="col-lg-8">
+        <!-- Model Information -->
+        <div class="card mb-3" id="modelInfoCard" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-robot me-2"></i>Model Information
+                </h5>
+            </div>
+            <div class="card-body" id="modelInfoContent">
+                <!-- Model info will be populated here -->
+            </div>
+        </div>
+        
+        <!-- Interactive Heatmap (W2) -->
+        <div class="card mb-3" id="heatmapCard" style="display: none;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-th me-2"></i>Interactive Activation Heatmap
+                </h5>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="refreshHeatmap()">
+                        <i class="fas fa-sync"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleFullscreen('heatmapContent')">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="heatmapContent" class="heatmap-container">
+                    <!-- Interactive heatmap will be rendered here -->
+                </div>
+                <div class="mt-3 p-3 bg-light rounded">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1 text-primary"></i>
+                        <strong>Click on any neuron</strong> to see detailed information and intervention options.
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Results Display (W4) -->
+        <div class="card" id="resultsCard" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>Intervention Results
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="resultsContent">
+                    <!-- Results will be displayed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Path Patching Modal (W5) -->
+<div class="modal fade" id="pathPatchingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-route me-2"></i>Path Patching Experiment
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="pathPatchingForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="cleanPrompt" class="form-label">Clean Prompt</label>
+                                <textarea class="form-control" id="cleanPrompt" name="clean_prompt" rows="3" 
+                                          placeholder="The capital of France is Paris"
+                                          required></textarea>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="corruptedPrompt" class="form-label">Corrupted Prompt</label>
+                                <textarea class="form-control" id="corruptedPrompt" name="corrupted_prompt" rows="3" 
+                                          placeholder="The capital of Germany is Paris"
+                                          required></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="patchLayers" class="form-label">Layers to Patch</label>
+                        <input type="text" class="form-control" id="patchLayers" name="patch_layers" 
+                               placeholder="transformer.h.6.attn,transformer.h.8.mlp"
+                               required>
+                        <div class="form-text">Comma-separated layer names</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Options</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="visualizePath" checked>
+                            <label class="form-check-label" for="visualizePath">
+                                Visualize causal path
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="runPathPatching()">
+                    <i class="fas fa-play me-1"></i>Run Path Patching
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Causal Path Visualization Modal (W6) -->
+<div class="modal fade" id="causalPathModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-project-diagram me-2"></i>Causal Path Visualization
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="causalPathViz" style="height: 600px;">
+                    <!-- Causal path graph will be rendered here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-primary" onclick="exportCausalPath()">
+                    <i class="fas fa-download me-1"></i>Export
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// Global variables
+let currentModel = null;
+let currentModelInfo = null;
+let selectedNeuron = null;
+let currentHeatmapData = null;
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Initializing Model Surgery interface...');
+    
+    // Initialize status
+    updateSystemStatus('Initializing...', 'warning');
+    updateSelectedModelStatus(null);
+    updateLastActionStatus('Starting up');
+    
+    // Show loading notification
+    showToast('🚀 Initializing Model Surgery interface...', 'info');
+    
+    // Initialize components
+    setTimeout(() => {
+        loadAvailableModels();
+        setupEventListeners();
+        
+        // Success notification
+        setTimeout(() => {
+            updateSystemStatus('Ready', 'success');
+            updateLastActionStatus('System ready');
+            showToast('✅ Model Surgery interface ready!', 'success');
+        }, 1000);
+    }, 500);
+    
+    // Global error handlers
+    window.addEventListener('error', function(e) {
+        console.error('Global error:', e.error);
+        updateSystemStatus('Error', 'danger');
+        showToast('❌ Error: ' + e.error.message, 'danger');
+    });
+    
+    window.addEventListener('unhandledrejection', function(e) {
+        console.error('Unhandled promise rejection:', e.reason);
+        updateSystemStatus('Promise Error', 'danger');
+        showToast('❌ Promise error: ' + e.reason, 'danger');
+    });
+});
+
+function setupEventListeners() {
+    console.log('Setting up event listeners...');
+    
+    // Model selection change
+    const modelSelect = document.getElementById('modelSelect');
+    if (modelSelect) {
+        modelSelect.addEventListener('change', function() {
+            currentModel = this.value;
+            console.log('Model selected:', currentModel);
+            updateSelectedModelStatus(currentModel);
+            if (currentModel) {
+                showToast(`Model "${currentModel}" selected`, 'success');
+                updateLastActionStatus('Model selected');
+                // Auto-load model info when a model is selected
+                loadModelInfo();
+            } else {
+                updateSelectedModelStatus(null);
+            }
+        });
+    }
+    
+    // Add click handlers for buttons
+    const loadModelBtn = document.querySelector('button[onclick="loadModelInfo()"]');
+    if (loadModelBtn) {
+        loadModelBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Load Model Info button clicked');
+            loadModelInfo();
+        });
+    }
+    
+    const generateHeatmapBtn = document.querySelector('button[onclick="generateHeatmap()"]');
+    if (generateHeatmapBtn) {
+        generateHeatmapBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Generate Heatmap button clicked');
+            generateHeatmap();
+        });
+    }
+    
+    console.log('Event listeners set up successfully');
+}
+
+// Status management functions
+function updateSystemStatus(status, type = 'secondary') {
+    const statusElement = document.getElementById('systemStatus');
+    if (statusElement) {
+        statusElement.textContent = status;
+        statusElement.className = `badge bg-${type} ms-1`;
+    }
+}
+
+function updateSelectedModelStatus(model) {
+    const statusElement = document.getElementById('selectedModelStatus');
+    if (statusElement) {
+        statusElement.textContent = model || 'None';
+        statusElement.className = `badge bg-${model ? 'success' : 'secondary'} ms-1`;
+    }
+}
+
+function updateLastActionStatus(action) {
+    const statusElement = document.getElementById('lastActionStatus');
+    if (statusElement) {
+        statusElement.textContent = action;
+        statusElement.className = 'badge bg-info ms-1';
+    }
+}
+
+// W1: API Integration
+async function loadAvailableModels() {
+    console.log('Loading available models...');
+    updateSystemStatus('Loading models...', 'warning');
+    updateLastActionStatus('Loading models');
+    
+    try {
+        const response = await fetch('/api/interventions/models');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        
+        const select = document.getElementById('modelSelect');
+        select.innerHTML = '<option value="">Select a model...</option>';
+        
+        if (data.success !== false && data.models) {
+            data.models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.name;
+                option.textContent = `${model.name} (${model.type})`;
+                if (model.supported) {
+                    select.appendChild(option);
+                }
+            });
+            console.log(`Loaded ${data.models.length} models`);
+            updateSystemStatus('Models loaded', 'success');
+            showToast(`✅ Loaded ${data.models.length} models successfully`, 'success');
+        } else {
+            select.innerHTML = '<option value="">No models available</option>';
+            console.error('API returned no models or error:', data);
+            updateSystemStatus('Error loading models', 'danger');
+            showError('No models available');
+        }
+    } catch (error) {
+        console.error('Error loading models:', error);
+        const select = document.getElementById('modelSelect');
+        select.innerHTML = '<option value="">Error loading models</option>';
+        updateSystemStatus('Model loading failed', 'danger');
+        showError('Failed to load models: ' + error.message);
+    }
+}
+
+async function loadModelInfo() {
+    if (!currentModel) {
+        showError('Please select a model first');
+        return;
+    }
+    
+    console.log('Loading model info for:', currentModel);
+    updateLastActionStatus('Loading model info');
+    
+    try {
+        showLoading('modelInfoContent');
+        
+        const response = await fetch(`/api/interventions/models/${currentModel}/info`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log('Model info received:', data);
+        
+        if (data.success !== false && data.model_info) {
+            currentModelInfo = data.model_info;
+            displayModelInfo(data.model_info);
+            document.getElementById('modelInfoCard').style.display = 'block';
+            showToast('✅ Model info loaded successfully!', 'success');
+            updateLastActionStatus('Model info loaded');
+        } else {
+            showError('Failed to load model info: ' + (data.error || 'Unknown error'));
+            updateLastActionStatus('Model info failed');
+        }
+    } catch (error) {
+        console.error('Error loading model info:', error);
+        showError('Network error loading model info: ' + error.message);
+        updateLastActionStatus('Model info error');
+    }
+}
+
+function displayModelInfo(info) {
+    const content = document.getElementById('modelInfoContent');
+    content.innerHTML = `
+        <div class="row">
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h3 class="text-primary">${info.total_parameters.toLocaleString()}</h3>
+                        <small>Parameters</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h3 class="text-success">${info.layer_count}</h3>
+                        <small>Layers</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h3 class="text-info">${info.attention_layers.length}</h3>
+                        <small>Attention Layers</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h3 class="text-warning">${info.mlp_layers.length}</h3>
+                        <small>MLP Layers</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mt-3">
+            <h6>Sample Layers:</h6>
+            <div class="d-flex flex-wrap gap-1">
+                ${info.sample_layers.slice(0, 10).map(layer => 
+                    `<span class="badge bg-secondary">${layer}</span>`
+                ).join('')}
+            </div>
+        </div>
+    `;
+}
+
+// W2: Interactive Heatmap Generation
+async function generateHeatmap() {
+    console.log('Generating heatmap...');
+    if (!currentModel) {
+        showError('Please select a model first');
+        return;
+    }
+    
+    const prompt = document.getElementById('inputText').value;
+    if (!prompt.trim()) {
+        showError('Please enter input text');
+        return;
+    }
+    
+    try {
+        showLoading('heatmapContent');
+        console.log('Requesting activations for:', currentModel, prompt);
+        
+        // Get real activation data from API
+        const response = await fetch('/api/interventions/activations', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: currentModel,
+                prompt: prompt
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Activation data received:', data);
+        
+        if (data.success !== false && data.activations) {
+            generateRealHeatmap(data);
+            showToast('Heatmap generated successfully!', 'success');
+        } else {
+            console.warn('API returned error, using mock data:', data.error);
+            await generateMockHeatmap();
+            showToast('Using mock data for demonstration', 'warning');
+        }
+        
+        document.getElementById('heatmapCard').style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error generating heatmap:', error);
+        showError('Network error, using mock data: ' + error.message);
+        // Fallback to mock data
+        await generateMockHeatmap();
+        document.getElementById('heatmapCard').style.display = 'block';
+    }
+}
+
+function generateRealHeatmap(data) {
+    const heatmapData = data.heatmap_data;
+    const layerNames = data.layer_names;
+    
+    if (!heatmapData || heatmapData.length === 0) {
+        generateMockHeatmap();
+        return;
+    }
+    
+    const trace = {
+        z: heatmapData,
+        type: 'heatmap',
+        colorscale: 'Viridis',
+        hoverongaps: false,
+        hovertemplate: 'Layer: %{y}<br>Neuron: %{x}<br>Activation: %{z:.3f}<extra></extra>'
+    };
+    
+    const layout = {
+        title: `Neural Activation Heatmap - ${data.model}`,
+        xaxis: { title: 'Neuron Index' },
+        yaxis: { 
+            title: 'Layer', 
+            tickvals: [...Array(layerNames.length).keys()], 
+            ticktext: layerNames.map(name => name.replace('transformer.h.', 'L').replace('bert.encoder.layer.', 'L'))
+        },
+        margin: { t: 50, r: 50, b: 50, l: 100 }
+    };
+    
+    Plotly.newPlot('heatmapContent', [trace], layout, {responsive: true});
+    
+    // Make heatmap clickable (W2)
+    document.getElementById('heatmapContent').on('plotly_click', function(eventData) {
+        const point = eventData.points[0];
+        const layerIdx = point.y;
+        const neuronIdx = point.x;
+        const activation = point.z;
+        
+        selectNeuron(layerNames[layerIdx], neuronIdx, activation);
+    });
+    
+    currentHeatmapData = {heatmapData, layerNames};
+    showToast('Heatmap generated with real activation data', 'success');
+}
+
+function generateMockHeatmap() {
+    return new Promise((resolve) => {
+        console.log('Generating mock heatmap...');
+        // Mock heatmap data
+        const layers = 12;
+        const neurons = 50;
+        const data = [];
+        const layerNames = [];
+        
+        for (let layer = 0; layer < layers; layer++) {
+            layerNames.push(`Layer ${layer}`);
+            const layerData = [];
+            for (let neuron = 0; neuron < neurons; neuron++) {
+                layerData.push(Math.random());
+            }
+            data.push(layerData);
+        }
+        
+        const trace = {
+            z: data,
+            type: 'heatmap',
+            colorscale: 'Viridis',
+            hoverongaps: false,
+            hovertemplate: 'Layer: %{y}<br>Neuron: %{x}<br>Activation: %{z:.3f}<extra></extra>'
+        };
+        
+        const layout = {
+            title: 'Neural Activation Heatmap (Interactive Mock Data)',
+            xaxis: { title: 'Neuron Index' },
+            yaxis: { title: 'Layer', tickvals: [...Array(layers).keys()], ticktext: layerNames },
+            margin: { t: 50, r: 50, b: 50, l: 100 }
+        };
+        
+        Plotly.newPlot('heatmapContent', [trace], layout, {responsive: true})
+            .then(() => {
+                console.log('Mock heatmap rendered, setting up click handler...');
+                // Make heatmap clickable (W2)
+                const heatmapDiv = document.getElementById('heatmapContent');
+                heatmapDiv.on('plotly_click', function(eventData) {
+                    console.log('Heatmap clicked:', eventData);
+                    if (eventData.points && eventData.points.length > 0) {
+                        const point = eventData.points[0];
+                        const layerIdx = point.y;
+                        const neuronIdx = point.x;
+                        const activation = point.z;
+                        
+                        selectNeuron(layerNames[layerIdx], neuronIdx, activation);
+                    }
+                });
+                
+                currentHeatmapData = {data, layerNames};
+                resolve();
+            })
+            .catch(error => {
+                console.error('Error creating mock heatmap:', error);
+                resolve();
+            });
+    });
+}
+
+// W3: Intervention Panel
+async function loadNeuronDetails(model, layer, neuronId) {
+    try {
+        const response = await fetch(`/api/interventions/neuron/${model}/${layer}/${neuronId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            return data.neuron_info;
+        } else {
+            console.error('Failed to load neuron details:', data.error);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error loading neuron details:', error);
+        return null;
+    }
+}
+
+async function selectNeuron(layerName, neuronIdx, activation) {
+    console.log('Neuron selected:', {layerName, neuronIdx, activation});
+    
+    selectedNeuron = {
+        layer: layerName,
+        neuron_id: neuronIdx,
+        activation: activation,
+        model: currentModel
+    };
+    
+    // Load detailed neuron information
+    const details = await loadNeuronDetails(currentModel, layerName, neuronIdx);
+    
+    showInterventionPanel(details);
+    showToast(`Selected neuron ${neuronIdx} in ${layerName}`, 'info');
+}
+
+function showInterventionPanel(neuronDetails = null) {
+    const panel = document.getElementById('interventionPanel');
+    const infoDiv = document.getElementById('neuronInfo');
+    
+    if (!selectedNeuron) return;
+    
+    let detailsHtml = '';
+    if (neuronDetails) {
+        detailsHtml = `
+            <div class="mt-2">
+                <h6>Detailed Analysis</h6>
+                <div class="row">
+                    <div class="col-6">
+                        <small class="text-muted">Avg Activation:</small><br>
+                        <strong>${neuronDetails.average_activation?.toFixed(3) || 'N/A'}</strong>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Max Activation:</small><br>
+                        <strong>${neuronDetails.max_activation?.toFixed(3) || 'N/A'}</strong>
+                    </div>
+                </div>
+                <div class="row mt-2">
+                    <div class="col-6">
+                        <small class="text-muted">Variance:</small><br>
+                        <strong>${neuronDetails.variance?.toFixed(3) || 'N/A'}</strong>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Sparsity:</small><br>
+                        <strong>${neuronDetails.sparsity?.toFixed(3) || 'N/A'}</strong>
+                    </div>
+                </div>
+                ${neuronDetails.top_activating_tokens ? `
+                <div class="mt-2">
+                    <small class="text-muted">Top Activating Tokens:</small><br>
+                    <div class="d-flex flex-wrap gap-1">
+                        ${neuronDetails.top_activating_tokens.slice(0, 5).map(token => 
+                            `<span class="badge bg-secondary">${token}</span>`
+                        ).join('')}
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        `;
+    }
+    
+    infoDiv.innerHTML = `
+        <div class="alert alert-info">
+            <h6><i class="fas fa-neuron me-2"></i>Selected Neuron</h6>
+            <p class="mb-1"><strong>Model:</strong> ${selectedNeuron.model}</p>
+            <p class="mb-1"><strong>Layer:</strong> ${selectedNeuron.layer}</p>
+            <p class="mb-1"><strong>Neuron ID:</strong> ${selectedNeuron.neuron_id}</p>
+            <p class="mb-0"><strong>Current Activation:</strong> ${selectedNeuron.activation.toFixed(3)}</p>
+            ${detailsHtml}
+        </div>
+    `;
+    
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth' });
+}
+
+function closeInterventionPanel() {
+    document.getElementById('interventionPanel').style.display = 'none';
+    selectedNeuron = null;
+}
+
+// W4: Run Interventions
+async function runIntervention(type) {
+    if (!selectedNeuron) {
+        showError('No neuron selected');
+        return;
+    }
+    
+    const prompt = document.getElementById('inputText').value;
+    
+    try {
+        showLoading('resultsContent');
+        
+        const response = await fetch('/api/interventions/ablate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: selectedNeuron.model,
+                prompt: prompt,
+                layer: selectedNeuron.layer.replace('Layer ', 'transformer.h.'),
+                neurons: [selectedNeuron.neuron_id]
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayInterventionResults(data.results);
+            document.getElementById('resultsCard').style.display = 'block';
+        } else {
+            showError('Intervention failed: ' + data.error);
+        }
+        
+    } catch (error) {
+        console.error('Error running intervention:', error);
+        showError('Network error running intervention');
+    }
+}
+
+// W4: Display Results
+function displayInterventionResults(results) {
+    const content = document.getElementById('resultsContent');
+    
+    content.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6><i class="fas fa-check me-2"></i>Baseline Output</h6>
+                <div class="alert alert-secondary">
+                    <code>${results.baseline_output}</code>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6><i class="fas fa-edit me-2"></i>After Intervention</h6>
+                <div class="alert alert-primary">
+                    <code>${results.ablated_output}</code>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h3 class="text-${getEffectColor(results.effect_size)}">${results.effect_size.toFixed(3)}</h3>
+                        <small>Effect Size</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="alert alert-info">
+                    <strong>Interpretation:</strong> ${results.interpretation}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function getEffectColor(effectSize) {
+    const abs = Math.abs(effectSize);
+    if (abs < 0.1) return 'secondary';
+    if (abs < 0.3) return 'info';
+    if (abs < 0.7) return 'warning';
+    return 'danger';
+}
+
+// W5: Path Patching
+function runPathPatching() {
+    const form = document.getElementById('pathPatchingForm');
+    const formData = new FormData(form);
+    
+    // Validate form
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    
+    // Convert patch_layers string to array
+    const patchLayers = formData.get('patch_layers').split(',').map(s => s.trim());
+    
+    const data = {
+        model: currentModel,
+        clean_prompt: formData.get('clean_prompt'),
+        corrupted_prompt: formData.get('corrupted_prompt'),
+        patch_layers: patchLayers
+    };
+    
+    fetch('/api/interventions/patch', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayPathPatchingResults(data.results);
+            
+            // Show causal path visualization if requested
+            if (document.getElementById('visualizePath').checked) {
+                showCausalPathVisualization(data.results);
+            }
+            
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('pathPatchingModal')).hide();
+            showToast('Path patching completed successfully', 'success');
+        } else {
+            showError('Path patching failed: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error running path patching:', error);
+        showError('Network error running path patching');
+    });
+}
+
+// W6: Causal Path Visualization
+function showCausalPathVisualization(results) {
+    const modal = new bootstrap.Modal(document.getElementById('causalPathModal'));
+    
+    // Generate causal path graph
+    generateCausalPathGraph(results);
+    
+    modal.show();
+}
+
+function generateCausalPathGraph(results) {
+    const container = document.getElementById('causalPathViz');
+    
+    // Clear previous content
+    container.innerHTML = '';
+    
+    // Create nodes and links for the causal path
+    const nodes = [];
+    const links = [];
+    
+    // Add input node
+    nodes.push({
+        id: 'input',
+        label: 'Input',
+        type: 'input',
+        x: 50,
+        y: 200
+    });
+    
+    // Add layer nodes based on patch results
+    const layerInfo = results.layer_effects || [];
+    layerInfo.forEach((layer, i) => {
+        const nodeId = `layer_${i}`;
+        nodes.push({
+            id: nodeId,
+            label: layer.name || `Layer ${i}`,
+            type: 'layer',
+            effect: layer.effect_size || 0,
+            x: 150 + (i * 100),
+            y: 200
+        });
+        
+        // Link from previous node
+        const prevId = i === 0 ? 'input' : `layer_${i-1}`;
+        links.push({
+            source: prevId,
+            target: nodeId,
+            weight: Math.abs(layer.effect_size || 0)
+        });
+    });
+    
+    // Add output node
+    nodes.push({
+        id: 'output',
+        label: 'Output',
+        type: 'output',
+        x: 150 + (layerInfo.length * 100),
+        y: 200
+    });
+    
+    if (layerInfo.length > 0) {
+        links.push({
+            source: `layer_${layerInfo.length - 1}`,
+            target: 'output',
+            weight: 1.0
+        });
+    } else {
+        links.push({
+            source: 'input',
+            target: 'output',
+            weight: 1.0
+        });
+    }
+    
+    // Create SVG
+    const width = Math.max(600, 200 + layerInfo.length * 100);
+    const height = 400;
+    
+    const svg = d3.select(container)
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+    
+    // Add links
+    svg.selectAll('.link')
+        .data(links)
+        .enter()
+        .append('line')
+        .attr('class', 'link')
+        .attr('x1', d => nodes.find(n => n.id === d.source).x)
+        .attr('y1', d => nodes.find(n => n.id === d.source).y)
+        .attr('x2', d => nodes.find(n => n.id === d.target).x)
+        .attr('y2', d => nodes.find(n => n.id === d.target).y)
+        .attr('stroke', '#999')
+        .attr('stroke-width', d => Math.max(1, d.weight * 5))
+        .attr('stroke-opacity', 0.6);
+    
+    // Add nodes
+    const nodeGroups = svg.selectAll('.node')
+        .data(nodes)
+        .enter()
+        .append('g')
+        .attr('class', 'node')
+        .attr('transform', d => `translate(${d.x}, ${d.y})`);
+    
+    nodeGroups.append('circle')
+        .attr('r', d => d.type === 'layer' ? 20 : 15)
+        .attr('fill', d => {
+            if (d.type === 'input') return '#28a745';
+            if (d.type === 'output') return '#dc3545';
+            const effect = Math.abs(d.effect || 0);
+            if (effect > 0.5) return '#fd7e14';
+            if (effect > 0.2) return '#ffc107';
+            return '#6c757d';
+        })
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 2);
+    
+    nodeGroups.append('text')
+        .attr('dy', -25)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '12px')
+        .style('fill', '#333')
+        .text(d => d.label);
+    
+    // Add effect size labels for layer nodes
+    nodeGroups.filter(d => d.type === 'layer')
+        .append('text')
+        .attr('dy', 35)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '10px')
+        .style('fill', '#666')
+        .text(d => d.effect ? d.effect.toFixed(3) : '0.000');
+    
+    // Add legend
+    const legend = svg.append('g')
+        .attr('transform', 'translate(20, 20)');
+    
+    legend.append('text')
+        .attr('x', 0)
+        .attr('y', 0)
+        .style('font-size', '14px')
+        .style('font-weight', 'bold')
+        .text('Causal Path Analysis');
+    
+    legend.append('text')
+        .attr('x', 0)
+        .attr('y', 20)
+        .style('font-size', '12px')
+        .text('Circle size: Effect magnitude');
+    
+    legend.append('text')
+        .attr('x', 0)
+        .attr('y', 35)
+        .style('font-size', '12px')
+        .text('Line thickness: Connection strength');
+}
+
+function displayPathPatchingResults(results) {
+    const content = document.getElementById('resultsContent');
+    
+    content.innerHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6><i class="fas fa-check me-2"></i>Clean Output</h6>
+                <div class="alert alert-success">
+                    <code>${results.clean_output}</code>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6><i class="fas fa-exclamation-triangle me-2"></i>Corrupted Output</h6>
+                <div class="alert alert-danger">
+                    <code>${results.corrupted_output}</code>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6">
+                <h6><i class="fas fa-tools me-2"></i>Patched Output</h6>
+                <div class="alert alert-primary">
+                    <code>${results.patched_output}</code>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h3 class="text-${getEffectColor(results.recovery_score)}">${(results.recovery_score * 100).toFixed(1)}%</h3>
+                        <small>Recovery Score</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mt-3">
+            <div class="alert alert-info">
+                <strong>Analysis:</strong> ${results.interpretation || 'Path patching analysis completed.'}
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('resultsCard').style.display = 'block';
+}
+
+// W5: Path Patching Handler
+function handlePathPatchingResponse(data) {
+    if (data.success) {
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('pathPatchingModal'));
+        if (modal) modal.hide();
+        
+        // Show results
+        showToast('Path patching completed successfully!', 'success');
+        
+        // Show causal path visualization if requested
+        const visualizeCheckbox = document.getElementById('visualizePath');
+        if (visualizeCheckbox && visualizeCheckbox.checked) {
+            showCausalPathVisualization(data.results);
+        }
+    } else {
+        showError('Path patching failed: ' + data.error);
+    }
+}
+
+// W6: Causal Path Visualization
+function showCausalPathVisualization(results) {
+    const modal = new bootstrap.Modal(document.getElementById('causalPathModal'));
+    modal.show();
+    
+    // Generate mock network graph
+    generateCausalPathGraph(results);
+}
+
+function generateCausalPathGraph(results) {
+    // Mock network data
+    const nodes = [
+        {id: 'input', label: 'Input', type: 'input'},
+        {id: 'layer1', label: 'Layer 1', type: 'layer'},
+        {id: 'layer2', label: 'Layer 2', type: 'layer'},
+        {id: 'layer3', label: 'Layer 3', type: 'layer'},
+        {id: 'output', label: 'Output', type: 'output'}
+    ];
+    
+    const links = [
+        {source: 'input', target: 'layer1', weight: 0.8, causal: true},
+        {source: 'layer1', target: 'layer2', weight: 0.6, causal: true},
+        {source: 'layer2', target: 'layer3', weight: 0.9, causal: true},
+        {source: 'layer3', target: 'output', weight: 0.7, causal: true}
+    ];
+    
+    // Create D3 visualization
+    const svg = d3.select('#causalPathViz').html('').append('svg')
+        .attr('width', '100%')
+        .attr('height', '100%');
+    
+    const width = 800;
+    const height = 600;
+    
+    const simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+        .force('charge', d3.forceManyBody().strength(-300))
+        .force('center', d3.forceCenter(width / 2, height / 2));
+    
+    // Draw links
+    const link = svg.append('g')
+        .selectAll('line')
+        .data(links)
+        .enter().append('line')
+        .attr('stroke', d => d.causal ? '#ff6b6b' : '#95a5a6')
+        .attr('stroke-width', d => d.weight * 5)
+        .attr('stroke-opacity', 0.8);
+    
+    // Draw nodes
+    const node = svg.append('g')
+        .selectAll('circle')
+        .data(nodes)
+        .enter().append('circle')
+        .attr('r', 20)
+        .attr('fill', d => {
+            switch(d.type) {
+                case 'input': return '#3498db';
+                case 'layer': return '#2ecc71';
+                case 'output': return '#e74c3c';
+                default: return '#95a5a6';
+            }
+        })
+        .call(d3.drag()
+            .on('start', dragstarted)
+            .on('drag', dragged)
+            .on('end', dragended));
+    
+    // Add labels
+    const label = svg.append('g')
+        .selectAll('text')
+        .data(nodes)
+        .enter().append('text')
+        .text(d => d.label)
+        .attr('text-anchor', 'middle')
+        .attr('dy', '.35em')
+        .style('fill', 'white')
+        .style('font-size', '12px');
+    
+    simulation.on('tick', () => {
+        link
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
+        
+        node
+            .attr('cx', d => d.x)
+            .attr('cy', d => d.y);
+        
+        label
+            .attr('x', d => d.x)
+            .attr('y', d => d.y);
+    });
+    
+    function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+    }
+    
+    function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+    }
+    
+    function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+    }
+}
+
+// Utility functions
+function showLoading(elementId) {
+    document.getElementById(elementId).innerHTML = `
+        <div class="text-center p-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Processing...</p>
+        </div>
+    `;
+}
+
+function showError(message) {
+    showToast(message, 'danger');
+}
+
+function showToast(message, type = 'info') {
+    console.log(`Toast: ${message} (${type})`);
+    
+    // Remove any existing toasts
+    const existingToasts = document.querySelectorAll('.custom-toast');
+    existingToasts.forEach(toast => toast.remove());
+    
+    // Create toast
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type} position-fixed custom-toast`;
+    toast.style.cssText = `
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+        max-width: 500px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        border-radius: 8px;
+        animation: slideInFromRight 0.3s ease-out;
+    `;
+    
+    const iconMap = {
+        'success': 'fas fa-check-circle',
+        'danger': 'fas fa-exclamation-triangle',
+        'warning': 'fas fa-exclamation-circle',
+        'info': 'fas fa-info-circle'
+    };
+    
+    toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="${iconMap[type] || iconMap.info} me-2"></i>
+            <span class="flex-grow-1">${message}</span>
+            <button type="button" class="btn-close ms-2" onclick="this.parentElement.parentElement.remove()" aria-label="Close"></button>
+        </div>
+    `;
+    
+    // Add CSS animation
+    if (!document.getElementById('toast-styles')) {
+        const style = document.createElement('style');
+        style.id = 'toast-styles';
+        style.textContent = `
+            @keyframes slideInFromRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(toast);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.style.animation = 'slideInFromRight 0.3s ease-out reverse';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 5000);
+}
+
+function refreshHeatmap() {
+    generateHeatmap();
+}
+
+function toggleFullscreen(elementId) {
+    const element = document.getElementById(elementId);
+    if (element.requestFullscreen) {
+        element.requestFullscreen();
+    }
+}
+
+function exportCausalPath() {
+    // Export the SVG as PNG or PDF
+    showToast('Export functionality would be implemented here', 'info');
+}
+
+// Quick action to open path patching modal
+window.openPathPatching = function() {
+    const modal = new bootstrap.Modal(document.getElementById('pathPatchingModal'));
+    modal.show();
+};
+</script>
+{% endblock %}

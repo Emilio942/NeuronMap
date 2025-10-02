@@ -10,11 +10,9 @@ This module implements statistical tests, experiment logging, and reproducibilit
 
 import logging
 import numpy as np
-import pandas as pd
-from typing import Dict, List, Tuple, Optional, Any, Union
+from typing import Dict, List, Tuple, Optional, Any
 from pathlib import Path
 import json
-import pickle
 from dataclasses import dataclass, asdict
 from datetime import datetime
 import hashlib
@@ -23,19 +21,18 @@ import warnings
 # Optional dependencies with fallbacks
 try:
     from scipy import stats
-    from scipy.stats import false_discovery_control
     SCIPY_AVAILABLE = True
 except ImportError:
     SCIPY_AVAILABLE = False
     warnings.warn("SciPy not available. Some statistical tests will be unavailable.")
 
 try:
-    from sklearn.model_selection import cross_val_score, StratifiedKFold
-    from sklearn.metrics import cohen_kappa_score
+    from sklearn.model_selection import cross_val_score
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
-    warnings.warn("Scikit-learn not available. Some statistical tests will be unavailable.")
+    warnings.warn(
+        "Scikit-learn not available. Some statistical tests will be unavailable.")
 
 logger = logging.getLogger(__name__)
 
@@ -91,9 +88,9 @@ class StatisticalTester:
         self.alpha = alpha
 
     def compare_activations(self,
-                          activations1: np.ndarray,
-                          activations2: np.ndarray,
-                          test_type: str = "wilcoxon") -> StatisticalTestResult:
+                            activations1: np.ndarray,
+                            activations2: np.ndarray,
+                            test_type: str = "wilcoxon") -> StatisticalTestResult:
         """Compare two sets of activations statistically.
 
         Args:
@@ -121,7 +118,10 @@ class StatisticalTester:
         else:
             raise ValueError(f"Unknown test type: {test_type}")
 
-    def _wilcoxon_test(self, data1: np.ndarray, data2: np.ndarray) -> StatisticalTestResult:
+    def _wilcoxon_test(
+            self,
+            data1: np.ndarray,
+            data2: np.ndarray) -> StatisticalTestResult:
         """Perform Wilcoxon signed-rank test."""
         try:
             # Paired test if same length, otherwise Mann-Whitney U
@@ -139,7 +139,8 @@ class StatisticalTester:
             ci_lower, ci_upper = self._bootstrap_effect_size_ci(data1, data2)
 
             significant = p_value < self.alpha
-            interpretation = self._interpret_wilcoxon_result(statistic, p_value, effect_size)
+            interpretation = self._interpret_wilcoxon_result(
+                statistic, p_value, effect_size)
 
             return StatisticalTestResult(
                 test_name=test_name,
@@ -169,7 +170,8 @@ class StatisticalTester:
                 test_name = "Paired t-test"
             else:
                 statistic, p_value = stats.ttest_ind(data1, data2, equal_var=equal_var)
-                test_name = f"Independent t-test ({'equal' if equal_var else 'unequal'} variance)"
+                test_name = f"Independent t-test ({
+                    'equal' if equal_var else 'unequal'} variance)"
 
             # Calculate Cohen's d effect size
             effect_size = self._calculate_cohens_d(data1, data2)
@@ -178,7 +180,8 @@ class StatisticalTester:
             ci_lower, ci_upper = self._bootstrap_effect_size_ci(data1, data2)
 
             significant = p_value < self.alpha
-            interpretation = self._interpret_t_test_result(statistic, p_value, effect_size)
+            interpretation = self._interpret_t_test_result(
+                statistic, p_value, effect_size)
 
             return StatisticalTestResult(
                 test_name=test_name,
@@ -196,7 +199,7 @@ class StatisticalTester:
             return self._mock_test_result("ttest")
 
     def _permutation_test(self, data1: np.ndarray, data2: np.ndarray,
-                         n_permutations: int = 10000) -> StatisticalTestResult:
+                          n_permutations: int = 10000) -> StatisticalTestResult:
         """Perform permutation test."""
         try:
             # Calculate observed difference in means
@@ -231,7 +234,8 @@ class StatisticalTester:
             ci_upper = np.percentile(perm_diffs, 97.5)
 
             significant = p_value < self.alpha
-            interpretation = self._interpret_permutation_result(observed_diff, p_value, effect_size)
+            interpretation = self._interpret_permutation_result(
+                observed_diff, p_value, effect_size)
 
             return StatisticalTestResult(
                 test_name="Permutation test",
@@ -259,7 +263,8 @@ class StatisticalTester:
 
         return (mean1 - mean2) / pooled_std if pooled_std > 0 else 0
 
-    def _calculate_rank_biserial_correlation(self, data1: np.ndarray, data2: np.ndarray) -> float:
+    def _calculate_rank_biserial_correlation(
+            self, data1: np.ndarray, data2: np.ndarray) -> float:
         """Calculate rank-biserial correlation effect size."""
         if len(data1) != len(data2):
             # For Mann-Whitney U, use different formula
@@ -272,7 +277,7 @@ class StatisticalTester:
             return np.mean(np.sign(differences))
 
     def _bootstrap_effect_size_ci(self, data1: np.ndarray, data2: np.ndarray,
-                                 n_bootstrap: int = 1000) -> Tuple[float, float]:
+                                  n_bootstrap: int = 1000) -> Tuple[float, float]:
         """Calculate confidence interval for effect size using bootstrap."""
         effect_sizes = []
 
@@ -287,7 +292,11 @@ class StatisticalTester:
 
         return np.percentile(effect_sizes, [2.5, 97.5])
 
-    def _interpret_wilcoxon_result(self, statistic: float, p_value: float, effect_size: float) -> str:
+    def _interpret_wilcoxon_result(
+            self,
+            statistic: float,
+            p_value: float,
+            effect_size: float) -> str:
         """Interpret Wilcoxon test result."""
         significance = "significant" if p_value < self.alpha else "not significant"
 
@@ -300,9 +309,14 @@ class StatisticalTester:
         else:
             magnitude = "large"
 
-        return f"The test is {significance} (p={p_value:.4f}) with {magnitude} effect size (r={effect_size:.3f})"
+        return f"The test is {significance} (p={p_value:.4f}) with {
+            magnitude} effect size (r={effect_size:.3f})"
 
-    def _interpret_t_test_result(self, statistic: float, p_value: float, effect_size: float) -> str:
+    def _interpret_t_test_result(
+            self,
+            statistic: float,
+            p_value: float,
+            effect_size: float) -> str:
         """Interpret t-test result."""
         significance = "significant" if p_value < self.alpha else "not significant"
 
@@ -315,13 +329,19 @@ class StatisticalTester:
         else:
             magnitude = "very large"
 
-        return f"The test is {significance} (t={statistic:.3f}, p={p_value:.4f}) with {magnitude} effect size (d={effect_size:.3f})"
+        return f"The test is {significance} (t={statistic:.3f}, p={p_value:.4f}) with {
+            magnitude} effect size (d={effect_size:.3f})"
 
-    def _interpret_permutation_result(self, statistic: float, p_value: float, effect_size: float) -> str:
+    def _interpret_permutation_result(
+            self,
+            statistic: float,
+            p_value: float,
+            effect_size: float) -> str:
         """Interpret permutation test result."""
         significance = "significant" if p_value < self.alpha else "not significant"
 
-        return f"The permutation test is {significance} (observed difference={statistic:.4f}, p={p_value:.4f})"
+        return f"The permutation test is {significance} (observed difference={
+            statistic:.4f}, p={p_value:.4f})"
 
     def _mock_test_result(self, test_type: str) -> StatisticalTestResult:
         """Create mock test result when dependencies are unavailable."""
@@ -344,7 +364,7 @@ class MultipleComparisonCorrector:
         self.alpha = alpha
 
     def correct_p_values(self, p_values: List[float],
-                        method: str = "fdr_bh") -> MultipleComparisonResult:
+                         method: str = "fdr_bh") -> MultipleComparisonResult:
         """Apply multiple comparison correction.
 
         Args:
@@ -385,7 +405,7 @@ class MultipleComparisonCorrector:
         if SCIPY_AVAILABLE:
             try:
                 return false_discovery_control(p_values, method='bh')
-            except:
+            except BaseException:
                 pass
 
         # Fallback implementation
@@ -395,11 +415,11 @@ class MultipleComparisonCorrector:
 
         # Calculate corrected p-values
         corrected = np.zeros_like(sorted_p)
-        for i in range(n-1, -1, -1):
-            if i == n-1:
+        for i in range(n - 1, -1, -1):
+            if i == n - 1:
                 corrected[i] = sorted_p[i]
             else:
-                corrected[i] = min(corrected[i+1], sorted_p[i] * n / (i+1))
+                corrected[i] = min(corrected[i + 1], sorted_p[i] * n / (i + 1))
 
         # Restore original order
         result = np.zeros_like(p_values)
@@ -412,13 +432,13 @@ class MultipleComparisonCorrector:
         if SCIPY_AVAILABLE:
             try:
                 return false_discovery_control(p_values, method='by')
-            except:
+            except BaseException:
                 pass
 
         # Fallback: more conservative than BH
         bh_corrected = self._fdr_bh_correction(p_values)
         n = len(p_values)
-        harmonic_sum = np.sum(1.0 / np.arange(1, n+1))
+        harmonic_sum = np.sum(1.0 / np.arange(1, n + 1))
 
         return np.minimum(bh_corrected * harmonic_sum, 1.0)
 
@@ -431,7 +451,7 @@ class CrossValidator:
         self.random_state = random_state
 
     def validate_analysis(self, data: np.ndarray, labels: np.ndarray,
-                         analysis_func: callable) -> Dict[str, Any]:
+                          analysis_func: callable) -> Dict[str, Any]:
         """Perform cross-validation on analysis function.
 
         Args:
@@ -449,7 +469,7 @@ class CrossValidator:
         try:
             # Create stratified k-fold
             skf = StratifiedKFold(n_splits=self.n_splits, shuffle=True,
-                                random_state=self.random_state)
+                                  random_state=self.random_state)
 
             scores = []
             for train_idx, test_idx in skf.split(data, labels):
@@ -458,7 +478,8 @@ class CrossValidator:
 
                 # Apply analysis function
                 try:
-                    score = analysis_func(train_data, test_data, train_labels, test_labels)
+                    score = analysis_func(
+                        train_data, test_data, train_labels, test_labels)
                     scores.append(score)
                 except Exception as e:
                     logger.warning(f"Analysis function failed in fold: {e}")
@@ -485,7 +506,8 @@ class ExperimentLogger:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate experiment ID
-        self.experiment_id = f"{experiment_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        self.experiment_id = f"{experiment_name}_{
+            datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
         # Initialize metadata
         self.metadata = ExperimentMetadata(
@@ -599,7 +621,8 @@ def main():
 
     correction_result = corrector.correct_p_values(p_values, method="fdr_bh")
     print(f"Original p-values: {correction_result.original_p_values}")
-    print(f"Corrected p-values: {[f'{p:.4f}' for p in correction_result.corrected_p_values]}")
+    print(
+        f"Corrected p-values: {[f'{p:.4f}' for p in correction_result.corrected_p_values]}")
     print(f"Significant tests: {correction_result.significant_tests}")
 
     # Experiment logging

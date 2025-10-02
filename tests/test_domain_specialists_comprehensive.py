@@ -12,7 +12,7 @@ from hypothesis import given, strategies as st, settings
 from unittest.mock import Mock, patch
 from typing import List, Dict, Any
 
-from src.data_generation.domain_specialists import (
+from src.data_generation.core_specialists import (
     DomainSpecializationFramework,
     BaseDomainSpecialist,
     ScienceSpecialist,

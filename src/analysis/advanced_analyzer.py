@@ -7,7 +7,7 @@ This module provides sophisticated analysis techniques for neural network activa
 
 import logging
 import numpy as np
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from pathlib import Path
 import json
 import time
@@ -17,8 +17,7 @@ logger = logging.getLogger(__name__)
 # Conditional imports
 try:
     from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
-    from sklearn.decomposition import PCA, FastICA
-    from sklearn.manifold import TSNE
+    from sklearn.decomposition import PCA
     from sklearn.preprocessing import StandardScaler
     from sklearn.metrics import silhouette_score, calinski_harabasz_score
     SKLEARN_AVAILABLE = True
@@ -28,8 +27,7 @@ except ImportError:
 
 try:
     import scipy.stats as stats
-    from scipy.spatial.distance import pdist, squareform
-    from scipy.cluster.hierarchy import dendrogram, linkage
+    from scipy.spatial.distance import pdist
     SCIPY_AVAILABLE = True
 except ImportError:
     SCIPY_AVAILABLE = False
@@ -46,6 +44,50 @@ class AdvancedAnalyzer:
         else:
             self.output_dir = Path("outputs") / "advanced_analysis"
         self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def _cluster_kmeans(self, activations: np.ndarray, n_clusters: Optional[int]) -> Dict[str, Any]:
+        """Perform KMeans clustering."""
+        if n_clusters is None:
+            n_clusters = self._find_optimal_clusters(activations, max_k=min(10, activations.shape[0]//2))
+
+        clusterer = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        labels = clusterer.fit_predict(activations)
+
+        return {
+            'n_clusters': n_clusters,
+            'labels': labels.tolist(),
+            'cluster_centers': clusterer.cluster_centers_.tolist(),
+            'inertia': clusterer.inertia_
+        }
+
+    def _cluster_dbscan(self, activations: np.ndarray) -> Dict[str, Any]:
+        """Perform DBSCAN clustering."""
+        eps = self._estimate_dbscan_eps(activations)
+        clusterer = DBSCAN(eps=eps, min_samples=max(2, activations.shape[0]//10))
+        labels = clusterer.fit_predict(activations)
+
+        n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+        noise_points = list(labels).count(-1)
+
+        return {
+            'n_clusters': n_clusters,
+            'n_noise_points': noise_points,
+            'labels': labels.tolist(),
+            'eps': eps
+        }
+
+    def _cluster_hierarchical(self, activations: np.ndarray, n_clusters: Optional[int]) -> Dict[str, Any]:
+        """Perform hierarchical clustering."""
+        if n_clusters is None:
+            n_clusters = min(5, activations.shape[0]//2)
+
+        clusterer = AgglomerativeClustering(n_clusters=n_clusters)
+        labels = clusterer.fit_predict(activations)
+
+        return {
+            'n_clusters': n_clusters,
+            'labels': labels.tolist()
+        }
 
     def cluster_activations(self, activations: np.ndarray,
                           method: str = "kmeans",
@@ -71,49 +113,14 @@ class AdvancedAnalyzer:
 
         try:
             if method.lower() == "kmeans":
-                # Determine optimal number of clusters if not specified
-                if n_clusters is None:
-                    n_clusters = self._find_optimal_clusters(scaled_activations, max_k=min(10, activations.shape[0]//2))
-
-                clusterer = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-                labels = clusterer.fit_predict(scaled_activations)
-
-                results.update({
-                    'n_clusters': n_clusters,
-                    'labels': labels.tolist(),
-                    'cluster_centers': clusterer.cluster_centers_.tolist(),
-                    'inertia': clusterer.inertia_
-                })
-
+                results.update(self._cluster_kmeans(scaled_activations, n_clusters))
             elif method.lower() == "dbscan":
-                # Use adaptive eps based on data scale
-                eps = self._estimate_dbscan_eps(scaled_activations)
-                clusterer = DBSCAN(eps=eps, min_samples=max(2, activations.shape[0]//10))
-                labels = clusterer.fit_predict(scaled_activations)
-
-                n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
-                noise_points = list(labels).count(-1)
-
-                results.update({
-                    'n_clusters': n_clusters,
-                    'n_noise_points': noise_points,
-                    'labels': labels.tolist(),
-                    'eps': eps
-                })
-
+                results.update(self._cluster_dbscan(scaled_activations))
             elif method.lower() == "hierarchical":
-                if n_clusters is None:
-                    n_clusters = min(5, activations.shape[0]//2)
-
-                clusterer = AgglomerativeClustering(n_clusters=n_clusters)
-                labels = clusterer.fit_predict(scaled_activations)
-
-                results.update({
-                    'n_clusters': n_clusters,
-                    'labels': labels.tolist()
-                })
+                results.update(self._cluster_hierarchical(scaled_activations, n_clusters))
 
             # Compute clustering metrics
+            labels = np.array(results.get('labels', []))
             if len(set(labels)) > 1:  # Need at least 2 clusters for metrics
                 valid_indices = labels != -1  # Exclude noise points for DBSCAN
                 if np.sum(valid_indices) > 0:
@@ -121,14 +128,14 @@ class AdvancedAnalyzer:
                         silhouette = silhouette_score(scaled_activations[valid_indices],
                                                     labels[valid_indices])
                         results['silhouette_score'] = silhouette
-                    except:
+                    except Exception:
                         pass
 
                     try:
                         calinski_harabasz = calinski_harabasz_score(scaled_activations[valid_indices],
                                                                   labels[valid_indices])
                         results['calinski_harabasz_score'] = calinski_harabasz
-                    except:
+                    except Exception:
                         pass
 
             logger.info(f"Clustering completed: {method}, {results.get('n_clusters', 0)} clusters")
@@ -152,7 +159,7 @@ class AdvancedAnalyzer:
                 kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
                 kmeans.fit(data)
                 inertias.append(kmeans.inertia_)
-            except:
+            except Exception:
                 break
 
         if len(inertias) < 2:
@@ -207,7 +214,7 @@ class AdvancedAnalyzer:
         try:
             # PCA Analysis
             pca = PCA()
-            pca_transformed = pca.fit_transform(activations)
+            pca.fit_transform(activations)
 
             # Find effective dimensionality (95% variance explained)
             cumvar = np.cumsum(pca.explained_variance_ratio_)
@@ -364,7 +371,7 @@ class AdvancedAnalyzer:
                             'p_value': float(ks_p),
                             'is_normal': ks_p > 0.05
                         }
-                except:
+                except Exception:
                     pass
 
             # Activation patterns

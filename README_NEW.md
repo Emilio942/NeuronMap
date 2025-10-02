@@ -24,25 +24,19 @@ pip install -r requirements.txt
 
 # Quick test
 python -m src.analysis.activation_extractor --help
-```
-
-### Option 2: Development Setup
-```bash
-# Create virtual environment
-python -m venv neuronmap_env
-source neuronmap_env/bin/activate  # On Windows: neuronmap_env\Scripts\activate
-
-# Install in development mode
-pip install -e .
-
-# Run validation
-python validate_section_1_1.py
-```
-
-### 🎯 Basic Usage Example
-
 ```python
-from src.analysis.activation_extractor import ActivationExtractor
+from src.utils.batch_processor import BatchProcessor
+from src.utils.performance import ProfiledBatchProcessor
+
+# Setup canonical batch processor for simple workloads
+processor = BatchProcessor({"batch_size": 32, "num_workers": 4})
+
+# For detailed profiling, use the performance wrapper
+profiled = ProfiledBatchProcessor(batch_size=32, num_workers=4)
+
+questions = load_large_question_list()
+results = profiled.process_questions_batch(questions, process_question_batch)
+```
 from src.visualization.core_visualizer import CoreVisualizer
 
 # Initialize analyzer
@@ -301,26 +295,17 @@ attention_analyzer.generate_head_analysis_report(attention_data)
 <summary><b>Large-Scale Processing</b></summary>
 
 ```python
-from src.utils.performance import BatchProcessor
+from src.utils.batch_processor import BatchProcessor
+from src.utils.performance import ProfiledBatchProcessor
 
-# Setup batch processor for large datasets
-processor = BatchProcessor(
-    model_name="gpt2",
-    batch_size=32,
-    max_workers=4,
-    memory_limit_gb=16
-)
+# Setup canonical batch processor for simple workloads
+processor = BatchProcessor({"batch_size": 32, "num_workers": 4})
 
-# Process large question dataset
-large_dataset = "path/to/large_questions.jsonl"
-results = processor.process_large_dataset(
-    large_dataset,
-    output_dir="results/large_scale/",
-    checkpoint_every=1000
-)
+# For detailed profiling, use the performance wrapper
+profiled = ProfiledBatchProcessor(batch_size=32, num_workers=4)
 
-# Monitor processing progress
-processor.get_processing_status()
+questions = load_large_question_list()
+results = profiled.process_questions_batch(questions, process_question_batch)
 ```
 
 </details>

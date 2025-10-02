@@ -2,20 +2,16 @@
 
 import numpy as np
 import logging
-from typing import Dict, List, Optional, Tuple, Any, Union, Callable
+from typing import Dict, List, Optional, Any, Tuple
 from pathlib import Path
 import json
-import h5py
 from dataclasses import dataclass
-import itertools
-from scipy import stats
 from scipy.spatial.distance import pdist, squareform
-from scipy.stats import pearsonr, spearmanr
+from scipy.stats import pearsonr
 import warnings
 
 try:
     import torch
-    import torch.nn.functional as F
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
@@ -24,18 +20,18 @@ try:
     from sklearn.metrics.pairwise import cosine_similarity
     from sklearn.decomposition import PCA
     from sklearn.linear_model import LogisticRegression, Ridge
-    from sklearn.model_selection import cross_val_score
     from sklearn.preprocessing import StandardScaler
+    from sklearn.model_selection import cross_val_score
     SKLEARN_AVAILABLE = True
 except ImportError:
     SKLEARN_AVAILABLE = False
 
 try:
     from ..utils.config import get_config
-    from ..utils.error_handling import with_retry, safe_execute
 except ImportError:
-    get_config = lambda: type('Config', (), {'get_experiment_config': lambda x: {}})()
-    handle_errors = lambda func: func
+    def get_config_fallback():
+        return type('Config', (), {'get_experiment_config': lambda x: {}})()
+    get_config = get_config_fallback
 
 
 logger = logging.getLogger(__name__)
@@ -86,12 +82,12 @@ class RepresentationalSimilarityAnalyzer:
         try:
             self.config = get_config()
             self.experiment_config = self.config.get_experiment_config(config_name)
-        except:
+        except Exception:
             self.config = None
             self.experiment_config = {}
 
     def compute_similarity_matrix(self, activations: np.ndarray,
-                                method: str = "cosine") -> np.ndarray:
+                                  method: str = "cosine") -> np.ndarray:
         """Compute similarity matrix from activations.
 
         Args:
@@ -123,8 +119,8 @@ class RepresentationalSimilarityAnalyzer:
             raise ValueError(f"Unknown similarity method: {method}")
 
     def compare_representations(self, activations1: np.ndarray,
-                              activations2: np.ndarray,
-                              method: str = "cosine") -> RSAResult:
+                                activations2: np.ndarray,
+                                method: str = "cosine") -> RSAResult:
         """Compare two sets of representations using RSA.
 
         Args:
@@ -163,7 +159,7 @@ class RepresentationalSimilarityAnalyzer:
         )
 
     def analyze_layer_progression(self, layer_activations: Dict[str, np.ndarray],
-                                method: str = "cosine") -> Dict[str, Any]:
+                                  method: str = "cosine") -> Dict[str, Any]:
         """Analyze representational similarity across layers.
 
         Args:
@@ -256,7 +252,11 @@ class CenteredKernelAlignmentAnalyzer:
 
         # Compute CKA
         numerator = np.trace(K_centered @ L_centered)
-        denominator = np.sqrt(np.trace(K_centered @ K_centered) * np.trace(L_centered @ L_centered))
+        denominator = np.sqrt(
+            np.trace(
+                K_centered @ K_centered) *
+            np.trace(
+                L_centered @ L_centered))
 
         if denominator == 0:
             return 0.0
@@ -277,7 +277,7 @@ class CenteredKernelAlignmentAnalyzer:
         def rbf_kernel(A: np.ndarray, sigma: float) -> np.ndarray:
             """Compute RBF kernel matrix."""
             pairwise_sq_dists = np.sum(A**2, axis=1, keepdims=True) + \
-                               np.sum(A**2, axis=1) - 2 * np.dot(A, A.T)
+                np.sum(A**2, axis=1) - 2 * np.dot(A, A.T)
             return np.exp(-pairwise_sq_dists / (2 * sigma**2))
 
         # Compute RBF Gram matrices
@@ -289,15 +289,23 @@ class CenteredKernelAlignmentAnalyzer:
         L_centered = self.center_gram_matrix(L)
 
         numerator = np.trace(K_centered @ L_centered)
-        denominator = np.sqrt(np.trace(K_centered @ K_centered) * np.trace(L_centered @ L_centered))
+        denominator = np.sqrt(
+            np.trace(
+                K_centered @ K_centered) *
+            np.trace(
+                L_centered @ L_centered))
 
         if denominator == 0:
             return 0.0
 
         return numerator / denominator
 
-    def compute_cka(self, X: np.ndarray, Y: np.ndarray,
-                   layer1_name: str = "layer1", layer2_name: str = "layer2") -> CKAResult:
+    def compute_cka(
+            self,
+            X: np.ndarray,
+            Y: np.ndarray,
+            layer1_name: str = "layer1",
+            layer2_name: str = "layer2") -> CKAResult:
         """Compute both linear and RBF CKA.
 
         Args:
@@ -315,7 +323,8 @@ class CenteredKernelAlignmentAnalyzer:
         # Use linear CKA as primary score
         primary_score = linear_score
 
-        logger.info(f"CKA: {layer1_name} vs {layer2_name} - Linear: {linear_score:.4f}, RBF: {rbf_score:.4f}")
+        logger.info(f"CKA: {layer1_name} vs {
+                    layer2_name} - Linear: {linear_score:.4f}, RBF: {rbf_score:.4f}")
 
         return CKAResult(
             cka_score=primary_score,
@@ -343,11 +352,14 @@ class ProbingTaskAnalyzer:
         try:
             self.config = get_config()
             self.experiment_config = self.config.get_experiment_config(config_name)
-        except:
+        except Exception:
             self.config = None
             self.experiment_config = {}
 
-    def create_pos_tagging_task(self, texts: List[str], pos_tags: List[List[str]]) -> Tuple[np.ndarray, np.ndarray]:
+    def create_pos_tagging_task(self,
+                                texts: List[str],
+                                pos_tags: List[List[str]]) -> Tuple[np.ndarray,
+                                                                    np.ndarray]:
         """Create a POS tagging probing task.
 
         Args:
@@ -385,7 +397,10 @@ class ProbingTaskAnalyzer:
 
         return np.array(features), np.array(labels)
 
-    def create_sentiment_task(self, texts: List[str], sentiments: List[str]) -> Tuple[np.ndarray, np.ndarray]:
+    def create_sentiment_task(self,
+                              texts: List[str],
+                              sentiments: List[str]) -> Tuple[np.ndarray,
+                                                              np.ndarray]:
         """Create a sentiment probing task.
 
         Args:
@@ -407,7 +422,13 @@ class ProbingTaskAnalyzer:
             feature_vector = np.zeros(100)
 
             # Basic sentiment indicators
-            positive_words = ['good', 'great', 'excellent', 'amazing', 'wonderful', 'love']
+            positive_words = [
+                'good',
+                'great',
+                'excellent',
+                'amazing',
+                'wonderful',
+                'love']
             negative_words = ['bad', 'terrible', 'awful', 'hate', 'horrible', 'worst']
 
             pos_count = sum(1 for word in words if word in positive_words)
@@ -427,8 +448,8 @@ class ProbingTaskAnalyzer:
         return np.array(features), np.array(labels)
 
     def run_probing_task(self, activations: np.ndarray, labels: np.ndarray,
-                        task_name: str, layer_name: str,
-                        model_type: str = "logistic") -> ProbingResult:
+                         task_name: str, layer_name: str,
+                         model_type: str = "logistic") -> ProbingResult:
         """Run a probing task on given activations.
 
         Args:
@@ -488,11 +509,13 @@ class ProbingTaskAnalyzer:
         confusion_matrix = np.zeros((len(unique_labels), len(unique_labels)))
         for i, true_label in enumerate(unique_labels):
             for j, pred_label in enumerate(unique_labels):
-                confusion_matrix[i, j] = np.sum((labels == true_label) & (y_pred == pred_label))
+                confusion_matrix[i, j] = np.sum(
+                    (labels == true_label) & (y_pred == pred_label))
 
         accuracy = np.mean(cv_scores)
 
-        logger.info(f"Probing task '{task_name}' on {layer_name}: {accuracy:.4f} accuracy")
+        logger.info(f"Probing task '{task_name}' on {
+                    layer_name}: {accuracy:.4f} accuracy")
 
         return ProbingResult(
             task_name=task_name,
@@ -519,7 +542,7 @@ class InformationTheoreticAnalyzer:
         pass
 
     def estimate_mutual_information(self, X: np.ndarray, Y: np.ndarray,
-                                  bins: int = 50) -> float:
+                                    bins: int = 50) -> float:
         """Estimate mutual information between two variables.
 
         Args:
@@ -553,7 +576,8 @@ class InformationTheoreticAnalyzer:
 
         return mi
 
-    def compute_layer_information_flow(self, layer_activations: Dict[str, np.ndarray]) -> Dict[str, Any]:
+    def compute_layer_information_flow(
+            self, layer_activations: Dict[str, np.ndarray]) -> Dict[str, Any]:
         """Compute information flow between layers.
 
         Args:
@@ -619,9 +643,13 @@ class ExperimentalAnalysisPipeline:
         self.probing_analyzer = ProbingTaskAnalyzer(config_name)
         self.info_analyzer = InformationTheoreticAnalyzer()
 
-    def run_experimental_analysis(self, layer_activations: Dict[str, np.ndarray],
-                                probing_data: Optional[Dict[str, Any]] = None,
-                                output_dir: str = "data/outputs/experimental") -> Dict[str, Any]:
+    def run_experimental_analysis(self,
+                                  layer_activations: Dict[str,
+                                                          np.ndarray],
+                                  probing_data: Optional[Dict[str,
+                                                              Any]] = None,
+                                  output_dir: str = "data/outputs/experimental") -> Dict[str,
+                                                                                         Any]:
         """Run complete experimental analysis pipeline.
 
         Args:
@@ -658,7 +686,7 @@ class ExperimentalAnalysisPipeline:
         logger.info("Performing CKA analysis...")
         cka_results = {}
         for i, layer1 in enumerate(layer_names):
-            for j, layer2 in enumerate(layer_names[i+1:], i+1):
+            for j, layer2 in enumerate(layer_names[i + 1:], i + 1):
                 cka_result = self.cka_analyzer.compute_cka(
                     layer_activations[layer1],
                     layer_activations[layer2],
@@ -702,8 +730,7 @@ class ExperimentalAnalysisPipeline:
         # 4. Information-Theoretic Analysis
         logger.info("Performing information-theoretic analysis...")
         results['information_analysis'] = self.info_analyzer.compute_layer_information_flow(
-            layer_activations
-        )
+            layer_activations)
 
         # Save results
         results_file = output_path / "experimental_analysis_results.json"
@@ -749,12 +776,12 @@ class ExperimentalAnalyzer:
         self.pipeline = ExperimentalAnalysisPipeline(config_name)
 
     def analyze_representation_similarity(self, activations1: np.ndarray,
-                                        activations2: np.ndarray) -> RSAResult:
+                                          activations2: np.ndarray) -> RSAResult:
         """Compute representational similarity analysis between two sets of activations."""
         return self.rsa_analyzer.compare_representations(activations1, activations2)
 
     def analyze_centered_kernel_alignment(self, X: np.ndarray, Y: np.ndarray,
-                                        kernel: str = 'linear') -> CKAResult:
+                                          kernel: str = 'linear') -> CKAResult:
         """Compute centered kernel alignment between two representation matrices."""
         if kernel == 'linear':
             cka_score = self.cka_analyzer.linear_cka(X, Y)
@@ -770,19 +797,23 @@ class ExperimentalAnalyzer:
         )
 
     def analyze_probing_tasks(self, activations: np.ndarray, labels: np.ndarray,
-                            task_type: str = 'classification') -> ProbingResult:
+                              task_type: str = 'classification') -> ProbingResult:
         """Run probing task analysis to test what information is encoded."""
         # Add default layer_name parameter for compatibility
-        return self.probing_analyzer.run_probing_task(activations, labels, task_type, layer_name='layer_0')
+        return self.probing_analyzer.run_probing_task(
+            activations, labels, task_type, layer_name='layer_0')
 
-    def analyze_mutual_information(self, layer_activations: Dict[str, np.ndarray]) -> Dict[str, Any]:
+    def analyze_mutual_information(
+            self, layer_activations: Dict[str, np.ndarray]) -> Dict[str, Any]:
         """Analyze information flow between layers using mutual information."""
         return self.info_analyzer.compute_layer_information_flow(layer_activations)
 
     # Method aliases for test compatibility
-    def representation_similarity_analysis(self, activations1: np.ndarray,
-                                          activations2: np.ndarray,
-                                          method: str = 'correlation') -> Dict[str, Any]:
+    def representation_similarity_analysis(self,
+                                           activations1: np.ndarray,
+                                           activations2: np.ndarray,
+                                           method: str = 'correlation') -> Dict[str,
+                                                                                Any]:
         """Alias for analyze_representation_similarity for test compatibility."""
         result = self.analyze_representation_similarity(activations1, activations2)
         # Convert RSAResult to dictionary format expected by tests
@@ -795,7 +826,8 @@ class ExperimentalAnalyzer:
 
         return {
             'similarity_matrix': sim_matrix,
-            'similarity_score': result.correlation_score,  # Use correlation_score as similarity_score
+            # Use correlation_score as similarity_score
+            'similarity_score': result.correlation_score,
             'method': result.method,
             'n_samples1': result.metadata.get('n_samples1', activations1.shape[0]),
             'n_samples2': result.metadata.get('n_samples2', activations2.shape[0]),
@@ -818,7 +850,7 @@ class ExperimentalAnalyzer:
         }
 
     def probing_task_analysis(self, activations: np.ndarray, labels: np.ndarray,
-                            task_name: str = 'classification') -> Dict[str, Any]:
+                              task_name: str = 'classification') -> Dict[str, Any]:
         """Alias for analyze_probing_tasks for test compatibility."""
         result = self.analyze_probing_tasks(activations, labels, task_name)
         # Convert ProbingResult to dictionary format expected by tests
@@ -832,7 +864,7 @@ class ExperimentalAnalyzer:
         }
 
     def mutual_information_analysis(self, activations: np.ndarray,
-                                   labels: np.ndarray) -> Dict[str, Any]:
+                                    labels: np.ndarray) -> Dict[str, Any]:
         """Analyze mutual information between activations and labels."""
         # Convert to layer format for the info analyzer
         layer_activations = {'layer_0': activations}
@@ -855,21 +887,25 @@ class ExperimentalAnalyzer:
             for i in range(min(10, activations.shape[1])):  # Sample first 10 features
                 try:
                     feature_mi = self.info_analyzer.estimate_mutual_information(
-                        activations[:, i:i+1], labels_2d
+                        activations[:, i:i + 1], labels_2d
                     )
                     feature_mi_scores.append(feature_mi)
-                except:
+                except Exception:
                     feature_mi_scores.append(0.0)
 
             # Find top informative features
-            top_features = sorted(enumerate(feature_mi_scores), key=lambda x: x[1], reverse=True)[:5]
+            top_features = sorted(
+                enumerate(feature_mi_scores),
+                key=lambda x: x[1],
+                reverse=True)[
+                :5]
 
             mi_results.update({
                 'mutual_information': mi_with_labels,
                 'label_mutual_information': mi_with_labels,
                 'feature_mi_scores': feature_mi_scores,
                 'top_informative_features': [{'feature_idx': idx, 'mi_score': score}
-                                           for idx, score in top_features]
+                                             for idx, score in top_features]
             })
 
         except Exception as e:
@@ -904,7 +940,7 @@ def main():
     # Add some correlation structure
     for i in range(1, 4):
         layer_name = f'layer_{i}'
-        prev_layer = f'layer_{i-1}'
+        prev_layer = f'layer_{i - 1}'
         # Add some correlation with previous layer
         layer_activations[layer_name] = (
             0.7 * layer_activations[layer_name] +

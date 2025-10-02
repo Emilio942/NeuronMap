@@ -149,7 +149,8 @@ class DifficultyAnalyzer:
         complexity_score += reasoning_count * 0.6
 
         # Multiple clauses (commas, semicolons)
-        clause_markers = text_lower.count(',') + text_lower.count(';') + text_lower.count(' and ')
+        clause_markers = text_lower.count(
+            ',') + text_lower.count(';') + text_lower.count(' and ')
         complexity_score += clause_markers * 0.3
 
         # Question complexity patterns
@@ -187,11 +188,15 @@ class DifficultyAnalyzer:
         text_lower = question.lower()
 
         # Mathematical patterns
-        if re.search(r'\b(calculate|solve|equation|formula|number|mathematical)\b', text_lower):
+        if re.search(
+            r'\b(calculate|solve|equation|formula|number|mathematical)\b',
+                text_lower):
             return QuestionCategory.MATHEMATICAL
 
         # Technical patterns
-        if re.search(r'\b(algorithm|programming|code|technical|system|software)\b', text_lower):
+        if re.search(
+            r'\b(algorithm|programming|code|technical|system|software)\b',
+                text_lower):
             return QuestionCategory.TECHNICAL
 
         # Reasoning patterns
@@ -203,15 +208,21 @@ class DifficultyAnalyzer:
             return QuestionCategory.CREATIVE
 
         # Ethical patterns
-        if re.search(r'\b(ethical|moral|right|wrong|should|ought|justice)\b', text_lower):
+        if re.search(
+            r'\b(ethical|moral|right|wrong|should|ought|justice)\b',
+                text_lower):
             return QuestionCategory.ETHICAL
 
         # Analytical patterns
-        if re.search(r'\b(compare|contrast|evaluate|assess|analyze|critique)\b', text_lower):
+        if re.search(
+            r'\b(compare|contrast|evaluate|assess|analyze|critique)\b',
+                text_lower):
             return QuestionCategory.ANALYTICAL
 
         # Conceptual patterns
-        if re.search(r'\b(concept|theory|principle|framework|understanding)\b', text_lower):
+        if re.search(
+            r'\b(concept|theory|principle|framework|understanding)\b',
+                text_lower):
             return QuestionCategory.CONCEPTUAL
 
         # Default to factual
@@ -229,11 +240,46 @@ class DifficultyAnalyzer:
         """
         # Simple keyword extraction based on content words
         stop_words = {
-            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-            'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-            'should', 'may', 'might', 'can', 'what', 'when', 'where', 'who', 'why', 'how'
-        }
+            'the',
+            'a',
+            'an',
+            'and',
+            'or',
+            'but',
+            'in',
+            'on',
+            'at',
+            'to',
+            'for',
+            'of',
+            'with',
+            'by',
+            'is',
+            'are',
+            'was',
+            'were',
+            'be',
+            'been',
+            'being',
+            'have',
+            'has',
+            'had',
+            'do',
+            'does',
+            'did',
+            'will',
+            'would',
+            'could',
+            'should',
+            'may',
+            'might',
+            'can',
+            'what',
+            'when',
+            'where',
+            'who',
+            'why',
+            'how'}
 
         # Extract words, filter stop words, and get unique terms
         words = re.findall(r'\b[a-zA-Z]+\b', question.lower())
@@ -309,7 +355,8 @@ class QualityValidator:
             quality_score -= 0.2
 
         # Bonus points for good structure
-        if any(word in question.lower() for word in ['explain', 'describe', 'analyze', 'compare']):
+        if any(word in question.lower()
+               for word in ['explain', 'describe', 'analyze', 'compare']):
             quality_score += 0.1
 
         if re.search(r'\b(specific|detailed|example|instance)\b', question.lower()):
@@ -318,8 +365,10 @@ class QualityValidator:
         # Ensure score is within bounds
         quality_score = max(0.0, min(1.0, quality_score))
 
-        # A question is valid if it has a quality score above threshold and no critical issues
-        is_valid = quality_score >= 0.6 and not any("Empty" in issue or "too short" in issue.lower() for issue in issues)
+        # A question is valid if it has a quality score above threshold and no
+        # critical issues
+        is_valid = quality_score >= 0.6 and not any(
+            "Empty" in issue or "too short" in issue.lower() for issue in issues)
 
         return is_valid, quality_score, issues
 
@@ -338,7 +387,8 @@ class EnhancedQuestionGenerator:
         self.gen_config = self.experiment_config["question_generation"]
 
         # Initialize components
-        self.error_handler = ErrorHandler(f"enhanced_question_generator_{config_name}_errors.jsonl")
+        self.error_handler = ErrorHandler(
+            f"enhanced_question_generator_{config_name}_errors.jsonl")
         self.health_checker = HealthChecker()
         self.difficulty_analyzer = DifficultyAnalyzer()
         self.quality_validator = QualityValidator()
@@ -354,12 +404,9 @@ class EnhancedQuestionGenerator:
         )
 
         # Enhanced configuration
-        self.target_difficulty_distribution = self.gen_config.get("difficulty_distribution", {
-            "beginner": 0.3,
-            "intermediate": 0.4,
-            "advanced": 0.2,
-            "expert": 0.1
-        })
+        self.target_difficulty_distribution = self.gen_config.get(
+            "difficulty_distribution", {
+                "beginner": 0.3, "intermediate": 0.4, "advanced": 0.2, "expert": 0.1})
 
         self.target_category_distribution = self.gen_config.get("category_distribution", {
             "factual": 0.3,
@@ -372,7 +419,8 @@ class EnhancedQuestionGenerator:
         })
 
         self.min_quality_score = self.gen_config.get("min_quality_score", 0.6)
-        self.enable_metadata_enrichment = self.gen_config.get("enable_metadata_enrichment", True)
+        self.enable_metadata_enrichment = self.gen_config.get(
+            "enable_metadata_enrichment", True)
 
     def generate_questions_with_difficulty(
         self,
@@ -390,7 +438,8 @@ class EnhancedQuestionGenerator:
         Returns:
             List of generated questions with metadata.
         """
-        prompt = self._create_targeted_prompt(target_difficulty, target_category, num_questions)
+        prompt = self._create_targeted_prompt(
+            target_difficulty, target_category, num_questions)
 
         try:
             response = self._generate_with_ollama(prompt)
@@ -402,15 +451,19 @@ class EnhancedQuestionGenerator:
 
             for question_text in raw_questions:
                 # Validate question quality
-                is_valid, quality_score, issues = self.quality_validator.validate_question(question_text)
+                is_valid, quality_score, issues = self.quality_validator.validate_question(
+                    question_text)
 
                 if not is_valid or quality_score < self.min_quality_score:
-                    logger.debug(f"Skipping low-quality question: {question_text[:50]}... (Score: {quality_score:.2f})")
+                    logger.debug(
+                        f"Skipping low-quality question: {question_text[:50]}... (Score: {quality_score:.2f})")
                     continue
 
                 # Analyze difficulty and category
-                actual_difficulty, complexity_score = self.difficulty_analyzer.estimate_difficulty(question_text)
-                actual_category = self.difficulty_analyzer.categorize_question(question_text)
+                actual_difficulty, complexity_score = self.difficulty_analyzer.estimate_difficulty(
+                    question_text)
+                actual_category = self.difficulty_analyzer.categorize_question(
+                    question_text)
                 keywords = self.difficulty_analyzer.extract_keywords(question_text)
 
                 # Create metadata
@@ -425,8 +478,10 @@ class EnhancedQuestionGenerator:
                     quality_score=quality_score,
                     validation_passed=True,
                     domain=self._infer_domain(question_text),
-                    requires_reasoning_steps=self._estimate_reasoning_steps(question_text),
-                    has_specific_knowledge=self._requires_specific_knowledge(question_text)
+                    requires_reasoning_steps=self._estimate_reasoning_steps(
+                        question_text),
+                    has_specific_knowledge=self._requires_specific_knowledge(
+                        question_text)
                 )
 
                 # Add targeting information as tags
@@ -442,10 +497,12 @@ class EnhancedQuestionGenerator:
             return questions_with_metadata
 
         except Exception as e:
-            logger.error(f"Error generating questions with difficulty {target_difficulty}: {e}")
+            logger.error(f"Error generating questions with difficulty {
+                         target_difficulty}: {e}")
             return []
 
-    def generate_balanced_question_set(self, total_questions: int) -> List[QuestionMetadata]:
+    def generate_balanced_question_set(
+            self, total_questions: int) -> List[QuestionMetadata]:
         """Generate a balanced set of questions across difficulties and categories.
 
         Args:
@@ -459,16 +516,20 @@ class EnhancedQuestionGenerator:
         # Calculate target counts for each difficulty level
         difficulty_targets = {}
         for difficulty, ratio in self.target_difficulty_distribution.items():
-            difficulty_targets[DifficultyLevel(difficulty)] = int(total_questions * ratio)
+            difficulty_targets[DifficultyLevel(difficulty)] = int(
+                total_questions * ratio)
 
         # Calculate target counts for each category
         category_targets = {}
         for category, ratio in self.target_category_distribution.items():
             category_targets[QuestionCategory(category)] = int(total_questions * ratio)
 
-        logger.info(f"Generating balanced question set: {total_questions} total questions")
-        logger.info(f"Difficulty targets: {[(d.value, count) for d, count in difficulty_targets.items()]}")
-        logger.info(f"Category targets: {[(c.value, count) for c, count in category_targets.items()]}")
+        logger.info(f"Generating balanced question set: {
+                    total_questions} total questions")
+        logger.info(f"Difficulty targets: {[(d.value, count)
+                    for d, count in difficulty_targets.items()]}")
+        logger.info(f"Category targets: {[(c.value, count)
+                    for c, count in category_targets.items()]}")
 
         # Generate questions for each combination
         total_combinations = len(difficulty_targets) * len(category_targets)
@@ -492,7 +553,10 @@ class EnhancedQuestionGenerator:
 
         return all_questions
 
-    def save_questions_with_metadata(self, questions: List[QuestionMetadata], output_file: str) -> bool:
+    def save_questions_with_metadata(
+            self,
+            questions: List[QuestionMetadata],
+            output_file: str) -> bool:
         """Save questions with rich metadata to JSON file.
 
         Args:
@@ -522,7 +586,9 @@ class EnhancedQuestionGenerator:
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(output_data, f, indent=2, ensure_ascii=False)
 
-            logger.info(f"Saved {len(questions)} questions with metadata to {output_file}")
+            logger.info(
+                f"Saved {
+                    len(questions)} questions with metadata to {output_file}")
             return True
 
         except Exception as e:
@@ -541,8 +607,7 @@ class EnhancedQuestionGenerator:
             DifficultyLevel.BEGINNER: "simple, straightforward questions that require basic knowledge",
             DifficultyLevel.INTERMEDIATE: "moderately complex questions that require some analysis or application",
             DifficultyLevel.ADVANCED: "challenging questions that require deep thinking, analysis, or synthesis",
-            DifficultyLevel.EXPERT: "highly sophisticated questions that require expert-level knowledge and complex reasoning"
-        }
+            DifficultyLevel.EXPERT: "highly sophisticated questions that require expert-level knowledge and complex reasoning"}
 
         category_instructions = {
             QuestionCategory.FACTUAL: "asking for specific facts, definitions, or concrete information",
@@ -552,10 +617,10 @@ class EnhancedQuestionGenerator:
             QuestionCategory.MATHEMATICAL: "involving mathematical concepts, calculations, or quantitative reasoning",
             QuestionCategory.TECHNICAL: "related to technology, engineering, programming, or technical systems",
             QuestionCategory.ANALYTICAL: "requiring analysis, comparison, evaluation, or critical thinking",
-            QuestionCategory.CONCEPTUAL: "exploring abstract concepts, theories, or fundamental principles"
-        }
+            QuestionCategory.CONCEPTUAL: "exploring abstract concepts, theories, or fundamental principles"}
 
-        prompt = f"""Generate {num_questions} {difficulty_instructions[difficulty]} {category_instructions[category]}.
+        prompt = f"""Generate {num_questions} {
+            difficulty_instructions[difficulty]} {category_instructions[category]}.
 
 Requirements:
 - Each question should be appropriate for {difficulty.value} level
@@ -610,7 +675,8 @@ Examples of {difficulty.value} {category.value} questions:"""
         lines = response_text.split('\n')
         for line in lines:
             cleaned_line = line.strip()
-            if cleaned_line and not cleaned_line.startswith('#') and '?' in cleaned_line:
+            if cleaned_line and not cleaned_line.startswith(
+                    '#') and '?' in cleaned_line:
                 # Remove numbering if present
                 if re.match(r'^\d+\.?\s+', cleaned_line):
                     cleaned_line = re.sub(r'^\d+\.?\s+', '', cleaned_line)
@@ -652,9 +718,12 @@ Examples of {difficulty.value} {category.value} questions:"""
         text_lower = question.lower()
 
         # Simple heuristic based on question complexity
-        reasoning_indicators = text_lower.count("why") + text_lower.count("how") + text_lower.count("explain")
-        conditional_indicators = text_lower.count("if") + text_lower.count("when") + text_lower.count("suppose")
-        comparison_indicators = text_lower.count("compare") + text_lower.count("contrast") + text_lower.count("versus")
+        reasoning_indicators = text_lower.count(
+            "why") + text_lower.count("how") + text_lower.count("explain")
+        conditional_indicators = text_lower.count(
+            "if") + text_lower.count("when") + text_lower.count("suppose")
+        comparison_indicators = text_lower.count(
+            "compare") + text_lower.count("contrast") + text_lower.count("versus")
 
         total_indicators = reasoning_indicators + conditional_indicators + comparison_indicators
 
@@ -765,23 +834,34 @@ Examples of {difficulty.value} {category.value} questions:"""
         logger.info(f"Generated {len(questions)} questions with metadata")
         logger.info(f"Difficulty distribution: {stats['difficulty_distribution']}")
         logger.info(f"Category distribution: {stats['category_distribution']}")
-        logger.info(f"Average quality score: {stats['quality_metrics']['mean_quality_score']:.2f}")
-        logger.info(f"Average complexity: {stats['complexity_metrics']['mean_complexity']:.2f}")
-        logger.info(f"Average word count: {stats['length_metrics']['mean_word_count']:.1f}")
+        logger.info(
+            f"Average quality score: {
+                stats['quality_metrics']['mean_quality_score']:.2f}")
+        logger.info(
+            f"Average complexity: {
+                stats['complexity_metrics']['mean_complexity']:.2f}")
+        logger.info(
+            f"Average word count: {
+                stats['length_metrics']['mean_word_count']:.1f}")
 
 
 def main():
     """Main function for command line usage."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Enhanced question generation with difficulty control")
+    parser = argparse.ArgumentParser(
+        description="Enhanced question generation with difficulty control")
     parser.add_argument("--config", default="default", help="Configuration name to use")
-    parser.add_argument("--num-questions", type=int, default=20, help="Number of questions to generate")
-    parser.add_argument("--output", default="enhanced_questions.json", help="Output file path")
+    parser.add_argument("--num-questions", type=int, default=20,
+                        help="Number of questions to generate")
+    parser.add_argument(
+        "--output",
+        default="enhanced_questions.json",
+        help="Output file path")
     parser.add_argument("--difficulty", choices=[d.value for d in DifficultyLevel],
-                       help="Target specific difficulty level")
+                        help="Target specific difficulty level")
     parser.add_argument("--category", choices=[c.value for c in QuestionCategory],
-                       help="Target specific category")
+                        help="Target specific category")
 
     args = parser.parse_args()
 
@@ -808,7 +888,10 @@ def main():
         if questions:
             success = generator.save_questions_with_metadata(questions, args.output)
             if success:
-                logger.info(f"Successfully generated and saved {len(questions)} questions to {args.output}")
+                logger.info(
+                    f"Successfully generated and saved {
+                        len(questions)} questions to {
+                        args.output}")
             else:
                 logger.error("Failed to save questions")
                 exit(1)

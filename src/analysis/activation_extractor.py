@@ -14,12 +14,11 @@ import json
 import sys
 import argparse
 import logging
-from typing import Optional, List, Dict, Any, Tuple
-from pathlib import Path
+from typing import Optional, List, Dict, Any
 
 # Try to import from utils, but provide fallbacks
 try:
-    from ..utils.error_handling import ModelLoadingError, DataProcessingError, NeuronMapException, ValidationError
+    from ..utils.error_handling import ModelLoadingError, DataProcessingError, ValidationError
     from ..utils.config import get_config_manager, ConfigManager
     from ..utils.validation import validate_file_path, validate_model_config
 except ImportError:
@@ -29,8 +28,11 @@ except ImportError:
     try:
         from src.utils.config import get_config_manager, ConfigManager
     except ImportError:
+        def get_config_manager_fallback():
+            return None
+
         ConfigManager = None
-        get_config_manager = lambda: None
+        get_config_manager = get_config_manager_fallback
 
     class ModelLoadingError(Exception):
         def __init__(self, model_name: str, message: str):
@@ -97,8 +99,8 @@ class ActivationExtractor:
         if config_manager is None:
             try:
                 config_manager = get_config_manager()
-            except Exception as e:
-                logger.warning(f"Could not load config manager: {e}. Using defaults.")
+            except Exception:
+                logger.warning(f"Could not load config manager. Using defaults.")
                 config_manager = None
          # Load configuration or use defaults
         if config_manager:

@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artifact Details - NeuronMap Analysis Zoo</title>
+    
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link href="/static/css/style.css" rel="stylesheet">
+    
+    <!-- Syntax highlighting for code snippets -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-brain me-2"></i>NeuronMap
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/model-surgery">Model Surgery</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/causal-tracing">Causal Tracing</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/circuit-explorer">Circuits</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/sae-explorer">SAE Explorer</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/analysis-zoo">Analysis Zoo</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/analysis-zoo">
+                            <i class="fas fa-arrow-left me-1"></i>Back to Zoo
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-5">
+            <div class="spinner-border text-primary mb-3" role="status"></div>
+            <h5>Loading Artifact Details...</h5>
+        </div>
+
+        <!-- Error State -->
+        <div id="errorState" class="alert alert-danger" style="display: none;">
+            <h5><i class="fas fa-exclamation-triangle me-2"></i>Error Loading Artifact</h5>
+            <p id="errorMessage">The requested artifact could not be found.</p>
+            <a href="/analysis-zoo" class="btn btn-primary">
+                <i class="fas fa-arrow-left me-1"></i>Return to Analysis Zoo
+            </a>
+        </div>
+
+        <!-- Main Content -->
+        <div id="mainContent" style="display: none;">
+            <!-- Header Section -->
+            <div class="row mb-4">
+                <div class="col-lg-8">
+                    <div class="d-flex align-items-start">
+                        <div class="artifact-icon me-3 mt-1">
+                            <i id="artifactTypeIcon" class="fas fa-cube fa-3x text-primary"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h1 id="artifactName" class="mb-2">Loading...</h1>
+                            <p id="artifactDescription" class="text-muted mb-3">Loading description...</p>
+                            <div class="d-flex gap-2 mb-3">
+                                <span id="artifactType" class="badge bg-primary">SAE</span>
+                                <span id="artifactModel" class="badge bg-secondary">gpt2</span>
+                                <span id="artifactLicense" class="badge bg-success">MIT</span>
+                                <span id="artifactVerified" class="badge bg-warning" style="display: none;">
+                                    <i class="fas fa-check-circle me-1"></i>Verified
+                                </span>
+                            </div>
+                            <div class="text-muted small">
+                                Created by <strong id="artifactAuthor">Loading...</strong> • 
+                                <span id="artifactDate">Loading...</span> • 
+                                <span id="artifactDownloads">0</span> downloads
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 text-lg-end">
+                    <div class="btn-group-vertical d-grid gap-2">
+                        <button class="btn btn-primary btn-lg" id="pullArtifactBtn">
+                            <i class="fas fa-download me-2"></i>Pull Artifact
+                        </button>
+                        <button class="btn btn-outline-secondary" id="copyPullCommand">
+                            <i class="fas fa-copy me-2"></i>Copy Command
+                        </button>
+                        <button class="btn btn-outline-info" id="starArtifact">
+                            <i class="fas fa-star me-2"></i>Star (<span id="starCount">0</span>)
+                        </button>
+                        <button class="btn btn-outline-warning" id="reportArtifact">
+                            <i class="fas fa-flag me-2"></i>Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Main Content Column -->
+                <div class="col-lg-8">
+                    <!-- Tab Navigation -->
+                    <ul class="nav nav-tabs mb-4" id="contentTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="readme-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#readme" type="button" role="tab">
+                                <i class="fas fa-readme me-1"></i>README
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="files-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#files" type="button" role="tab">
+                                <i class="fas fa-folder me-1"></i>Files
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="usage-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#usage" type="button" role="tab">
+                                <i class="fas fa-code me-1"></i>Usage
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="dependencies-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#dependencies" type="button" role="tab">
+                                <i class="fas fa-sitemap me-1"></i>Dependencies
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="contentTabsContent">
+                        <!-- README Tab -->
+                        <div class="tab-pane fade show active" id="readme" role="tabpanel">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div id="readmeContent">
+                                        <div class="text-center py-4">
+                                            <div class="spinner-border text-primary mb-3" role="status"></div>
+                                            <p>Loading README...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Files Tab -->
+                        <div class="tab-pane fade" id="files" role="tabpanel">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Artifact Files</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="filesList">
+                                        <div class="text-center py-4">
+                                            <div class="spinner-border text-primary mb-3" role="status"></div>
+                                            <p>Loading files...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Usage Tab -->
+                        <div class="tab-pane fade" id="usage" role="tabpanel">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Usage Examples</h6>
+                                </div>
+                                <div class="card-body">
+                                    <h6>Pull this artifact:</h6>
+                                    <pre class="bg-dark text-light p-3 rounded"><code id="pullCommand">neuronmap zoo pull artifact_id</code></pre>
+                                    
+                                    <h6 class="mt-4">Load in Python:</h6>
+                                    <pre class="bg-dark text-light p-3 rounded"><code class="language-python" id="pythonUsage"># Loading example will be generated based on artifact type</code></pre>
+
+                                    <h6 class="mt-4">CLI Usage:</h6>
+                                    <pre class="bg-dark text-light p-3 rounded"><code id="cliUsage"># CLI examples will be generated</code></pre>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Dependencies Tab -->
+                        <div class="tab-pane fade" id="dependencies" role="tabpanel">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="mb-0">Dependencies</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="dependenciesList">
+                                        <div class="text-center py-4">
+                                            <div class="spinner-border text-primary mb-3" role="status"></div>
+                                            <p>Loading dependencies...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sidebar -->
+                <div class="col-lg-4">
+                    <!-- Metadata Card -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fas fa-info-circle me-1"></i>Artifact Details
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="artifactMetadata">
+                                <div class="row mb-2">
+                                    <div class="col-5 fw-bold">Type:</div>
+                                    <div class="col-7" id="metaType">Loading...</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-5 fw-bold">Version:</div>
+                                    <div class="col-7" id="metaVersion">Loading...</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-5 fw-bold">Model:</div>
+                                    <div class="col-7" id="metaModel">Loading...</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-5 fw-bold">Size:</div>
+                                    <div class="col-7" id="metaSize">Loading...</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-5 fw-bold">License:</div>
+                                    <div class="col-7" id="metaLicense">Loading...</div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-5 fw-bold">Created:</div>
+                                    <div class="col-7" id="metaCreated">Loading...</div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-5 fw-bold">Updated:</div>
+                                    <div class="col-7" id="metaUpdated">Loading...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Related Artifacts -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fas fa-link me-1"></i>Related Artifacts
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="relatedArtifacts">
+                                <small class="text-muted">Loading related artifacts...</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tags -->
+                    <div class="card shadow-sm">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="fas fa-tags me-1"></i>Tags
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="artifactTags">
+                                <small class="text-muted">Loading tags...</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Command Modal -->
+    <div class="modal fade" id="commandModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Pull Command</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Copy this command to pull the artifact:</p>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="commandToCopy" readonly>
+                        <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard()">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/5.1.0/marked.min.js"></script>
+
+    <script>
+        class ArtifactDetailView {
+            constructor() {
+                this.artifactId = this.getArtifactIdFromURL();
+                this.artifact = null;
+                this.initializeEventListeners();
+                this.loadArtifactDetails();
+            }
+
+            getArtifactIdFromURL() {
+                const path = window.location.pathname;
+                return path.split('/').pop();
+            }
+
+            initializeEventListeners() {
+                document.getElementById('pullArtifactBtn').addEventListener('click', () => this.pullArtifact());
+                document.getElementById('copyPullCommand').addEventListener('click', () => this.showCommandModal());
+                document.getElementById('starArtifact').addEventListener('click', () => this.toggleStar());
+                document.getElementById('reportArtifact').addEventListener('click', () => this.reportArtifact());
+            }
+
+            async loadArtifactDetails() {
+                try {
+                    // For now, generate mock data since the Zoo API might not be running
+                    this.artifact = this.generateMockArtifact();
+                    this.displayArtifactDetails();
+                    this.hideLoadingState();
+                } catch (error) {
+                    console.error('Error loading artifact:', error);
+                    this.showErrorState(error.message);
+                }
+            }
+
+            generateMockArtifact() {
+                const types = ['SAE', 'Circuit', 'Config', 'Dataset'];
+                const models = ['gpt2', 'gpt2-medium', 'bert-base', 'llama2-7b'];
+                const licenses = ['MIT', 'Apache-2.0', 'CC-BY-4.0'];
+                
+                return {
+                    id: this.artifactId,
+                    name: `Sample ${types[Math.floor(Math.random() * types.length)]} Artifact`,
+                    description: 'This is a sample artifact demonstrating the Analysis Zoo interface. It contains pre-trained components for neural network interpretability research.',
+                    type: types[Math.floor(Math.random() * types.length)],
+                    author: 'researcher@example.com',
+                    version: '1.0.0',
+                    license: licenses[Math.floor(Math.random() * licenses.length)],
+                    model_compatibility: {
+                        model_name: models[Math.floor(Math.random() * models.length)],
+                        model_family: 'transformer'
+                    },
+                    created_at: new Date(Date.now() - Math.random() * 10000000000).toISOString(),
+                    updated_at: new Date().toISOString(),
+                    total_size_bytes: Math.floor(Math.random() * 1000000000),
+                    downloads: Math.floor(Math.random() * 1000),
+                    stars: Math.floor(Math.random() * 50),
+                    verified: Math.random() > 0.5,
+                    tags: ['interpretability', 'research', 'neural-analysis'],
+                    files: [
+                        { name: 'model.pt', size: 45123456, type: 'model' },
+                        { name: 'config.json', size: 1024, type: 'config' },
+                        { name: 'README.md', size: 2048, type: 'documentation' },
+                        { name: 'examples.py', size: 4096, type: 'code' }
+                    ],
+                    dependencies: ['torch>=1.9.0', 'transformers>=4.20.0', 'numpy>=1.21.0'],
+                    readme: `# ${this.artifactId}\n\nThis is a sample artifact for demonstration purposes.\n\n## Description\n\nThis artifact contains pre-trained components for neural network interpretability research. It demonstrates the capabilities of the NeuronMap Analysis Zoo platform.\n\n## Usage\n\n\`\`\`python\nfrom neuronmap.zoo import load_artifact\n\nartifact = load_artifact("${this.artifactId}")\nprint(artifact.analyze())\n\`\`\`\n\n## Features\n\n- High-quality pre-trained components\n- Easy integration with NeuronMap\n- Comprehensive documentation\n- Research-ready examples\n\n## Citation\n\nIf you use this artifact in your research, please cite:\n\n\`\`\`\n@misc{neuronmap_artifact,\n  title={Sample Artifact},\n  author={NeuronMap Team},\n  year={2025}\n}\n\`\`\``
+                };
+            }
+
+            displayArtifactDetails() {
+                // Header information
+                document.getElementById('artifactName').textContent = this.artifact.name;
+                document.getElementById('artifactDescription').textContent = this.artifact.description;
+                document.getElementById('artifactType').textContent = this.artifact.type;
+                document.getElementById('artifactModel').textContent = this.artifact.model_compatibility.model_name;
+                document.getElementById('artifactLicense').textContent = this.artifact.license;
+                document.getElementById('artifactAuthor').textContent = this.artifact.author;
+                document.getElementById('artifactDate').textContent = new Date(this.artifact.created_at).toLocaleDateString();
+                document.getElementById('artifactDownloads').textContent = this.artifact.downloads;
+                document.getElementById('starCount').textContent = this.artifact.stars;
+
+                // Icon based on type
+                const iconMap = {
+                    'SAE': 'fas fa-brain',
+                    'Circuit': 'fas fa-project-diagram',
+                    'Config': 'fas fa-cog',
+                    'Dataset': 'fas fa-database'
+                };
+                document.getElementById('artifactTypeIcon').className = iconMap[this.artifact.type] + ' fa-3x text-primary';
+
+                // Verified badge
+                if (this.artifact.verified) {
+                    document.getElementById('artifactVerified').style.display = 'inline-block';
+                }
+
+                // Metadata sidebar
+                document.getElementById('metaType').textContent = this.artifact.type;
+                document.getElementById('metaVersion').textContent = this.artifact.version;
+                document.getElementById('metaModel').textContent = this.artifact.model_compatibility.model_name;
+                document.getElementById('metaSize').textContent = this.formatFileSize(this.artifact.total_size_bytes);
+                document.getElementById('metaLicense').textContent = this.artifact.license;
+                document.getElementById('metaCreated').textContent = new Date(this.artifact.created_at).toLocaleDateString();
+                document.getElementById('metaUpdated').textContent = new Date(this.artifact.updated_at).toLocaleDateString();
+
+                // README content
+                document.getElementById('readmeContent').innerHTML = marked.parse(this.artifact.readme);
+
+                // Files list
+                this.displayFilesList();
+
+                // Dependencies
+                this.displayDependencies();
+
+                // Usage examples
+                this.displayUsageExamples();
+
+                // Tags
+                this.displayTags();
+
+                // Commands
+                document.getElementById('pullCommand').textContent = `neuronmap zoo pull ${this.artifact.id}`;
+                document.getElementById('commandToCopy').value = `neuronmap zoo pull ${this.artifact.id}`;
+            }
+
+            displayFilesList() {
+                const filesContainer = document.getElementById('filesList');
+                const fileIcons = {
+                    'model': 'fas fa-brain text-primary',
+                    'config': 'fas fa-cog text-warning',
+                    'documentation': 'fas fa-file-text text-info',
+                    'code': 'fas fa-code text-success'
+                };
+
+                const filesHtml = this.artifact.files.map(file => `
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                        <div class="d-flex align-items-center">
+                            <i class="${fileIcons[file.type] || 'fas fa-file'} me-2"></i>
+                            <span>${file.name}</span>
+                        </div>
+                        <small class="text-muted">${this.formatFileSize(file.size)}</small>
+                    </div>
+                `).join('');
+
+                filesContainer.innerHTML = filesHtml;
+            }
+
+            displayDependencies() {
+                const depsContainer = document.getElementById('dependenciesList');
+                const depsHtml = this.artifact.dependencies.map(dep => `
+                    <span class="badge bg-secondary me-1 mb-1">${dep}</span>
+                `).join('');
+
+                depsContainer.innerHTML = depsHtml || '<small class="text-muted">No dependencies</small>';
+            }
+
+            displayUsageExamples() {
+                const pythonCode = `# Load artifact from NeuronMap Zoo
+from neuronmap.zoo import load_artifact
+
+# Pull and load the artifact
+artifact = load_artifact("${this.artifact.id}")
+
+# Use the artifact in your analysis
+result = artifact.analyze(model, prompt)
+print(result)`;
+
+                const cliCode = `# Pull the artifact
+neuronmap zoo pull ${this.artifact.id}
+
+# Use in analysis pipeline
+neuronmap ${this.artifact.type.toLowerCase()} analyze --artifact ${this.artifact.id} --model ${this.artifact.model_compatibility.model_name}`;
+
+                document.getElementById('pythonUsage').textContent = pythonCode;
+                document.getElementById('cliUsage').textContent = cliCode;
+            }
+
+            displayTags() {
+                const tagsContainer = document.getElementById('artifactTags');
+                const tagsHtml = this.artifact.tags.map(tag => `
+                    <span class="badge bg-light text-dark me-1 mb-1">${tag}</span>
+                `).join('');
+
+                tagsContainer.innerHTML = tagsHtml;
+            }
+
+            formatFileSize(bytes) {
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                if (bytes === 0) return '0 Bytes';
+                const i = Math.floor(Math.log(bytes) / Math.log(1024));
+                return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+            }
+
+            hideLoadingState() {
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block';
+            }
+
+            showErrorState(message) {
+                document.getElementById('loadingState').style.display = 'none';
+                document.getElementById('errorMessage').textContent = message;
+                document.getElementById('errorState').style.display = 'block';
+            }
+
+            pullArtifact() {
+                // Simulate pulling the artifact
+                const btn = document.getElementById('pullArtifactBtn');
+                const originalText = btn.innerHTML;
+                
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Pulling...';
+                btn.disabled = true;
+
+                setTimeout(() => {
+                    btn.innerHTML = '<i class="fas fa-check me-2"></i>Pulled Successfully';
+                    btn.className = 'btn btn-success btn-lg';
+                    
+                    setTimeout(() => {
+                        btn.innerHTML = originalText;
+                        btn.className = 'btn btn-primary btn-lg';
+                        btn.disabled = false;
+                    }, 2000);
+                }, 2000);
+            }
+
+            showCommandModal() {
+                const modal = new bootstrap.Modal(document.getElementById('commandModal'));
+                modal.show();
+            }
+
+            toggleStar() {
+                const btn = document.getElementById('starArtifact');
+                const countSpan = document.getElementById('starCount');
+                
+                if (btn.classList.contains('starred')) {
+                    btn.classList.remove('starred');
+                    btn.innerHTML = '<i class="fas fa-star me-2"></i>Star (<span id="starCount">' + (this.artifact.stars - 1) + '</span>)';
+                    countSpan.textContent = this.artifact.stars - 1;
+                } else {
+                    btn.classList.add('starred');
+                    btn.innerHTML = '<i class="fas fa-star me-2 text-warning"></i>Starred (<span id="starCount">' + (this.artifact.stars + 1) + '</span>)';
+                    countSpan.textContent = this.artifact.stars + 1;
+                }
+            }
+
+            reportArtifact() {
+                alert('Report functionality would open a modal for reporting inappropriate content.');
+            }
+        }
+
+        function copyToClipboard() {
+            const input = document.getElementById('commandToCopy');
+            input.select();
+            document.execCommand('copy');
+            
+            const btn = event.target;
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i>';
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+            }, 1000);
+        }
+
+        // Initialize the artifact detail view
+        document.addEventListener('DOMContentLoaded', () => {
+            window.artifactDetailView = new ArtifactDetailView();
+            console.log('🚀 Artifact Detail View initialized');
+        });
+    </script>
+
+    <style>
+        .artifact-icon {
+            min-width: 80px;
+        }
+
+        .nav-tabs .nav-link {
+            border-bottom: 2px solid transparent;
+        }
+
+        .nav-tabs .nav-link.active {
+            border-bottom-color: #007bff;
+        }
+
+        .btn.starred .fa-star {
+            color: #ffc107 !important;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .border-bottom:last-child {
+            border-bottom: none !important;
+        }
+
+        .card-header h6 {
+            color: #007bff;
+        }
+
+        #mainContent {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+
+    <script>
+        class ArtifactDetailPage {
+            constructor() {
+                this.artifactId = this.getArtifactIdFromUrl();
+                this.artifact = null;
+                this.init();
+            }
+            
+            getArtifactIdFromUrl() {
+                const pathParts = window.location.pathname.split('/');
+                return pathParts[pathParts.length - 1];
+            }
+            
+            async init() {
+                await this.loadArtifactData();
+            }
+            
+            async loadArtifactData() {
+                try {
+                    this.showLoadingState();
+                    
+                    const response = await fetch(`/api/zoo/artifacts/${this.artifactId}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    this.artifact = await response.json();
+                    this.renderArtifactData();
+                    this.showMainContent();
+                } catch (error) {
+                    console.error('Failed to load artifact:', error);
+                    this.showErrorState(error.message);
+                }
+            }
+            
+            renderArtifactData() {
+                if (!this.artifact) return;
+                
+                // Type icons mapping
+                const typeIcons = {
+                    'sae_model': 'fas fa-brain',
+                    'circuit': 'fas fa-project-diagram',
+                    'intervention_config': 'fas fa-cog',
+                    'analysis_result': 'fas fa-chart-line',
+                    'dataset': 'fas fa-database',
+                    'visualization': 'fas fa-chart-bar'
+                };
+                
+                const typeLabels = {
+                    'sae_model': 'SAE Model',
+                    'circuit': 'Circuit',
+                    'intervention_config': 'Configuration',
+                    'analysis_result': 'Analysis Result',
+                    'dataset': 'Dataset',
+                    'visualization': 'Visualization'
+                };
+                
+                // Update header information
+                const typeIconElement = document.getElementById('artifactTypeIcon');
+                if (typeIconElement) {
+                    typeIconElement.className = `${typeIcons[this.artifact.type]} fa-3x text-primary`;
+                }
+                
+                const nameElement = document.getElementById('artifactName');
+                if (nameElement) {
+                    nameElement.textContent = this.artifact.name;
+                }
+                
+                const descElement = document.getElementById('artifactDescription');
+                if (descElement) {
+                    descElement.textContent = this.artifact.description;
+                }
+            }
+            
+            showLoadingState() {
+                const loadingState = document.getElementById('loadingState');
+                const errorState = document.getElementById('errorState');
+                const mainContent = document.getElementById('mainContent');
+                
+                if (loadingState) loadingState.style.display = 'block';
+                if (errorState) errorState.style.display = 'none';
+                if (mainContent) mainContent.style.display = 'none';
+            }
+            
+            showErrorState(message) {
+                const loadingState = document.getElementById('loadingState');
+                const errorState = document.getElementById('errorState');
+                const mainContent = document.getElementById('mainContent');
+                const errorMessageElement = document.getElementById('errorMessage');
+                
+                if (loadingState) loadingState.style.display = 'none';
+                if (errorState) errorState.style.display = 'block';
+                if (mainContent) mainContent.style.display = 'none';
+                if (errorMessageElement) errorMessageElement.textContent = message;
+            }
+            
+            showMainContent() {
+                const loadingState = document.getElementById('loadingState');
+                const errorState = document.getElementById('errorState');
+                const mainContent = document.getElementById('mainContent');
+                
+                if (loadingState) loadingState.style.display = 'none';
+                if (errorState) errorState.style.display = 'none';
+                if (mainContent) mainContent.style.display = 'block';
+            }
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            new ArtifactDetailPage();
+        });
+    </script>
+</body>
+</html>

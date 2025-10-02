@@ -1,0 +1,69 @@
+# Example Ablation Experiment Configuration
+# This demonstrates B6: Konfigurations-Schema for structured experiment parameters
+
+experiment_name: "gpt2_attention_ablation"
+description: "Ablate attention heads in GPT-2 to understand their role in next-token prediction"
+
+# Model configuration
+model:
+  name: "gpt2"
+  device: "auto"
+  precision: "float32"
+  max_length: 512
+  batch_size: 1
+
+# Input configuration
+inputs:
+  clean_prompts:
+    - "The capital of France is"
+    - "The largest planet in our solar system is"
+    - "William Shakespeare wrote"
+    - "The theory of relativity was developed by"
+  tokenizer_args:
+    truncation: true
+    padding: false
+
+# Intervention targets
+targets:
+  - layer_selection:
+      patterns: ["transformer.h.8.attn"]  # Target attention in layer 8
+    neuron_selection:
+      indices: [0, 1, 2, 3, 4]  # Ablate first 5 attention heads
+    intervention_type: "ablation"
+    
+  - layer_selection:
+      patterns: ["transformer.h.10.mlp"]  # Target MLP in layer 10
+    neuron_selection:
+      top_k: 100  # Ablate top 100 most active neurons
+    intervention_type: "ablation"
+
+# Analysis configuration
+analysis:
+  metrics: ["logit_diff", "probability"]
+  baseline_comparison: true
+  statistical_tests: false
+  confidence_level: 0.95
+  effect_size_threshold: 0.1
+
+# Cache configuration
+cache:
+  enabled: true
+  max_memory_gb: 2.0
+  compression_level: 6
+  experiment_id: "gpt2_attention_study"
+  auto_cleanup: true
+
+# Output configuration
+output:
+  output_dir: "./outputs/gpt2_attention_ablation"
+  save_activations: false
+  save_detailed_results: true
+  plot_results: true
+  export_format: ["json", "csv"]
+
+# Metadata
+created_by: "neuronmap_user"
+tags:
+  model_family: "gpt2"
+  experiment_type: "attention_analysis"
+  research_question: "attention_head_importance"

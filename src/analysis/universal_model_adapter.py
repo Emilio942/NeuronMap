@@ -9,20 +9,12 @@ neural network architectures including GPT, BERT, T5, LLaMA, and domain-specific
 import torch
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple, Union
-import pandas as pd
-import numpy as np
-from tqdm import tqdm
-import yaml
+from typing import List, Dict, Any, Optional, Tuple
 from abc import ABC, abstractmethod
 
 from transformers import (
     AutoTokenizer, AutoModel, AutoModelForCausalLM, AutoModelForSeq2SeqLM,
-    AutoModelForSequenceClassification, AutoModelForMaskedLM,
-    GPT2Model, GPT2LMHeadModel, GPTNeoModel, GPTJModel,
-    BertModel, RobertaModel, DistilBertModel,
-    T5Model, T5ForConditionalGeneration,
-    LlamaModel, LlamaForCausalLM
+    AutoModelForSequenceClassification, AutoModelForMaskedLM
 )
 
 logger = logging.getLogger(__name__)
@@ -54,7 +46,8 @@ class ModelAdapter(ABC):
         pass
 
     @abstractmethod
-    def get_target_layers(self, layer_config: Dict[str, Any]) -> List[Tuple[str, torch.nn.Module]]:
+    def get_target_layers(
+            self, layer_config: Dict[str, Any]) -> List[Tuple[str, torch.nn.Module]]:
         """Get target layers based on configuration."""
         pass
 
@@ -75,9 +68,12 @@ class GPTAdapter(ModelAdapter):
             # Load model
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
-                torch_dtype=getattr(torch, self.config.get('preferred_dtype', 'float32')),
-                device_map="auto" if self.device.type == "cuda" else None
-            )
+                torch_dtype=getattr(
+                    torch,
+                    self.config.get(
+                        'preferred_dtype',
+                        'float32')),
+                device_map="auto" if self.device.type == "cuda" else None)
 
             if self.device.type != "cuda" or "device_map" not in locals():
                 self.model.to(self.device)
@@ -110,7 +106,8 @@ class GPTAdapter(ModelAdapter):
             layer_names.append(name)
         return layer_names
 
-    def get_target_layers(self, layer_config: Dict[str, Any]) -> List[Tuple[str, torch.nn.Module]]:
+    def get_target_layers(
+            self, layer_config: Dict[str, Any]) -> List[Tuple[str, torch.nn.Module]]:
         """Get target layers for GPT models."""
         found_layers = []
         total_layers = layer_config.get('total_layers', 12)
@@ -160,15 +157,15 @@ class BERTAdapter(ModelAdapter):
             # Load model - try different model classes
             try:
                 self.model = AutoModel.from_pretrained(
-                    self.model_name,
-                    torch_dtype=getattr(torch, self.config.get('preferred_dtype', 'float32'))
-                )
-            except:
+                    self.model_name, torch_dtype=getattr(
+                        torch, self.config.get(
+                            'preferred_dtype', 'float32')))
+            except BaseException:
                 # Fallback to masked LM model
                 self.model = AutoModelForMaskedLM.from_pretrained(
-                    self.model_name,
-                    torch_dtype=getattr(torch, self.config.get('preferred_dtype', 'float32'))
-                )
+                    self.model_name, torch_dtype=getattr(
+                        torch, self.config.get(
+                            'preferred_dtype', 'float32')))
 
             self.model.to(self.device)
             self.model.eval()
@@ -199,7 +196,8 @@ class BERTAdapter(ModelAdapter):
             layer_names.append(name)
         return layer_names
 
-    def get_target_layers(self, layer_config: Dict[str, Any]) -> List[Tuple[str, torch.nn.Module]]:
+    def get_target_layers(
+            self, layer_config: Dict[str, Any]) -> List[Tuple[str, torch.nn.Module]]:
         """Get target layers for BERT models."""
         found_layers = []
         total_layers = layer_config.get('total_layers', 12)
@@ -248,9 +246,9 @@ class T5Adapter(ModelAdapter):
 
             # Load model
             self.model = AutoModelForSeq2SeqLM.from_pretrained(
-                self.model_name,
-                torch_dtype=getattr(torch, self.config.get('preferred_dtype', 'float32'))
-            )
+                self.model_name, torch_dtype=getattr(
+                    torch, self.config.get(
+                        'preferred_dtype', 'float32')))
 
             self.model.to(self.device)
             self.model.eval()
@@ -267,7 +265,8 @@ class T5Adapter(ModelAdapter):
         # T5 expects "task prefix" for many tasks
         processed_texts = []
         for text in texts:
-            if not any(text.startswith(prefix) for prefix in ["translate", "summarize", "question"]):
+            if not any(text.startswith(prefix)
+                       for prefix in ["translate", "summarize", "question"]):
                 text = f"analyze: {text}"
             processed_texts.append(text)
 
@@ -288,7 +287,8 @@ class T5Adapter(ModelAdapter):
             layer_names.append(name)
         return layer_names
 
-    def get_target_layers(self, layer_config: Dict[str, Any]) -> List[Tuple[str, torch.nn.Module]]:
+    def get_target_layers(
+            self, layer_config: Dict[str, Any]) -> List[Tuple[str, torch.nn.Module]]:
         """Get target layers for T5 models."""
         found_layers = []
         total_layers = layer_config.get('total_layers', 6)
@@ -340,10 +340,13 @@ class LlamaAdapter(ModelAdapter):
             # Load model with special handling for LLaMA
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
-                torch_dtype=getattr(torch, self.config.get('preferred_dtype', 'float16')),
+                torch_dtype=getattr(
+                    torch,
+                    self.config.get(
+                        'preferred_dtype',
+                        'float16')),
                 device_map="auto" if self.device.type == "cuda" else None,
-                trust_remote_code=True
-            )
+                trust_remote_code=True)
 
             if self.device.type != "cuda" or "device_map" not in locals():
                 self.model.to(self.device)
@@ -376,7 +379,8 @@ class LlamaAdapter(ModelAdapter):
             layer_names.append(name)
         return layer_names
 
-    def get_target_layers(self, layer_config: Dict[str, Any]) -> List[Tuple[str, torch.nn.Module]]:
+    def get_target_layers(
+            self, layer_config: Dict[str, Any]) -> List[Tuple[str, torch.nn.Module]]:
         """Get target layers for LLaMA models."""
         found_layers = []
         total_layers = layer_config.get('total_layers', 32)
@@ -448,10 +452,12 @@ class UniversalModelAdapter:
                     with open(models_config_path, 'r') as f:
                         return yaml.safe_load(f)
             except Exception as e:
-                logger.debug(f"Could not load models config from {models_config_path}: {e}")
+                logger.debug(f"Could not load models config from {
+                             models_config_path}: {e}")
                 continue
 
-        logger.warning("Could not load models config from any location, using empty config")
+        logger.warning(
+            "Could not load models config from any location, using empty config")
         return {}
 
     def load_model(self, model_name: str) -> ModelAdapter:
@@ -459,11 +465,14 @@ class UniversalModelAdapter:
         # Find model configuration
         model_config = self._find_model_config(model_name)
         if not model_config:
-            logger.warning(f"No configuration found for model {model_name}, attempting auto-detection")
+            logger.warning(f"No configuration found for model {
+                           model_name}, attempting auto-detection")
             model_config = self._auto_detect_model_type(model_name)
 
         model_type = model_config.get('type', 'auto')
-        extraction_config = self.models_config.get('extraction_settings', {}).get(model_type, {})
+        extraction_config = self.models_config.get(
+            'extraction_settings', {}).get(
+            model_type, {})
 
         # Create appropriate adapter
         if model_type == 'gpt':
@@ -502,7 +511,13 @@ class UniversalModelAdapter:
         """Auto-detect model type based on model name."""
         model_name_lower = model_name.lower()
 
-        if any(name in model_name_lower for name in ['gpt', 'gpt2', 'gpt-neo', 'gpt-j', 'codegen']):
+        if any(
+            name in model_name_lower for name in [
+                'gpt',
+                'gpt2',
+                'gpt-neo',
+                'gpt-j',
+                'codegen']):
             return {'type': 'gpt', 'total_layers': 12}
         elif any(name in model_name_lower for name in ['bert', 'roberta', 'distilbert', 'scibert', 'biobert']):
             return {'type': 'bert', 'total_layers': 12}
@@ -512,10 +527,14 @@ class UniversalModelAdapter:
             return {'type': 'llama', 'total_layers': 32}
         else:
             # Default to GPT-style
-            logger.warning(f"Could not auto-detect type for {model_name}, defaulting to GPT")
+            logger.warning(
+                f"Could not auto-detect type for {model_name}, defaulting to GPT")
             return {'type': 'gpt', 'total_layers': 12}
 
-    def _auto_create_adapter(self, model_name: str, extraction_config: Dict[str, Any]) -> ModelAdapter:
+    def _auto_create_adapter(self,
+                             model_name: str,
+                             extraction_config: Dict[str,
+                                                     Any]) -> ModelAdapter:
         """Auto-create adapter based on model name patterns."""
         model_type_config = self._auto_detect_model_type(model_name)
         model_type = model_type_config['type']
@@ -542,12 +561,27 @@ class UniversalModelAdapter:
         model_config = self._find_model_config(model_name)
         if model_config:
             return {
-                'name': model_config.get('name', model_name),
-                'type': model_config.get('type', 'unknown'),
-                'total_layers': model_config.get('layers', {}).get('total_layers', 'unknown'),
-                'attention_pattern': model_config.get('layers', {}).get('attention', ''),
-                'mlp_pattern': model_config.get('layers', {}).get('mlp', '')
-            }
+                'name': model_config.get(
+                    'name',
+                    model_name),
+                'type': model_config.get(
+                    'type',
+                    'unknown'),
+                'total_layers': model_config.get(
+                    'layers',
+                    {}).get(
+                    'total_layers',
+                    'unknown'),
+                'attention_pattern': model_config.get(
+                    'layers',
+                        {}).get(
+                            'attention',
+                            ''),
+                'mlp_pattern': model_config.get(
+                    'layers',
+                    {}).get(
+                    'mlp',
+                    '')}
         else:
             auto_config = self._auto_detect_model_type(model_name)
             return {

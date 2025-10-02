@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuronMap - Visualization Debug</title>
+    <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .debug-container {
+            background: white;
+            border: 3px solid #007bff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        #graph-container {
+            width: 100%;
+            height: 600px;
+            border: 5px solid #28a745;
+            background: linear-gradient(45deg, #f8f9fa 25%, #e9ecef 25%, #e9ecef 50%, #f8f9fa 50%, #f8f9fa 75%, #e9ecef 75%);
+            background-size: 20px 20px;
+            position: relative;
+            margin: 20px 0;
+        }
+        
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        button:hover {
+            background: #0056b3;
+        }
+        
+        button:active {
+            background: #004085;
+        }
+        
+        .status {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .success { background: #d1edff; border-left: 5px solid #0066cc; }
+        .error { background: #ffe6e6; border-left: 5px solid #cc0000; }
+        .warning { background: #fff3cd; border-left: 5px solid #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧠 NeuronMap - Visualization Debug Test</h1>
+        <p>Systematischer Test der Cytoscape-Visualisierung</p>
+    </div>
+
+    <div class="debug-container">
+        <h2>🔍 Debug Status</h2>
+        <div id="debug-status" class="status">Initialisierung...</div>
+    </div>
+
+    <div class="debug-container">
+        <h2>📊 Graph Visualization</h2>
+        <div id="graph-container"></div>
+        
+        <div class="controls">
+            <button onclick="initializeGraph()">🚀 Graph Initialisieren</button>
+            <button onclick="addTestNodes()">➕ Test-Knoten Hinzufügen</button>
+            <button onclick="clearGraph()">🗑️ Graph Leeren</button>
+            <button onclick="testLayout()">🔄 Layout Testen</button>
+            <button onclick="runFullTest()">🧪 Vollständiger Test</button>
+        </div>
+    </div>
+
+    <div class="debug-container">
+        <h2>📝 Log Output</h2>
+        <div id="log-output" class="status"></div>
+        <button onclick="clearLog()">Log Leeren</button>
+    </div>
+
+    <script>
+        let cy = null;
+        let logMessages = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = `[${timestamp}] ${message}`;
+            logMessages.push(logEntry);
+            
+            console.log(message);
+            
+            const logOutput = document.getElementById('log-output');
+            logOutput.textContent = logMessages.join('\n');
+            logOutput.scrollTop = logOutput.scrollHeight;
+            
+            // Update debug status
+            updateDebugStatus();
+        }
+
+        function updateDebugStatus() {
+            const status = document.getElementById('debug-status');
+            const container = document.getElementById('graph-container');
+            
+            let statusText = '';
+            statusText += `🌐 Cytoscape Library: ${typeof cytoscape !== 'undefined' ? '✅ Geladen' : '❌ Nicht geladen'}\n`;
+            statusText += `📦 Container: ${container ? '✅ Gefunden' : '❌ Nicht gefunden'}\n`;
+            
+            if (container) {
+                statusText += `📏 Container Größe: ${container.offsetWidth}x${container.offsetHeight}px\n`;
+                statusText += `👁️ Container Sichtbar: ${container.offsetWidth > 0 && container.offsetHeight > 0 ? '✅ Ja' : '❌ Nein'}\n`;
+            }
+            
+            statusText += `🎯 Cytoscape Instanz: ${cy ? '✅ Initialisiert' : '❌ Nicht initialisiert'}\n`;
+            
+            if (cy) {
+                statusText += `🔘 Knoten: ${cy.nodes().length}\n`;
+                statusText += `🔗 Verbindungen: ${cy.edges().length}\n`;
+            }
+            
+            status.textContent = statusText;
+            
+            // Color coding
+            if (typeof cytoscape !== 'undefined' && container && cy) {
+                status.className = 'status success';
+            } else if (typeof cytoscape === 'undefined') {
+                status.className = 'status error';
+            } else {
+                status.className = 'status warning';
+            }
+        }
+
+        function initializeGraph() {
+            log('🚀 Starte Graph-Initialisierung...');
+            
+            const container = document.getElementById('graph-container');
+            if (!container) {
+                log('❌ FEHLER: Container nicht gefunden!', 'error');
+                return;
+            }
+            
+            log(`📦 Container gefunden: ${container.offsetWidth}x${container.offsetHeight}px`);
+            
+            if (typeof cytoscape === 'undefined') {
+                log('❌ FEHLER: Cytoscape-Bibliothek nicht geladen!', 'error');
+                container.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: red; font-size: 24px;"><div>❌ Cytoscape nicht geladen!</div></div>';
+                return;
+            }
+            
+            log('📚 Cytoscape-Bibliothek ist verfügbar');
+            
+            try {
+                // Clear container
+                container.innerHTML = '';
+                
+                log('🔧 Erstelle Cytoscape-Instanz...');
+                
+                cy = cytoscape({
+                    container: container,
+                    
+                    elements: [
+                        // Nodes
+                        { data: { id: 'neuron1', label: 'Neuron 1' } },
+                        { data: { id: 'neuron2', label: 'Neuron 2' } },
+                        { data: { id: 'head1', label: 'Attention Head' } },
+                        
+                        // Edges
+                        { data: { id: 'e1', source: 'neuron1', target: 'neuron2' } },
+                        { data: { id: 'e2', source: 'neuron2', target: 'head1' } }
+                    ],
+                    
+                    style: [
+                        {
+                            selector: 'node',
+                            style: {
+                                'label': 'data(label)',
+                                'text-valign': 'center',
+                                'text-halign': 'center',
+                                'color': 'white',
+                                'background-color': '#007bff',
+                                'width': 100,
+                                'height': 100,
+                                'font-size': '16px',
+                                'font-weight': 'bold',
+                                'border-width': 4,
+                                'border-color': '#0056b3'
+                            }
+                        },
+                        {
+                            selector: 'edge',
+                            style: {
+                                'width': 6,
+                                'line-color': '#28a745',
+                                'target-arrow-color': '#28a745',
+                                'target-arrow-shape': 'triangle',
+                                'curve-style': 'bezier',
+                                'arrow-scale': 2
+                            }
+                        }
+                    ],
+                    
+                    layout: {
+                        name: 'circle',
+                        fit: true,
+                        padding: 100,
+                        animate: true,
+                        animationDuration: 1000
+                    }
+                });
+                
+                log(`✅ Graph erfolgreich initialisiert! Knoten: ${cy.nodes().length}, Verbindungen: ${cy.edges().length}`);
+                
+                // Event listeners
+                cy.on('tap', 'node', function(evt) {
+                    const node = evt.target;
+                    log(`🎯 Knoten angeklickt: ${node.id()}`);
+                    node.style('background-color', '#ff6b6b');
+                    setTimeout(() => {
+                        node.style('background-color', '#007bff');
+                    }, 1000);
+                });
+                
+                cy.on('tap', 'edge', function(evt) {
+                    const edge = evt.target;
+                    log(`🔗 Verbindung angeklickt: ${edge.id()}`);
+                });
+                
+                log('👂 Event-Listener hinzugefügt');
+                
+            } catch (error) {
+                log(`❌ FEHLER bei Graph-Initialisierung: ${error.message}`, 'error');
+                container.innerHTML = `<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: red; font-size: 18px; text-align: center;"><div>❌ Fehler:<br>${error.message}</div></div>`;
+            }
+            
+            updateDebugStatus();
+        }
+
+        function addTestNodes() {
+            if (!cy) {
+                log('❌ Graph nicht initialisiert!', 'error');
+                return;
+            }
+            
+            const nodeId = 'test_' + Date.now();
+            const nodeLabel = 'Test Node ' + (cy.nodes().length + 1);
+            
+            cy.add({
+                data: { 
+                    id: nodeId, 
+                    label: nodeLabel 
+                }
+            });
+            
+            // Add connection to random existing node
+            const existingNodes = cy.nodes();
+            if (existingNodes.length > 1) {
+                const randomNode = existingNodes[Math.floor(Math.random() * (existingNodes.length - 1))];
+                cy.add({
+                    data: {
+                        id: 'edge_' + Date.now(),
+                        source: randomNode.id(),
+                        target: nodeId
+                    }
+                });
+            }
+            
+            cy.layout({ name: 'circle', fit: true, animate: true }).run();
+            
+            log(`➕ Knoten hinzugefügt: ${nodeLabel} (ID: ${nodeId})`);
+            updateDebugStatus();
+        }
+
+        function clearGraph() {
+            if (!cy) {
+                log('❌ Graph nicht initialisiert!', 'error');
+                return;
+            }
+            
+            cy.elements().remove();
+            log('🗑️ Graph geleert');
+            updateDebugStatus();
+        }
+
+        function testLayout() {
+            if (!cy) {
+                log('❌ Graph nicht initialisiert!', 'error');
+                return;
+            }
+            
+            const layouts = ['grid', 'circle', 'random', 'breadthfirst'];
+            const randomLayout = layouts[Math.floor(Math.random() * layouts.length)];
+            
+            cy.layout({ 
+                name: randomLayout, 
+                fit: true, 
+                animate: true,
+                animationDuration: 1000
+            }).run();
+            
+            log(`🔄 Layout angewendet: ${randomLayout}`);
+        }
+
+        function runFullTest() {
+            log('🧪 Starte vollständigen Test...');
+            
+            // Step 1: Initialize
+            setTimeout(() => {
+                initializeGraph();
+                
+                // Step 2: Add nodes
+                setTimeout(() => {
+                    addTestNodes();
+                    addTestNodes();
+                    
+                    // Step 3: Test layout
+                    setTimeout(() => {
+                        testLayout();
+                        log('✅ Vollständiger Test abgeschlossen!');
+                    }, 2000);
+                }, 1000);
+            }, 500);
+        }
+
+        function clearLog() {
+            logMessages = [];
+            document.getElementById('log-output').textContent = '';
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🌟 Seite geladen, starte automatische Initialisierung...');
+            updateDebugStatus();
+            
+            // Auto-initialize after 1 second
+            setTimeout(() => {
+                initializeGraph();
+            }, 1000);
+        });
+
+        // Make functions globally available
+        window.debugGraph = {
+            initialize: initializeGraph,
+            addNodes: addTestNodes,
+            clear: clearGraph,
+            testLayout: testLayout,
+            fullTest: runFullTest
+        };
+    </script>
+</body>
+</html>

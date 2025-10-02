@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Try to import Flask and dependencies
 try:
-    from flask import Flask, render_template, request, jsonify
+    from flask import Flask, render_template, request, jsonify, send_from_directory
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
@@ -49,6 +49,22 @@ if FLASK_AVAILABLE:
                 template_folder='../../web/templates',
                 static_folder='../../web/static')
     app.secret_key = 'neuronmap_secret_key_change_in_production'
+    
+    # Register API blueprints
+    try:
+        from api.interventions import interventions_bp
+        app.register_blueprint(interventions_bp)
+        logger.info("Interventions API blueprint registered")
+    except ImportError as e:
+        logger.warning(f"Could not register interventions API: {e}")
+
+    # Register circuits API blueprint
+    try:
+        from api.circuits import circuits_bp
+        app.register_blueprint(circuits_bp)
+        logger.info("Circuits API blueprint registered")
+    except ImportError as e:
+        logger.warning(f"Could not register circuits API: {e}")
 
     # Global state management
     analysis_jobs = {}
@@ -171,7 +187,7 @@ if FLASK_AVAILABLE:
     @app.route('/')
     def index():
         """Home page."""
-        return render_template('index.html')
+        return render_template('working_viz.html')
 
     @app.route('/analysis')
     def analysis():
@@ -207,6 +223,61 @@ if FLASK_AVAILABLE:
     def reports_page():
         """Reports and export page."""
         return render_template('reports.html')
+
+    @app.route('/model-surgery')
+    def model_surgery():
+        """Interactive Model Surgery & Path Analysis page."""
+        return render_template('model_surgery.html')
+
+    @app.route('/circuits')
+    def circuit_explorer():
+        """Circuit discovery and exploration page."""
+        return render_template('circuit_explorer.html')
+
+    @app.route('/circuit-fixed')
+    def circuit_fixed():
+        """Repaired Circuit Explorer page."""
+        return render_template('circuit_fixed.html')
+
+    @app.route('/zoo')
+    def analysis_zoo():
+        """Analysis Zoo - Community artifact sharing platform."""
+        return render_template('analysis_zoo_simple.html')
+
+    @app.route('/minimal-test')
+    def minimal_test():
+        """Minimaler Test."""
+        return render_template('minimal_test.html')
+
+    @app.route('/simple-test')
+    def simple_test():
+        """Einfacher Test."""
+        return render_template('simple_test.html')
+
+    @app.route('/test-cytoscape')
+    def test_cytoscape():
+        """Test page for Cytoscape integration."""
+        return render_template('cytoscape_test.html')
+
+    @app.route('/fixed')
+    def fixed_visualization():
+        """Repaired visualization test page."""
+        return render_template('working_viz.html')
+
+    @app.route('/working')
+    def working_viz():
+        """Working visualization test page."""
+        return render_template('working_viz.html')
+
+    @app.route('/neuronmap-fixed')
+    def neuronmap_fixed():
+        """NeuronMap fixed visualization test page."""
+        return render_template('fixed_viz.html')
+
+    @app.route('/visualization-fixed')
+    def visualization_fixed():
+        """Fixed visualization page."""
+        return send_from_directory('web/static', 'fixed_visualization.html')
 
     # ============================================================================
     # UTILITY FUNCTIONS
@@ -441,28 +512,159 @@ if FLASK_AVAILABLE:
 
         return jsonify({'message': 'Analysis cancelled'})
 
-    @app.route('/api/list-layers')
-    def api_list_layers():
-        """List available layers for a model."""
-        if not NEURONMAP_AVAILABLE:
-            return jsonify({'error': 'NeuronMap components not available'}), 500
-
-        model_name = request.args.get('model')
-        if not model_name:
-            return jsonify({'error': 'Model name required'}), 400
-
+    # Circuit API endpoints
+    @app.route('/api/circuits/load-model', methods=['POST'])
+    def api_circuits_load_model():
+        """Load a model for circuit analysis."""
         try:
-            # Use a simple approach to get layers
-            config = ConfigManager()
-            analyzer = ActivationAnalyzer(config)
-
-            # Load model and get layer names
-            layers = analyzer.list_available_layers(model_name)
-
-            return jsonify({'layers': layers})
-
+            data = request.get_json()
+            model_name = data.get('model_name', 'gpt2-small')
+            
+            # Simulate model loading
+            analysis_id = str(uuid.uuid4())
+            add_activity(f"Loading model {model_name} for circuit analysis", "upload", "info")
+            
+            return jsonify({
+                'success': True,
+                'analysis_id': analysis_id,
+                'model': model_name,
+                'message': f'Model {model_name} loaded successfully'
+            })
         except Exception as e:
-            logger.error(f"Error listing layers: {e}")
+            logger.error(f"Error loading model for circuits: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/circuits/find-induction-heads', methods=['POST'])
+    def api_circuits_find_induction_heads():
+        """Find induction heads in the loaded model."""
+        try:
+            data = request.get_json()
+            analysis_id = data.get('analysis_id')
+            
+            # Simulate finding induction heads
+            add_activity("Finding induction heads", "search", "info")
+            
+            # Mock data for demonstration
+            induction_heads = [
+                {'layer': 5, 'head': 1, 'score': 0.89, 'pattern_type': 'induction'},
+                {'layer': 5, 'head': 5, 'score': 0.76, 'pattern_type': 'induction'},
+                {'layer': 6, 'head': 9, 'score': 0.82, 'pattern_type': 'induction'}
+            ]
+            
+            return jsonify({
+                'success': True,
+                'induction_heads': induction_heads,
+                'count': len(induction_heads)
+            })
+        except Exception as e:
+            logger.error(f"Error finding induction heads: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/circuits/find-copying-heads', methods=['POST'])
+    def api_circuits_find_copying_heads():
+        """Find copying heads in the loaded model."""
+        try:
+            data = request.get_json()
+            analysis_id = data.get('analysis_id')
+            
+            # Simulate finding copying heads
+            add_activity("Finding copying heads", "search", "info")
+            
+            # Mock data for demonstration
+            copying_heads = [
+                {'layer': 0, 'head': 7, 'score': 0.94, 'pattern_type': 'copying'},
+                {'layer': 1, 'head': 4, 'score': 0.88, 'pattern_type': 'copying'},
+                {'layer': 2, 'head': 1, 'score': 0.79, 'pattern_type': 'copying'}
+            ]
+            
+            return jsonify({
+                'success': True,
+                'copying_heads': copying_heads,
+                'count': len(copying_heads)
+            })
+        except Exception as e:
+            logger.error(f"Error finding copying heads: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/circuits/analyze-neuron-heads', methods=['POST'])
+    def api_circuits_analyze_neuron_heads():
+        """Analyze neuron-head interactions."""
+        try:
+            data = request.get_json()
+            analysis_id = data.get('analysis_id')
+            
+            # Simulate neuron-head analysis
+            add_activity("Analyzing neuron-head interactions", "cogs", "info")
+            
+            # Mock data for demonstration
+            interactions = [
+                {
+                    'neuron': {'layer': 3, 'index': 42},
+                    'head': {'layer': 5, 'index': 1},
+                    'interaction_strength': 0.87,
+                    'interaction_type': 'excitatory'
+                },
+                {
+                    'neuron': {'layer': 4, 'index': 156},
+                    'head': {'layer': 6, 'index': 9},
+                    'interaction_strength': 0.73,
+                    'interaction_type': 'inhibitory'
+                }
+            ]
+            
+            return jsonify({
+                'success': True,
+                'interactions': interactions,
+                'count': len(interactions)
+            })
+        except Exception as e:
+            logger.error(f"Error analyzing neuron-head interactions: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/circuits/export-circuit', methods=['POST'])
+    def api_circuits_export_circuit():
+        """Export discovered circuit data."""
+        try:
+            data = request.get_json()
+            circuit_data = data.get('circuit_data')
+            format_type = data.get('format', 'json')
+            
+            # Simulate circuit export
+            add_activity(f"Exporting circuit data as {format_type}", "download", "success")
+            
+            export_id = str(uuid.uuid4())
+            
+            return jsonify({
+                'success': True,
+                'export_id': export_id,
+                'format': format_type,
+                'download_url': f'/api/circuits/download/{export_id}',
+                'message': 'Circuit data exported successfully'
+            })
+        except Exception as e:
+            logger.error(f"Error exporting circuit: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    @app.route('/api/circuits/download/<export_id>')
+    def api_circuits_download(export_id):
+        """Download exported circuit data."""
+        try:
+            # Mock circuit data for download
+            circuit_data = {
+                'export_id': export_id,
+                'timestamp': datetime.now().isoformat(),
+                'circuit_type': 'induction_head_circuit',
+                'components': [
+                    {'type': 'head', 'layer': 5, 'index': 1, 'role': 'induction'},
+                    {'type': 'neuron', 'layer': 3, 'index': 42, 'role': 'feature_detector'}
+                ]
+            }
+            
+            add_activity(f"Downloaded circuit data {export_id[:8]}", "download", "success")
+            
+            return jsonify(circuit_data)
+        except Exception as e:
+            logger.error(f"Error downloading circuit data: {e}")
             return jsonify({'error': str(e)}), 500
 
     # ============================================================================
@@ -877,6 +1079,12 @@ else:
     # Flask not available
     app = None
     FLASK_AVAILABLE = False
+
+if __name__ == '__main__':
+    if FLASK_AVAILABLE:
+        app.run(host='0.0.0.0', port=5000, debug=True)
+    else:
+        print("Flask is not installed. Cannot start web server.")
 
 # Export for use in other modules
 __all__ = ['app', 'FLASK_AVAILABLE']

@@ -279,6 +279,67 @@ class SystemResourceMonitor:
         """
         self.alert_callbacks.append(callback)
 
+    def start_monitoring(self):
+        """Start system monitoring in background thread."""
+        if self.monitoring_thread and self.monitoring_thread.is_alive():
+            logger.warning("Monitoring already started")
+            return
+        
+        self.stop_monitoring.clear()
+        self.monitoring_thread = threading.Thread(target=self._monitoring_loop, daemon=True)
+        self.monitoring_thread.start()
+        logger.info("System monitoring started")
+
+    def stop_monitoring(self):
+        """Stop system monitoring."""
+        self.stop_monitoring.set()
+        if self.monitoring_thread:
+            self.monitoring_thread.join(timeout=5.0)
+        logger.info("System monitoring stopped")
+
+    def _monitoring_loop(self):
+        """Main monitoring loop running in background thread."""
+        while not self.stop_monitoring.is_set():
+            try:
+                metrics = self.get_current_metrics()
+                with self.lock:
+                    self._add_to_history(metrics)
+                    self._check_thresholds(metrics)
+                
+                self.stop_monitoring.wait(self.collection_interval)
+            except Exception as e:
+                logger.error(f"Error in monitoring loop: {e}")
+                self.stop_monitoring.wait(self.collection_interval)
+
+    def _check_thresholds(self, metrics: Dict[str, Any]):
+        """Check if metrics exceed thresholds and trigger alerts."""
+        try:
+            # Check CPU threshold
+            if metrics.get('cpu_percent', 0) > self.thresholds.cpu_warning:
+                level = AlertLevel.CRITICAL if metrics['cpu_percent'] > self.thresholds.cpu_critical else AlertLevel.WARNING
+                self._trigger_alert(level, f"High CPU usage: {metrics['cpu_percent']:.1f}%", metrics)
+            
+            # Check memory threshold
+            if metrics.get('memory_percent', 0) > self.thresholds.memory_warning:
+                level = AlertLevel.CRITICAL if metrics['memory_percent'] > self.thresholds.memory_critical else AlertLevel.WARNING
+                self._trigger_alert(level, f"High memory usage: {metrics['memory_percent']:.1f}%", metrics)
+            
+            # Check disk threshold
+            if metrics.get('disk_percent', 0) > self.thresholds.disk_warning:
+                level = AlertLevel.CRITICAL if metrics['disk_percent'] > self.thresholds.disk_critical else AlertLevel.WARNING
+                self._trigger_alert(level, f"High disk usage: {metrics['disk_percent']:.1f}%", metrics)
+                
+        except Exception as e:
+            logger.error(f"Error checking thresholds: {e}")
+
+    def _trigger_alert(self, level: AlertLevel, message: str, context: Dict[str, Any]):
+        """Trigger alert callbacks."""
+        for callback in self.alert_callbacks:
+            try:
+                callback(level, message, context)
+            except Exception as e:
+                logger.error(f"Error in alert callback: {e}")
+
     def _add_to_history(self, metrics: Dict[str, Any]):
         """Add metrics to history."""
         self.metrics_history.append(metrics)

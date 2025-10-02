@@ -5,6 +5,77 @@
 
 Die bisherigen Markierungen als "abgeschlossen" waren zu oberflächlich und unpräzise. Alle Aufgaben werden nun mit detaillierten, technisch spezifischen und verifizierbaren Anforderungen neu definiert. Das Projekt benötigt eine systematische Überarbeitung mit klaren Implementierungsschritten und Qualitätskriterien.
 
+## ✅ Überprüfungsmatrix (Stand 1. Oktober 2025)
+
+| Status | Bereich | Verifikation | Aktueller Befund |
+|--------|---------|--------------|------------------|
+| [✅] | Grundlegende Tests | `.venv/bin/python -m pytest` ausführen, Ergebnis dokumentieren | 253 bestanden, 7 Warnungen (Pydantic Namespace, PCA), 0 fehlgeschlagen |
+| [✅] | Konfigurationssystem | Sicherstellen, dass genau **ein** `ConfigManager` produktiv genutzt wird (keine Mehrfach-Implementierungen). Imports und tatsächliche Verwendung prüfen. | Konsolidiert: `src/utils/config.py` & `src/utils/enhanced_config.py` re-export `config_manager` |
+| [ ] | Validierungs- & QA-Pipelines | Prüfen, ob `OutputValidator`, `DomainValidatorRegistry`, `QualityBenchmarkSuite` in Analyse-/CLI-Flows integriert sind. | Nicht eingebunden; Klassen existieren nur in `src/utils/validation.py` bzw. `src/utils/quality_assurance.py` |
+| [✅] | Batch-Verarbeitung | Prüfen, ob nur eine `BatchProcessor`-Implementierung übrig ist und wie sie aufgerufen wird (zentrale Nutzung vs. Duplikate). | Konsolidiert auf `src/utils/batch_processor.BatchProcessor`; andere Module importieren oder umbenannt (`ProfiledBatchProcessor`, `ResilientBatchProcessor`). |
+| [✅] | Logging & Fehlerbehandlung | Überprüfen, ob `NeuronMapLogger`/Structured Logging im CLI und in Kernmodulen initialisiert wird. | Konsolidiert: Alle CLI-Einstiegspunkte (`main.py`, `neuronmap.py`, `neuronmap-cli.py`) und Click-Module initialisieren `NeuronMapLogger`; Handler werden auf Root gespiegelt. |
+| [✅] | CLI-Funktionsumfang | Tatsächliche Kommandos (`neuronmap-cli.py --help`) vs. Dokumentation vergleichen; Differenzen protokollieren. | Abgleich durchgeführt: CLI bietet 6 Top-Level-Kommandos (`analyze`, `generate-config`, `validate-config`, `cache`, `model-info`, `verify-circuit`) mit 8 Subkommandos/Optionen; Dokumentation in `docs/technical_specs.md` behauptet 30+ Kommandos (Model/Viz/Data/etc.) – Großteil fehlt. |
+| [✅] | Modellintegration | Verifizieren, dass `ModelManager` aus `analysis/model_integration.py` reale Modelle lädt und die Konfigurationsdateien (`configs/models.yaml`) abdeckt. Smoke-Test ausführen. | `ModelManager` lädt Konfiguration (`configs/models.yaml`) vollständig (19 Modelle: GPT/BERT/T5/LLaMA). Smoke-Test (`distilgpt2`) erfolgreich geladen via `load_model('default')`, Layer-Info abrufbar (`layer_count=86`). |
+| [✅] | Dokumentation vs. Implementierung | README/Docs-Aussagen (z. B. 25+ CLI-Kommandos, Benchmarks) mit Codezustand abgleichen. | Abgleich durchgeführt: README/Docs nennen `python main.py {validate,generate,extract,...}` & 25+ CLI-Kommandos, Benchmarks (10× schneller, 175B Modelle). Tatsächlich bietet `main.py` nur `surgery/circuits/sae/zoo`; `neuronmap-cli.py` hat 6 Top-Level-Kommandos. Keine verifizierten Benchmarks oder Messdaten vorhanden. |
+| [✅] | Infrastruktur | Abhängigkeiten & Setup (requirements, virtuelle Umgebung) validieren; fehlende Pakete nachziehen. | requirements konsolidiert, fehlende Imports ergänzt, `.venv` (Python 3.12.3) aktiv und einsatzbereit |
+| [✅] | Regressionen/Backlog | Auffälligkeiten sammeln, die als Issues/Tasks nachgepflegt werden müssen. | siehe Abschnitt „Regressionen & Backlog – Auffälligkeiten (Stand 2. Oktober 2025)” |
+
+> Vorgehen: Obige Matrix schrittweise validieren, Ergebnisse hier direkt markieren (✔️/✖️) und in den jeweiligen Bereichen detailliert dokumentieren.
+
+### CLI-Funktionsumfang – Vergleich (Stand 2. Oktober 2025)
+
+- **Tatsächliche Kommandos (`neuronmap-cli.py --help`):**
+   - Top-Level: `analyze`, `generate-config`, `validate-config`, `cache`, `model-info`, `verify-circuit`
+   - Subcommands/Optionen:
+      - `analyze` → `{ablate, patch, circuits}`
+      - `generate-config` → `{ablation, patching}`
+      - `validate-config` → `<config-file> {ablation, patching}`
+      - `cache` → `info`
+      - `model-info` → Flags `--model`, `--list-layers`
+      - `verify-circuit` → Flags `--circuit-file`, `--model`, `--prompt`, optional `--method`, `--output`
+- **Dokumentationsstand (`docs/technical_specs.md`):** Behauptet 6 Kategorien mit 30+ Kommandos (`neuronmap model|analyze|viz|data|config|system ...`).
+- **Differenzen:**
+   - Dokumentierte Kategorien `model`, `viz`, `data`, `config`, `system` existieren nicht im aktuellen CLI.
+   - Dokumentation nutzt Prefix `neuronmap` statt `neuronmap-cli.py`.
+   - Tatsächliche Subkommandos beschränken sich auf Analyse (ablation/patch/circuits) und Konfigurations-/Cache-Hilfen.
+- **Empfohlene Nachverfolgung:** Dokumentation oder CLI-Funktionsumfang harmonisieren; offizielle Statements zu „25+ Kommandos“ korrigieren oder Features implementieren.
+
+### Modellintegration – Verifikation (Stand 2. Oktober 2025)
+
+- **Konfigurationsabdeckung:** `configs/models.yaml` definiert 19 Modelle (GPT-Familie, BERT/RoBERTa/DistilBERT, T5/FLAN, LLaMA, Code- und Domain-Modelle). `ModelManager._load_models_from_config()` importiert alle Einträge (`SUPPORTED_MODELS` Größe = 19) und ordnet Adapterklassen (`GPTAdapter`, `BERTAdapter`, `T5Adapter`, `LlamaAdapter`) anhand des `type`-Felds korrekt zu.
+- **Smoke-Test:** `python -c "... ModelManager(); load_model('default') ..."` innerhalb der `.venv` ausgeführt. Der Download von `distilgpt2` (≈353 MB) wurde erfolgreich abgeschlossen; `load_model('default')` lieferte `GPTAdapter`, `get_model_info('default')` gab u. a. `layer_count=86`, `hidden_size=768` und Beispiel-Layer zurück. Gerätenerkennung meldet `cuda` (automatisches Device-Mapping aktiv).
+- **Laufzeitverhalten:** Initialer Modell-Download benötigt Internetzugang; spätere Aufrufe nutzen Cache. Abruf der Layer-Liste funktioniert (erste drei Layer `['', 'transformer', 'transformer.wte']`).
+- **Offene Punkte:** Große Modelle (z. B. `llama2_7b`, `gpt_j_6b`) wurden nicht geladen – hierfür GPU-Speicherbedarf prüfen. Optional Adapter-Erweiterung für weitere Typen (z. B. `mistral`) evaluieren.
+
+### Dokumentation vs. Implementierung – Abgleich (Stand 2. Oktober 2025)
+
+- **README Quick Start / CLI Beispiele:** README listet Kommandos wie `python main.py validate`, `generate`, `extract`, `visualize`, `pipeline`. Tatsächlich stellt `main.py` ausschließlich Click-Gruppen `surgery`, `circuits`, `sae`, `zoo` bereit. Aufruf `python main.py validate` endet mit `No such command 'validate'` (Exit-Code 2).
+- **CLI-Kommandos (Docs vs. Realität):** `docs/technical_specs.md` behauptet 6 Kategorien mit 30+ Kommandos (`neuronmap model|analyze|viz|data|config|system`). Real vorhanden sind 6 Top-Level-Kommandos in `neuronmap-cli.py` (`analyze`, `generate-config`, `validate-config`, `cache`, `model-info`, `verify-circuit`) sowie Click-Gruppen (`surgery`, `circuits`, `sae`, `zoo`). Umfangreicher CLI-Katalog aus der Doku ist nicht implementiert.
+- **Performance-/Benchmark-Aussagen:** `docs/PROJECT_OVERVIEW.md` verspricht u. a. „10× schneller“, „50 % weniger Speicher“, „getestet auf 175B Parameter“. Im Repo existiert keine Benchmark-Pipeline oder Messdaten, lediglich Skript-Skelette (`scripts/utilities/run_comprehensive_tests.py`) ohne Ergebnisse. Keine Nachweise in Tests oder Logs.
+- **Feature Claims:** README bewirbt „Question Generation via Ollama“ und vollständige Pipeline-Kommandos über `main.py`. Zwar existieren Module unter `src/data_generation/`, jedoch fehlt die CLI-Anbindung (keine Click-Kommandos, keine Einträge in `main.py`).
+- **Empfohlene Maßnahmen:** Dokumentation korrigieren (CLI-Abschnitte, Performance-Versprechen) oder entsprechende Features/Benchmarks nachliefern. Verweis auf reale Kommandos (`neuronmap-cli.py`, `main.py` Click-Gruppen) ergänzen.
+
+### Regressionen & Backlog – Auffälligkeiten (Stand 2. Oktober 2025)
+
+1. **NeuronMap Zoo API** (`src/zoo/api_server.py`)
+   - `GET /artifacts/{artifact_id}/download` liefert aktuell nur `artifact.json`; ZIP-Paketierung der Artefakte fehlt (Zeilen 318–338).
+   - Sterne-Handling inkrementiert lediglich einen Zähler im JSON; es fehlt Benutzertracking sowie Duplikat-Prävention (Zeilen 351–379).
+   - `PUT /artifacts/{artifact_id}` führt keine Besitzerprüfung durch, obwohl TODO markiert ist (Zeilen 392–420).
+   - `POST /auth/logout` widerruft ausgegebene JWTs nicht; Token-Blacklist oder Signatur-Rotation muss ergänzt werden (Zeilen 500–520).
+
+2. **Berichtserstellung im Web-Frontend** (`src/web/app.py`)
+   - `/api/reports/generate` und `/api/reports/download/<report_id>` liefern Mock-Antworten; Integration mit `src/utils/advanced_reporter.py` und echte Datei-Downloads stehen aus (Zeilen 1020–1065).
+
+3. **Zoo CLI** (`src/cli/zoo_commands.py`)
+   - Download-Kommandos unterstützen keine ZIP-Dateien (TODO in Zeile 165).
+   - SAE-Export nutzt fest verdrahtete Parameter (`layer=0`, `dict_size=16384`); sollte konfigurierbar sein (Zeilen 243–247).
+
+4. **Realtime-Visualisierung** (`src/visualization/realtime_streamer.py`)
+   - Layer-Index beim Live-Streaming ist auf `0` fixiert; Konfiguration via Request-Payload oder UI fehlt (Zeile 277).
+
+5. **Dokumentation ↔ CLI**
+   - Doku behauptet weiterhin 30+ CLI-Kommandos (`docs/technical_specs.md`); tatsächliche Befehle sind deutlich weniger. Harmonisierung oder Feature-Nachlieferung erforderlich (siehe Abschnitt oben).
+
 ### 🎯 Projektziel und Überblick ✅ COMPLETED
 **PRÄZISE AUFGABENSTELLUNG:**
 Das bisherige "Projektziel" ist zu vage und oberflächlich. Eine comprehensive und technisch präzise Definition des Projektziels ist erforderlich:

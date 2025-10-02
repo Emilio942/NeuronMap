@@ -4,23 +4,18 @@ Supports LLaMA, Alpaca, Vicuna with large-scale autoregressive model analysis.
 """
 
 import torch
-import torch.nn as nn
 from transformers import (
     LlamaForCausalLM,
     LlamaTokenizer,
     AutoTokenizer,
     AutoModelForCausalLM
 )
-from typing import Dict, List, Tuple, Optional, Any, Union
-import numpy as np
+from typing import Dict, List, Optional, Any
 import logging
-from pathlib import Path
 from dataclasses import dataclass
 import psutil
-import gc
 
-from ..utils.config import get_config_manager
-from .base_model_handler import BaseModelHandler, ModelConfig, ActivationResult
+from .base_model_handler import BaseModelHandler, ModelConfig, ActivationResult, ModelFactory
 
 logger = logging.getLogger(__name__)
 
@@ -233,6 +228,32 @@ class LlamaModelHandler(BaseModelHandler):
 
         return name_mappings.get(model_name, model_name)
 
+    def _load_tokenizer(self, model_name_hf: str, trust_remote_code: bool):
+        try:
+            self.tokenizer = LlamaTokenizer.from_pretrained(
+                model_name_hf,
+                trust_remote_code=trust_remote_code
+            )
+        except Exception:
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_name_hf,
+                trust_remote_code=trust_remote_code
+            )
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+
+    def _load_model_from_pretrained(self, model_name_hf: str, model_kwargs: Dict[str, Any]):
+        try:
+            self.model = LlamaForCausalLM.from_pretrained(
+                model_name_hf,
+                **model_kwargs
+            )
+        except Exception:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name_hf,
+                **model_kwargs
+            )
+
     def load_model(self,
                    max_memory_gb: Optional[float] = None,
                    device_map: Optional[str] = "auto",
@@ -240,54 +261,25 @@ class LlamaModelHandler(BaseModelHandler):
                    trust_remote_code: bool = False,
                    use_gradient_checkpointing: bool = True,
                    **kwargs) -> bool:
-        """
-        Load LLaMA model with memory optimization.
-
-        Args:
-            max_memory_gb: Maximum memory to use (auto-detected if None)
-            device_map: Device mapping strategy ("auto", "cpu", or custom dict)
-            torch_dtype: Data type for model weights
-            trust_remote_code: Whether to trust remote code
-            use_gradient_checkpointing: Enable gradient checkpointing for memory savings
-            **kwargs: Additional arguments for model loading
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
+        """Load LLaMA model with memory optimization."""
         try:
             logger.info(f"Loading LLaMA model: {self.model_name}")
 
-            # Check memory requirements
             model_size_gb = self.model_config.special_features.get('approximate_size_gb', 13.5)
             available_memory = self._get_available_memory_gb()
 
             if max_memory_gb is None:
-                max_memory_gb = available_memory * 0.8  # Use 80% of available memory
+                max_memory_gb = available_memory * 0.8
 
             logger.info(f"Model size: {model_size_gb:.1f}GB, Available: {available_memory:.1f}GB, Max: {max_memory_gb:.1f}GB")
 
-            # Determine loading strategy
             if model_size_gb > max_memory_gb:
                 logger.info("Model size exceeds available memory, using CPU offloading")
                 device_map = self._create_memory_optimized_device_map(max_memory_gb, model_size_gb)
 
-            # Load tokenizer
-            try:
-                self.tokenizer = LlamaTokenizer.from_pretrained(
-                    self.model_name,
-                    trust_remote_code=trust_remote_code
-                )
-            except Exception:
-                self.tokenizer = AutoTokenizer.from_pretrained(
-                    self.model_name,
-                    trust_remote_code=trust_remote_code
-                )
+            model_name_hf = self.model_config.special_features.get('model_name_hf', self.model_name)
+            self._load_tokenizer(model_name_hf, trust_remote_code)
 
-            # Ensure tokenizer has pad token
-            if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
-
-            # Load model with memory optimization
             model_kwargs = {
                 'torch_dtype': torch_dtype,
                 'trust_remote_code': trust_remote_code,
@@ -298,29 +290,17 @@ class LlamaModelHandler(BaseModelHandler):
             if device_map:
                 model_kwargs['device_map'] = device_map
 
-            try:
-                self.model = LlamaForCausalLM.from_pretrained(
-                    self.model_name,
-                    **model_kwargs
-                )
-            except Exception:
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    self.model_name,
-                    **model_kwargs
-                )
+            self._load_model_from_pretrained(model_name_hf, model_kwargs)
 
-            # Enable gradient checkpointing for memory efficiency
             if use_gradient_checkpointing and hasattr(self.model, 'gradient_checkpointing_enable'):
                 self.model.gradient_checkpointing_enable()
 
-            # Move to device if not using device_map
             if not device_map or device_map == "cpu":
                 self.model.to(self.device)
 
             self.model.eval()
             self.is_loaded = True
 
-            # Initialize memory tracking
             self.memory_tracker.record_baseline()
 
             logger.info(f"Successfully loaded LLaMA model: {self.model_name}")
@@ -500,16 +480,14 @@ class LlamaModelHandler(BaseModelHandler):
 
         return result
 
-    def _register_llama_hooks(
+    def _register_layer_hooks(
         self,
         activations_dict: Dict[str, torch.Tensor],
         hidden_states_list: List[torch.Tensor],
-        rms_norm_stats: Dict[str, torch.Tensor],
         attention_weights: Dict[str, torch.Tensor],
         layer_indices: Optional[List[int]] = None,
         return_attention: bool = True
     ) -> Dict[str, Any]:
-        """Register hooks for LLaMA-specific analysis."""
         hooks = {}
 
         def layer_hook(name, layer_idx):
@@ -525,12 +503,31 @@ class LlamaModelHandler(BaseModelHandler):
 
                 activations_dict[f"layer_{layer_idx}"] = hidden_state.detach().cpu()
 
-                # Store in sequential list
                 if len(hidden_states_list) <= layer_idx:
                     hidden_states_list.extend([None] * (layer_idx - len(hidden_states_list) + 1))
                 hidden_states_list[layer_idx] = hidden_state.detach().cpu()
 
             return hook
+
+        if hasattr(self.model, 'model') and hasattr(self.model.model, 'layers'):
+            layers = self.model.model.layers
+            target_indices = layer_indices if layer_indices else range(len(layers))
+
+            for i in target_indices:
+                if i < len(layers):
+                    hook_handle = layers[i].register_forward_hook(layer_hook(f"layer_{i}", i))
+                    hooks[f"layer_{i}"] = hook_handle
+        else:
+            logger.warning("Could not find model layers for hook registration")
+
+        return hooks
+
+    def _register_rms_norm_hooks(
+        self,
+        rms_norm_stats: Dict[str, torch.Tensor],
+        layer_indices: Optional[List[int]] = None
+    ) -> Dict[str, Any]:
+        hooks = {}
 
         def rms_norm_hook(name):
             def hook(module, input, output):
@@ -538,7 +535,6 @@ class LlamaModelHandler(BaseModelHandler):
                     input_tensor = input[0]
                     output_tensor = output
 
-                    # Calculate RMS norm statistics
                     rms_norm_stats[name] = {
                         'input_rms': torch.sqrt(torch.mean(input_tensor**2, dim=-1)).detach().cpu(),
                         'output_rms': torch.sqrt(torch.mean(output_tensor**2, dim=-1)).detach().cpu(),
@@ -546,18 +542,12 @@ class LlamaModelHandler(BaseModelHandler):
                     }
             return hook
 
-        # Register on model layers
         if hasattr(self.model, 'model') and hasattr(self.model.model, 'layers'):
             layers = self.model.model.layers
             target_indices = layer_indices if layer_indices else range(len(layers))
 
             for i in target_indices:
                 if i < len(layers):
-                    # Register main layer hook
-                    hook_handle = layers[i].register_forward_hook(layer_hook(f"layer_{i}", i))
-                    hooks[f"layer_{i}"] = hook_handle
-
-                    # Register RMS norm hooks
                     if hasattr(layers[i], 'input_layernorm'):
                         rms_hook = layers[i].input_layernorm.register_forward_hook(
                             rms_norm_hook(f"layer_{i}_input_norm")
@@ -569,7 +559,21 @@ class LlamaModelHandler(BaseModelHandler):
                             rms_norm_hook(f"layer_{i}_post_attn_norm")
                         )
                         hooks[f"layer_{i}_post_attn_norm"] = rms_hook
+        return hooks
 
+    def _register_llama_hooks(
+        self,
+        activations_dict: Dict[str, torch.Tensor],
+        hidden_states_list: List[torch.Tensor],
+        rms_norm_stats: Dict[str, torch.Tensor],
+        attention_weights: Dict[str, torch.Tensor],
+        layer_indices: Optional[List[int]] = None,
+        return_attention: bool = True
+    ) -> Dict[str, Any]:
+        """Register hooks for LLaMA-specific analysis."""
+        hooks = {}
+        hooks.update(self._register_layer_hooks(activations_dict, hidden_states_list, attention_weights, layer_indices, return_attention))
+        hooks.update(self._register_rms_norm_hooks(rms_norm_stats, layer_indices))
         return hooks
 
     def _extract_conversation_state(self, input_text: str, outputs) -> Dict[str, Any]:
