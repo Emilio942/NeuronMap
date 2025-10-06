@@ -14,6 +14,27 @@ import json
 logger = logging.getLogger(__name__)
 
 
+def setup_monitoring(log_interval: int = 60) -> "SystemMonitor":
+    """Return a shared :class:`SystemMonitor` instance.
+
+    Several higher-level services expect a convenience helper named
+    ``setup_monitoring`` which was removed during refactors.  Reintroducing a
+    thin wrapper keeps that contract intact while avoiding a heavier
+    dependency on any background threads.  Callers can still interact with the
+    returned monitor directly.
+
+    Args:
+        log_interval: Frequency (seconds) for metric polling.
+
+    Returns:
+        An initialized :class:`SystemMonitor`.
+    """
+
+    monitor = SystemMonitor(log_interval=log_interval)
+    logger.debug("System monitoring helper initialized with interval=%s", log_interval)
+    return monitor
+
+
 @dataclass
 class SystemMetrics:
     """System resource metrics."""

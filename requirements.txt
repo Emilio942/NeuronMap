@@ -32,7 +32,7 @@ spacy>=3.8.0
 # Graph & interpretability tooling
 networkx>=3.0
 igraph>=0.10.0
-community>=1.0.0
+python-louvain>=0.16.0
 captum>=0.6.0
 gradio>=3.0.0
 

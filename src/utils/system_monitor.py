@@ -259,7 +259,7 @@ class SystemResourceMonitor:
         self.optimizer = ResourceOptimizer()
 
         self.monitoring_thread: Optional[threading.Thread] = None
-        self.stop_monitoring = threading.Event()
+        self._stop_event = threading.Event()
         self.lock = threading.Lock()
 
         # Cache for expensive operations
@@ -285,31 +285,31 @@ class SystemResourceMonitor:
             logger.warning("Monitoring already started")
             return
         
-        self.stop_monitoring.clear()
+        self._stop_event.clear()
         self.monitoring_thread = threading.Thread(target=self._monitoring_loop, daemon=True)
         self.monitoring_thread.start()
         logger.info("System monitoring started")
 
     def stop_monitoring(self):
         """Stop system monitoring."""
-        self.stop_monitoring.set()
+        self._stop_event.set()
         if self.monitoring_thread:
             self.monitoring_thread.join(timeout=5.0)
         logger.info("System monitoring stopped")
 
     def _monitoring_loop(self):
         """Main monitoring loop running in background thread."""
-        while not self.stop_monitoring.is_set():
+        while not self._stop_event.is_set():
             try:
                 metrics = self.get_current_metrics()
                 with self.lock:
                     self._add_to_history(metrics)
                     self._check_thresholds(metrics)
                 
-                self.stop_monitoring.wait(self.collection_interval)
+                self._stop_event.wait(self.collection_interval)
             except Exception as e:
                 logger.error(f"Error in monitoring loop: {e}")
-                self.stop_monitoring.wait(self.collection_interval)
+                self._stop_event.wait(self.collection_interval)
 
     def _check_thresholds(self, metrics: Dict[str, Any]):
         """Check if metrics exceed thresholds and trigger alerts."""
@@ -343,8 +343,6 @@ class SystemResourceMonitor:
     def _add_to_history(self, metrics: Dict[str, Any]):
         """Add metrics to history."""
         self.metrics_history.append(metrics)
-        if len(self.metrics_history) > self.max_history_size:
-            self.metrics_history.pop(0)
 
     def get_current_metrics(self) -> Dict[str, Any]:
         """Get current system metrics."""

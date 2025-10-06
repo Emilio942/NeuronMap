@@ -14,22 +14,72 @@ import traceback
 from typing import Dict, Any, List, Optional
 import json
 from pathlib import Path
+import uuid
+import statistics
+import re
 
 import sys
-from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 import torch
+import numpy as np
 
 from src.analysis.model_integration import get_model_manager
 from src.analysis.intervention_cache import InterventionCache
 from src.analysis.intervention_config import ConfigurationManager, generate_config_template
 from src.analysis.interventions import ModifiableHookManager
+from src.analysis.functional_groups_finder import (
+    FunctionalGroupsFinder,
+    AnalysisTaskType,
+    ClusteringMethod,
+)
 
 logger = logging.getLogger(__name__)
 
 # Create Blueprint for intervention API
 interventions_bp = Blueprint('interventions', __name__, url_prefix='/api/interventions')
+
+
+def _resolve_module(model: torch.nn.Module, module_path: str) -> Optional[torch.nn.Module]:
+    """Resolve a dotted module path (supports ModuleList indices)."""
+    if not module_path:
+        return None
+
+    module: torch.nn.Module = model
+    for part in module_path.split('.'):
+        if not part:
+            continue
+
+        if part.isdigit():
+            try:
+                module = module[int(part)]  # type: ignore[index]
+            except (IndexError, TypeError):
+                return None
+        else:
+            if not hasattr(module, part):
+                return None
+            module = getattr(module, part)
+
+    return module
+
+
+def _extract_layer_index(layer_name: str) -> int:
+    """Extract first integer from a layer name, defaulting to 0."""
+    match = re.search(r"(\d+)", layer_name or "")
+    return int(match.group(1)) if match else 0
+
+
+def _vectorize_activation(tensor: torch.Tensor) -> torch.Tensor:
+    """Reduce activation tensor to a 1D vector for clustering."""
+    if tensor is None:
+        return torch.zeros(1)
+
+    activation = tensor.detach()
+    if activation.dim() >= 3:
+        activation = activation.mean(dim=1)
+    if activation.dim() >= 2:
+        activation = activation.mean(dim=0)
+    return activation.flatten()
 
 
 @interventions_bp.route('/models', methods=['GET'])
@@ -570,6 +620,274 @@ def get_neuron_info(model_name: str, layer_name: str, neuron_id: int):
         
     except Exception as e:
         logger.error(f"Error getting neuron info: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@interventions_bp.route('/groups/discover', methods=['POST'])
+def discover_neuron_groups():
+    """Discover functional neuron groups for given prompts and layer."""
+    try:
+        data = request.get_json() or {}
+
+        model_name = data.get('model')
+        prompts = data.get('prompts') or []
+        layer_name = data.get('layer')
+        task_type_value = (data.get('task_type') or AnalysisTaskType.SEMANTIC_SIMILARITY.value)
+        clustering_value = (data.get('clustering_method') or ClusteringMethod.KMEANS.value)
+        similarity_threshold = float(data.get('similarity_threshold', 0.7))
+        min_group_size = int(data.get('min_group_size', 3))
+        max_group_size = int(data.get('max_group_size', 40))
+
+        if not model_name:
+            return jsonify({'success': False, 'error': 'Model name is required'}), 400
+
+        if not prompts:
+            return jsonify({'success': False, 'error': 'At least one prompt is required'}), 400
+
+        model_manager = get_model_manager()
+
+        if layer_name is None:
+            available_layers = model_manager.list_available_layers(model_name)
+            if not available_layers:
+                return jsonify({'success': False, 'error': 'No layers available for selected model'}), 400
+            layer_name = available_layers[0]
+
+        adapter = model_manager.load_model(model_name)
+        model = adapter.model
+        tokenizer = adapter.tokenizer
+        device = next(model.parameters()).device
+
+        layer_module = _resolve_module(model, layer_name)
+        if layer_module is None:
+            return jsonify({
+                'success': False,
+                'error': f'Layer {layer_name} could not be resolved in model {model_name}'
+            }), 404
+
+        activations: List[np.ndarray] = []
+        failed_prompts: List[str] = []
+
+        for prompt in prompts:
+            capture: Dict[str, torch.Tensor] = {}
+            prompt_failed = False
+
+            def hook(_, __, output):
+                output_tensor = output[0] if isinstance(output, tuple) and output else output
+                if output_tensor is None:
+                    return
+                vector = _vectorize_activation(output_tensor)
+                if vector.numel() > 0:
+                    capture['activation'] = vector.detach().cpu()
+
+            handle = layer_module.register_forward_hook(hook)
+            try:
+                encoded = tokenizer(prompt, return_tensors='pt', truncation=True, max_length=512)
+                encoded = {k: v.to(device) for k, v in encoded.items()}
+                with torch.no_grad():
+                    model(**encoded)
+            except Exception as inference_error:  # pragma: no cover - logging path
+                logger.error(f"Failed to capture activation for prompt '{prompt[:32]}...': {inference_error}")
+                prompt_failed = True
+            finally:
+                handle.remove()
+
+            if 'activation' in capture:
+                activations.append(capture['activation'].numpy())
+            else:
+                prompt_failed = True
+
+            if prompt_failed:
+                failed_prompts.append(prompt)
+
+        use_synthetic = False
+        if not activations:
+            # Fall back to synthetic data so the UI can still render results
+            use_synthetic = True
+            hidden_size = getattr(getattr(model, 'config', None), 'hidden_size', 768)
+            synthetic_count = max(len(prompts), min_group_size * 2)
+            activations = [
+                np.random.randn(hidden_size).astype(np.float32) * 0.05
+                for _ in range(synthetic_count)
+            ]
+
+        activation_matrix = np.stack(activations)
+
+        try:
+            task_type = AnalysisTaskType(task_type_value)
+        except ValueError:
+            task_type = AnalysisTaskType.SEMANTIC_SIMILARITY
+
+        try:
+            clustering_method = ClusteringMethod(clustering_value)
+        except ValueError:
+            clustering_method = ClusteringMethod.KMEANS
+
+        finder = FunctionalGroupsFinder(
+            similarity_threshold=similarity_threshold,
+            min_group_size=min_group_size,
+            max_group_size=max_group_size,
+            clustering_method=clustering_method
+        )
+
+        pattern_id = f"{model_name}_{layer_name}_{uuid.uuid4().hex[:8]}"
+        finder.add_activation_pattern(
+            pattern_id=pattern_id,
+            activations=activation_matrix,
+            inputs=prompts,
+            layer=_extract_layer_index(layer_name),
+            task_type=task_type
+        )
+
+        groups = finder.discover_functional_groups(
+            pattern_id=pattern_id,
+            task_type=task_type,
+            generate_visualizations=False
+        )
+
+        group_payload = []
+        group_sizes: List[int] = []
+        for group in groups:
+            neurons = [int(n) for n in group.neurons]
+            group_sizes.append(len(neurons))
+            group_payload.append({
+                'group_id': group.group_id,
+                'layer': group.layer,
+                'size': len(neurons),
+                'neurons': neurons,
+                'function': group.function,
+                'activation_trigger': group.activation_trigger,
+                'ablation_effect': group.ablation_effect,
+                'confidence': group.confidence,
+                'statistics': group.statistical_metrics,
+                'co_activation_strength': group.co_activation_strength,
+                'cluster_coherence': group.cluster_coherence,
+                'sample_examples': [example.get('input') for example in (group.examples or [])[:3]]
+            })
+
+        summary = {
+            'total_groups': len(group_payload),
+            'average_group_size': float(statistics.mean(group_sizes)) if group_sizes else 0.0,
+            'largest_group': max(group_sizes) if group_sizes else 0,
+            'smallest_group': min(group_sizes) if group_sizes else 0,
+            'layer_name': layer_name,
+            'task_type': task_type.value,
+            'uses_synthetic_data': use_synthetic,
+            'failed_prompts': failed_prompts,
+        }
+
+        return jsonify({
+            'success': True,
+            'model': model_name,
+            'layer': layer_name,
+            'summary': summary,
+            'groups': group_payload
+        })
+
+    except Exception as e:
+        logger.error(f"Error discovering neuron groups: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@interventions_bp.route('/questions/context', methods=['POST'])
+def analyze_question_context():
+    """Analyze question context by inspecting next-token predictions."""
+    try:
+        data = request.get_json() or {}
+
+        model_name = data.get('model')
+        questions = [q for q in (data.get('questions') or []) if isinstance(q, str) and q.strip()]
+        top_k = int(data.get('top_k', 5))
+
+        if not model_name:
+            return jsonify({'success': False, 'error': 'Model name is required'}), 400
+
+        if not questions:
+            return jsonify({'success': False, 'error': 'At least one question is required'}), 400
+
+        top_k = max(1, min(top_k, 10))
+
+        model_manager = get_model_manager()
+        adapter = model_manager.load_model(model_name)
+        model = adapter.model
+        tokenizer = adapter.tokenizer
+        device = next(model.parameters()).device
+
+        results: List[Dict[str, Any]] = []
+        vocab_tokens = set()
+        total_tokens = 0
+        unsupported_questions: List[Dict[str, Any]] = []
+
+        for question in questions:
+            question_clean = question.strip()
+            token_count = len(question_clean.split())
+            total_tokens += token_count
+
+            encoded = tokenizer(question_clean, return_tensors='pt', truncation=True, max_length=512)
+            encoded = {k: v.to(device) for k, v in encoded.items()}
+
+            try:
+                with torch.no_grad():
+                    outputs = model(**encoded)
+            except Exception as inference_error:  # pragma: no cover - logging path
+                logger.error(f"Question context analysis failed for '{question_clean[:32]}...': {inference_error}")
+                unsupported_questions.append({'question': question_clean, 'error': str(inference_error)})
+                continue
+
+            if not hasattr(outputs, 'logits'):
+                unsupported_questions.append({'question': question_clean, 'error': 'Model output does not provide logits'})
+                continue
+
+            logits = outputs.logits[:, -1, :]
+            probabilities = torch.softmax(logits, dim=-1)
+            values, indices = torch.topk(probabilities, k=top_k, dim=-1)
+
+            token_ids = indices[0].tolist()
+            probs = values[0].tolist()
+            tokens = tokenizer.convert_ids_to_tokens(token_ids)
+
+            vocab_tokens.update(tokens)
+
+            predictions = [
+                {
+                    'token_id': int(token_id),
+                    'token': token,
+                    'probability': float(prob)
+                }
+                for token_id, token, prob in zip(token_ids, tokens, probs)
+            ]
+
+            results.append({
+                'question': question_clean,
+                'token_count': token_count,
+                'predictions': predictions
+            })
+
+        summary = {
+            'total_questions': len(questions),
+            'analyzed_questions': len(results),
+            'average_token_count': (total_tokens / len(questions)) if questions else 0.0,
+            'unique_predicted_tokens': len(vocab_tokens),
+            'top_k': top_k,
+            'warnings': unsupported_questions
+        }
+
+        return jsonify({
+            'success': True,
+            'model': model_name,
+            'summary': summary,
+            'results': results
+        })
+
+    except Exception as e:
+        logger.error(f"Error analyzing question context: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': str(e)

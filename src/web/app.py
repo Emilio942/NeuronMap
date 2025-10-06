@@ -52,7 +52,7 @@ if FLASK_AVAILABLE:
     
     # Register API blueprints
     try:
-        from api.interventions import interventions_bp
+        from web.api.interventions import interventions_bp
         app.register_blueprint(interventions_bp)
         logger.info("Interventions API blueprint registered")
     except ImportError as e:
@@ -60,7 +60,7 @@ if FLASK_AVAILABLE:
 
     # Register circuits API blueprint
     try:
-        from api.circuits import circuits_bp
+        from web.api.circuits import circuits_bp
         app.register_blueprint(circuits_bp)
         logger.info("Circuits API blueprint registered")
     except ImportError as e:

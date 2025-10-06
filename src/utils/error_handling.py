@@ -14,6 +14,38 @@ import torch
 logger = logging.getLogger(__name__)
 
 
+def setup_error_handling(level: int | str = logging.INFO) -> None:
+    """Initialize basic logging and exception hooks for development use.
+
+    The historical codebase expected a convenience helper that prepared the
+    logging subsystem and ensured unhandled exceptions were captured.  The
+    modern module exposes richer building blocks but the wrapper was never
+    reintroduced, which caused imports like ``from utils.error_handling import
+    setup_error_handling`` to fail.  This lightweight implementation restores
+    the function with sensible defaults while delegating to Python's standard
+    logging.
+
+    Args:
+        level: Logging level to apply to the root logger.  Accepts either the
+            integer constant or its string representation (e.g. ``"INFO"``).
+    """
+
+    root_logger = logging.getLogger()
+    if isinstance(level, str):
+        level = level.upper()
+    root_logger.setLevel(level)
+
+    if not root_logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            "%(asctime)s | %(levelname)s | %(name)s: %(message)s"
+        )
+        handler.setFormatter(formatter)
+        root_logger.addHandler(handler)
+
+    logger.debug("Error handling system initialized")
+
+
 # ===== COMPREHENSIVE EXCEPTION HIERARCHY =====
 
 class NeuronMapException(Exception):

@@ -56,6 +56,15 @@
                             </select>
                             <div class="form-text">Select the model to analyze</div>
                         </div>
+
+                        <!-- Layer Selection -->
+                        <div class="mb-3">
+                            <label for="layerSelect" class="form-label fw-bold">Layer Focus</label>
+                            <select class="form-select" id="layerSelect" name="layer">
+                                <option value="">Select a model first...</option>
+                            </select>
+                            <div class="form-text">Choose the layer to inspect for neuron group analysis</div>
+                        </div>
                         
                         <!-- Input Text -->
                         <div class="mb-3">
@@ -63,6 +72,18 @@
                             <textarea class="form-control" id="inputText" name="prompt" rows="3" 
                                       placeholder="Enter text to analyze..."
                                       required>The capital of France is</textarea>
+                        </div>
+
+                        <!-- Analysis Prompts -->
+                        <div class="mb-3">
+                            <label for="groupPrompts" class="form-label fw-bold">Analysis Prompts</label>
+                            <textarea class="form-control" id="groupPrompts" name="prompts" rows="4"
+                                      placeholder="Enter one prompt per line for group discovery and context analysis">The capital of France is Paris
+Paris is the capital of France
+Berlin is the capital of Germany
+Tokyo is the capital of Japan
+What is the capital of Spain?</textarea>
+                            <div class="form-text">Used for neuron group discovery and question context analysis</div>
                         </div>
                         
                         <!-- Quick Actions -->
@@ -74,9 +95,15 @@
                                 </button>
                                 <button type="button" class="btn btn-generate-heatmap btn-intervention" onclick="generateHeatmap()">
                                     <i class="fas fa-th me-1"></i>Generate Activation Heatmap
-                            </button>
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-intervention" onclick="discoverNeuronGroups()">
+                                    <i class="fas fa-project-diagram me-1"></i>Discover Neuron Groups
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-intervention" onclick="analyzeQuestionContext()">
+                                    <i class="fas fa-question-circle me-1"></i>Analyze Question Context
+                                </button>
+                            </div>
                         </div>
-                    </div>
                 </form>
             </div>
         </div>
@@ -186,6 +213,92 @@
                 </div>
             </div>
         </div>
+
+        <!-- Neuron Group Results -->
+        <div class="card mt-3" id="groupResultsCard" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-layer-group me-2"></i>Neuron Group Discovery
+                </h5>
+            </div>
+            <div class="card-body" id="groupResultsContent">
+                <div class="text-muted small">Run neuron group discovery to uncover coordinated neuron clusters.</div>
+            </div>
+        </div>
+
+        <!-- Question Context Analysis -->
+        <div class="card mt-3" id="questionContextCard" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-comments me-2"></i>Question Context Analysis
+                </h5>
+            </div>
+            <div class="card-body" id="questionContextContent">
+                <div class="text-muted small">Analyze questions to inspect the model's predicted continuations.</div>
+            </div>
+        </div>
+
+        <!-- Circuit Insights -->
+        <div class="card mt-3" id="circuitVisualizationCard" style="display: none;">
+            <div class="card-header">
+                <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center">
+                    <div>
+                        <h5 class="mb-0">
+                            <i class="fas fa-project-diagram me-2"></i>Circuit Insights
+                        </h5>
+                        <small class="text-muted" id="circuitStatusLabel">Select a circuit type to visualize functional motifs.</small>
+                    </div>
+                    <div class="d-flex gap-2 mt-2 mt-lg-0">
+                        <select class="form-select form-select-sm" id="circuitTypeSelect">
+                            <option value="induction" selected>Induction Heads</option>
+                            <option value="composition">Layer Composition</option>
+                            <option value="neuron-head">Neuron ↔ Head Influence</option>
+                        </select>
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="loadCircuitBtn">
+                            <i class="fas fa-project-diagram me-1"></i>Load
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="refreshCircuitBtn" title="Refresh visualization">
+                            <i class="fas fa-sync"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="position-relative border rounded" style="min-height: 420px;">
+                    <div id="circuitLoader" class="position-absolute top-50 start-50 translate-middle text-center" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading circuit...</span>
+                        </div>
+                        <div class="small text-muted mt-2">Building circuit...</div>
+                    </div>
+                    <div id="circuitGraph" style="height: 420px;"></div>
+                </div>
+                <div class="row mt-3 g-3">
+                    <div class="col-lg-6">
+                        <div class="border rounded p-3 bg-light h-100">
+                            <h6 class="mb-2 text-uppercase small text-muted">Circuit Summary</h6>
+                            <div id="circuitMetadata" class="small text-body-secondary">
+                                Run an analysis to populate circuit statistics.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="border rounded p-3 h-100">
+                            <h6 class="mb-2 text-uppercase small text-muted">Selection Details</h6>
+                            <div id="circuitSelectionDetails" class="small text-muted">
+                                Select a node or edge to inspect metadata.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <h6 class="mb-2 text-uppercase small text-muted">Legend &amp; Context</h6>
+                    <div id="circuitLegend" class="small text-muted">
+                        Circuit legends will appear after loading data.
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -278,12 +391,18 @@
 {% block scripts %}
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+<script src="https://unpkg.com/cytoscape-cose-bilkent@4.1.0/cytoscape-cose-bilkent.js"></script>
 <script>
 // Global variables
 let currentModel = null;
 let currentModelInfo = null;
 let selectedNeuron = null;
 let currentHeatmapData = null;
+let availableLayers = [];
+let circuitCy = null;
+let currentCircuitType = 'induction';
+let lastCircuitData = null;
 
 // Initialize page
 document.addEventListener('DOMContentLoaded', function() {
@@ -301,6 +420,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(() => {
         loadAvailableModels();
         setupEventListeners();
+        setupCircuitPanel();
         
         // Success notification
         setTimeout(() => {
@@ -334,6 +454,16 @@ function setupEventListeners() {
             currentModel = this.value;
             console.log('Model selected:', currentModel);
             updateSelectedModelStatus(currentModel);
+            availableLayers = [];
+
+            const layerSelect = document.getElementById('layerSelect');
+            if (layerSelect) {
+                if (currentModel) {
+                    layerSelect.innerHTML = '<option value="">Loading layers...</option>';
+                } else {
+                    layerSelect.innerHTML = '<option value="">Select a model first...</option>';
+                }
+            }
             if (currentModel) {
                 showToast(`Model "${currentModel}" selected`, 'success');
                 updateLastActionStatus('Model selected');
@@ -365,6 +495,464 @@ function setupEventListeners() {
     }
     
     console.log('Event listeners set up successfully');
+}
+
+function setupCircuitPanel() {
+    console.log('Initializing circuit panel controls...');
+    const card = document.getElementById('circuitVisualizationCard');
+    const typeSelect = document.getElementById('circuitTypeSelect');
+    const loadBtn = document.getElementById('loadCircuitBtn');
+    const refreshBtn = document.getElementById('refreshCircuitBtn');
+
+    if (!card || !typeSelect || !loadBtn) {
+        console.warn('Circuit panel UI elements missing; skipping circuit setup.');
+        return;
+    }
+
+    typeSelect.addEventListener('change', (event) => {
+        currentCircuitType = event.target.value || 'induction';
+        updateCircuitStatus(`Ready to load ${getCircuitTypeLabel(currentCircuitType)} circuit.`);
+    });
+
+    loadBtn.addEventListener('click', () => {
+        const selectedType = typeSelect.value || currentCircuitType || 'induction';
+        triggerCircuitInsight(selectedType, { source: 'manual-load' });
+    });
+
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+            const selectedType = typeSelect.value || currentCircuitType || 'induction';
+            if (lastCircuitData && lastCircuitData.circuitType === selectedType && lastCircuitData.data) {
+                console.log('Refreshing circuit with cached data');
+                const highlightSummary = renderCircuitVisualization(lastCircuitData.data, {
+                    ...lastCircuitData.context,
+                    circuitType: selectedType,
+                    highlights: lastCircuitData.highlights
+                });
+                lastCircuitData.highlights = highlightSummary;
+                updateCircuitMetadata(lastCircuitData.data, {
+                    ...lastCircuitData.context,
+                    circuitType: selectedType,
+                    highlights: highlightSummary
+                });
+                updateCircuitLegend(lastCircuitData.data, {
+                    ...lastCircuitData.context,
+                    circuitType: selectedType,
+                    highlights: highlightSummary
+                });
+                updateCircuitStatus(`${getCircuitTypeLabel(selectedType)} circuit refreshed.`);
+            } else {
+                triggerCircuitInsight(selectedType, { source: 'refresh' });
+            }
+        });
+    }
+
+    updateCircuitStatus('Select a circuit type to begin.');
+}
+
+async function loadCircuitVisualization(circuitType = 'induction', context = {}) {
+    const card = document.getElementById('circuitVisualizationCard');
+    const loader = document.getElementById('circuitLoader');
+    const graphContainer = document.getElementById('circuitGraph');
+
+    if (!card || !graphContainer) {
+        console.warn('Circuit visualization container missing.');
+        return;
+    }
+
+    card.style.display = 'block';
+    currentCircuitType = circuitType;
+    updateCircuitStatus(`Loading ${getCircuitTypeLabel(circuitType)} circuit...`);
+
+    if (loader) {
+        loader.style.display = 'block';
+    }
+    graphContainer.classList.add('opacity-25');
+
+    try {
+        const response = await fetch(`/api/circuits/circuit-data/${circuitType}`);
+        if (!response.ok) {
+            throw new Error(`Circuit API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data || data.success === false) {
+            throw new Error(data?.error || 'Circuit data unavailable');
+        }
+
+        const highlightSummary = renderCircuitVisualization(data, { ...context, circuitType });
+        updateCircuitMetadata(data, { ...context, circuitType, highlights: highlightSummary });
+        updateCircuitLegend(data, { ...context, circuitType, highlights: highlightSummary });
+        updateCircuitStatus(`${getCircuitTypeLabel(circuitType)} circuit ready.`);
+        showToast(`Loaded ${getCircuitTypeLabel(circuitType)} circuit`, 'info');
+
+        lastCircuitData = {
+            data,
+            context,
+            circuitType,
+            highlights: highlightSummary
+        };
+    } catch (error) {
+        console.error('Error loading circuit visualization:', error);
+        updateCircuitStatus(`Circuit load failed: ${error.message}`);
+        showError(`Circuit load failed: ${error.message}`);
+    } finally {
+        if (loader) {
+            loader.style.display = 'none';
+        }
+        graphContainer.classList.remove('opacity-25');
+    }
+}
+
+function renderCircuitVisualization(data, options = {}) {
+    const graphContainer = document.getElementById('circuitGraph');
+    if (!graphContainer) {
+        return { nodes: [], edges: [] };
+    }
+
+    const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+    const edges = Array.isArray(data.edges) ? data.edges : [];
+
+    if (!nodes.length && !edges.length) {
+        if (circuitCy) {
+            circuitCy.destroy();
+            circuitCy = null;
+        }
+        graphContainer.innerHTML = '<div class="circuit-empty-state d-flex align-items-center justify-content-center h-100 text-muted">No circuit data available for this selection.</div>';
+        resetCircuitSelectionDetails();
+        return { nodes: [], edges: [] };
+    }
+
+    if (graphContainer.querySelector('.circuit-empty-state')) {
+        graphContainer.innerHTML = '';
+    }
+
+    const topNodeIds = nodes
+        .filter(node => node && node.id)
+        .slice()
+        .sort((a, b) => (b.score || 0) - (a.score || 0))
+        .slice(0, 3)
+        .map(node => node.id);
+
+    const topEdgeIds = edges
+        .filter(edge => edge && edge.source && edge.target)
+        .slice()
+        .sort((a, b) => Math.abs(b.weight || 0) - Math.abs(a.weight || 0))
+        .slice(0, 3)
+        .map(edge => edge.edge_id || `${edge.source}_${edge.target}`);
+
+    const presetNodeHighlights = options.highlightNodes || options.highlights?.nodes;
+    const presetEdgeHighlights = options.highlightEdges || options.highlights?.edges;
+
+    const highlightNodes = new Set(presetNodeHighlights && presetNodeHighlights.length ? presetNodeHighlights : topNodeIds);
+    const highlightEdges = new Set(presetEdgeHighlights && presetEdgeHighlights.length ? presetEdgeHighlights : topEdgeIds);
+
+    const elements = [];
+
+    nodes.forEach(node => {
+        const metadata = node.metadata || {};
+        elements.push({
+            data: {
+                id: node.id,
+                label: node.label || node.id,
+                component_type: node.type || node.component_type || 'component',
+                layer: node.layer ?? metadata.layer ?? null,
+                position: node.position ?? metadata.position ?? null,
+                score: node.score ?? metadata.score ?? null,
+                metadata: metadata
+            },
+            classes: highlightNodes.has(node.id) ? 'highlight' : ''
+        });
+    });
+
+    edges.forEach(edge => {
+        const metadata = edge.metadata || {};
+        const weight = Number(edge.weight ?? metadata.weight ?? 0);
+        const edgeId = edge.edge_id || `${edge.source}_${edge.target}`;
+        elements.push({
+            data: {
+                id: edgeId,
+                source: edge.source,
+                target: edge.target,
+                weight: weight,
+                absWeight: Math.abs(weight),
+                connection_type: edge.type || edge.connection_type || 'connection',
+                metadata: metadata
+            },
+            classes: highlightEdges.has(edgeId) ? 'highlight' : ''
+        });
+    });
+
+    if (!circuitCy) {
+        circuitCy = cytoscape({
+            container: graphContainer,
+            wheelSensitivity: 0.2,
+            pixelRatio: 1,
+            boxSelectionEnabled: false,
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'background-color': '#4f46e5',
+                        'label': 'data(label)',
+                        'color': '#111827',
+                        'font-size': 12,
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'width': 32,
+                        'height': 32,
+                        'border-color': '#e5e7eb',
+                        'border-width': 2,
+                        'text-wrap': 'wrap',
+                        'text-max-width': 80
+                    }
+                },
+                {
+                    selector: 'node.highlight',
+                    style: {
+                        'background-color': '#f59e0b',
+                        'border-color': '#111827',
+                        'border-width': 3,
+                        'color': '#111827',
+                        'font-weight': '600'
+                    }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 'mapData(absWeight, 0, 1, 1, 6)',
+                        'line-color': '#9ca3af',
+                        'target-arrow-color': '#9ca3af',
+                        'target-arrow-shape': 'triangle',
+                        'curve-style': 'bezier'
+                    }
+                },
+                {
+                    selector: 'edge.highlight',
+                    style: {
+                        'line-color': '#f97316',
+                        'target-arrow-color': '#f97316',
+                        'width': 5
+                    }
+                }
+            ]
+        });
+
+        circuitCy.on('tap', 'node', (event) => {
+            displayCircuitComponent(event.target.data());
+        });
+
+        circuitCy.on('tap', 'edge', (event) => {
+            displayCircuitConnection(event.target.data());
+        });
+    } else {
+        circuitCy.elements().remove();
+    }
+
+    circuitCy.add(elements);
+    const layout = circuitCy.layout({
+        name: 'cose-bilkent',
+        animate: false,
+        randomize: false,
+        nodeDimensionsIncludeLabels: true
+    });
+    layout.run();
+    circuitCy.resize();
+    circuitCy.fit();
+
+    resetCircuitSelectionDetails();
+
+    return {
+        nodes: Array.from(highlightNodes),
+        edges: Array.from(highlightEdges)
+    };
+}
+
+function triggerCircuitInsight(circuitType = 'induction', context = {}) {
+    const card = document.getElementById('circuitVisualizationCard');
+    const typeSelect = document.getElementById('circuitTypeSelect');
+
+    if (!card) {
+        console.warn('Circuit visualization card not available.');
+        return;
+    }
+
+    card.style.display = 'block';
+    currentCircuitType = circuitType;
+
+    if (typeSelect) {
+        typeSelect.value = circuitType;
+    }
+
+    loadCircuitVisualization(circuitType, context);
+
+    setTimeout(() => {
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 200);
+}
+
+function updateCircuitStatus(message) {
+    const label = document.getElementById('circuitStatusLabel');
+    if (label) {
+        label.textContent = message;
+    }
+}
+
+function updateCircuitMetadata(data, options = {}) {
+    const container = document.getElementById('circuitMetadata');
+    if (!container) {
+        return;
+    }
+
+    const nodes = Array.isArray(data.nodes) ? data.nodes : [];
+    const edges = Array.isArray(data.edges) ? data.edges : [];
+    const highlights = options.highlights || { nodes: [], edges: [] };
+
+    const weights = edges.map(edge => Math.abs(edge.weight ?? 0)).filter(weight => !Number.isNaN(weight));
+    const meanWeight = weights.length ? (weights.reduce((acc, value) => acc + value, 0) / weights.length).toFixed(3) : 'n/a';
+    const maxWeight = weights.length ? Math.max(...weights).toFixed(3) : 'n/a';
+
+    container.innerHTML = `
+        <div class="d-flex flex-wrap gap-4 align-items-center">
+            <div>
+                <div class="fw-bold h4 mb-0">${nodes.length}</div>
+                <small class="text-muted text-uppercase">Nodes</small>
+            </div>
+            <div>
+                <div class="fw-bold h4 mb-0">${edges.length}</div>
+                <small class="text-muted text-uppercase">Connections</small>
+            </div>
+            <div>
+                <div class="fw-bold h4 mb-0">${Math.max(highlights.nodes.length, highlights.edges.length)}</div>
+                <small class="text-muted text-uppercase">Highlights</small>
+            </div>
+        </div>
+        <div class="mt-3 small">
+            <div><strong>Type:</strong> ${getCircuitTypeLabel(options.circuitType || data.metadata?.circuit_type || currentCircuitType)}</div>
+            <div><strong>Model:</strong> ${data.metadata?.model || currentModel || 'n/a'}</div>
+            <div><strong>Mean Weight:</strong> ${meanWeight}</div>
+            <div><strong>Max Weight:</strong> ${maxWeight}</div>
+            ${data.metadata?.threshold ? `<div><strong>Threshold:</strong> ${data.metadata.threshold}</div>` : ''}
+        </div>
+    `;
+}
+
+function updateCircuitLegend(data, options = {}) {
+    const container = document.getElementById('circuitLegend');
+    if (!container) {
+        return;
+    }
+
+    const type = options.circuitType || data.metadata?.circuit_type || currentCircuitType;
+    const highlights = options.highlights || { nodes: [], edges: [] };
+
+    const descriptions = {
+        'induction': 'Induction circuits capture attention heads that continue repeating token sequences across the context.',
+        'composition': 'Composition circuits reveal how attention heads in earlier layers feed into downstream heads.',
+        'neuron-head': 'Neuron ↔ head circuits expose MLP neurons that strongly modulate specific attention heads.'
+    };
+
+    container.innerHTML = `
+        <div>${descriptions[type] || 'Circuit visualization ready.'}</div>
+        <div class="mt-2">
+            <span class="badge bg-warning text-dark me-2">${highlights.nodes.length}</span> highlighted nodes
+            <span class="badge bg-info text-dark">${highlights.edges.length}</span> strong edges
+        </div>
+        <div class="mt-2 text-muted">Orange nodes mark high-impact components; bright edges represent the strongest information flows.</div>
+    `;
+}
+
+function displayCircuitComponent(nodeData) {
+    const container = document.getElementById('circuitSelectionDetails');
+    if (!container) {
+        return;
+    }
+
+    const metadata = nodeData.metadata || {};
+
+    container.innerHTML = `
+        <div class="bg-white border rounded p-3">
+            <div class="fw-bold">${nodeData.label || nodeData.id}</div>
+            <div class="small text-muted mb-2">${getComponentTypeLabel(nodeData.component_type)}</div>
+            <div class="small"><strong>Layer:</strong> ${nodeData.layer ?? 'n/a'}</div>
+            <div class="small"><strong>Position:</strong> ${nodeData.position ?? 'n/a'}</div>
+            ${nodeData.score !== null && nodeData.score !== undefined ? `<div class="small"><strong>Score:</strong> ${Number(nodeData.score).toFixed(3)}</div>` : ''}
+            ${Object.keys(metadata).length ? `<div class="small mt-2">${buildMetadataList(metadata)}</div>` : ''}
+        </div>
+    `;
+}
+
+function displayCircuitConnection(edgeData) {
+    const container = document.getElementById('circuitSelectionDetails');
+    if (!container) {
+        return;
+    }
+
+    const metadata = edgeData.metadata || {};
+
+    container.innerHTML = `
+        <div class="bg-white border rounded p-3">
+            <div class="fw-bold">Connection</div>
+            <div class="small"><strong>From:</strong> ${edgeData.source}</div>
+            <div class="small"><strong>To:</strong> ${edgeData.target}</div>
+            <div class="small"><strong>Type:</strong> ${getComponentTypeLabel(edgeData.connection_type)}</div>
+            <div class="small"><strong>Weight:</strong> ${Number(edgeData.weight ?? 0).toFixed(3)}</div>
+            ${Object.keys(metadata).length ? `<div class="small mt-2">${buildMetadataList(metadata)}</div>` : ''}
+        </div>
+    `;
+}
+
+function resetCircuitSelectionDetails() {
+    const container = document.getElementById('circuitSelectionDetails');
+    if (container) {
+        container.textContent = 'Select a node or edge to inspect metadata.';
+    }
+}
+
+function buildMetadataList(metadata) {
+    return `
+        <ul class="list-unstyled mb-0">
+            ${Object.entries(metadata).slice(0, 5).map(([key, value]) => `<li><span class="text-muted">${key}:</span> ${formatMetadataValue(value)}</li>`).join('')}
+        </ul>
+    `;
+}
+
+function formatMetadataValue(value) {
+    if (value === null || value === undefined) {
+        return 'n/a';
+    }
+    if (Array.isArray(value)) {
+        const preview = value.slice(0, 5).map(item => formatMetadataValue(item));
+        return `${preview.join(', ')}${value.length > 5 ? ' …' : ''}`;
+    }
+    if (typeof value === 'object') {
+        const entries = Object.entries(value).slice(0, 3).map(([key, val]) => `${key}: ${formatMetadataValue(val)}`);
+        return entries.join('; ');
+    }
+    if (typeof value === 'number' && !Number.isNaN(value)) {
+        return Number.isInteger(value) ? value : value.toFixed(3);
+    }
+    return String(value);
+}
+
+function getCircuitTypeLabel(type) {
+    const mapping = {
+        'induction': 'Induction Heads',
+        'composition': 'Layer Composition',
+        'neuron-head': 'Neuron ↔ Head Influence'
+    };
+    return mapping[type] || (type ? type.replace(/_/g, ' ') : 'Circuit');
+}
+
+function getComponentTypeLabel(type) {
+    const mapping = {
+        'attention_head': 'Attention Head',
+        'mlp_neuron': 'MLP Neuron',
+        'residual_stream': 'Residual Stream',
+        'layer_norm': 'Layer Norm',
+        'connection': 'Connection'
+    };
+    return mapping[type] || (type ? type.replace(/_/g, ' ') : 'Component');
 }
 
 // Status management functions
@@ -458,6 +1046,7 @@ async function loadModelInfo() {
             currentModelInfo = data.model_info;
             displayModelInfo(data.model_info);
             document.getElementById('modelInfoCard').style.display = 'block';
+            await loadModelLayers(currentModel);
             showToast('✅ Model info loaded successfully!', 'success');
             updateLastActionStatus('Model info loaded');
         } else {
@@ -517,6 +1106,45 @@ function displayModelInfo(info) {
             </div>
         </div>
     `;
+}
+
+async function loadModelLayers(model) {
+    const layerSelect = document.getElementById('layerSelect');
+    if (!layerSelect) return;
+
+    if (!model) {
+        layerSelect.innerHTML = '<option value="">Select a model first...</option>';
+        availableLayers = [];
+        return;
+    }
+
+    layerSelect.innerHTML = '<option value="">Loading layers...</option>';
+
+    try {
+        const response = await fetch(`/api/interventions/models/${model}/layers`);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const layers = data.layers || {};
+        availableLayers = layers.all || [];
+
+        if (!availableLayers.length) {
+            availableLayers = layers.attention || layers.mlp || layers.other || [];
+        }
+
+        if (!availableLayers.length) {
+            layerSelect.innerHTML = '<option value="">No layers available</option>';
+            return;
+        }
+
+        layerSelect.innerHTML = availableLayers.map(layer => `<option value="${layer}">${layer}</option>`).join('');
+    } catch (error) {
+        console.error('Error loading layers:', error);
+        layerSelect.innerHTML = '<option value="">Error loading layers</option>';
+        showToast('Failed to load layer list: ' + error.message, 'warning');
+    }
 }
 
 // W2: Interactive Heatmap Generation
@@ -855,6 +1483,288 @@ function displayInterventionResults(results) {
             </div>
         </div>
     `;
+}
+
+
+async function discoverNeuronGroups() {
+    if (!currentModel) {
+        showError('Please select a model first');
+        return;
+    }
+
+    const promptsInput = document.getElementById('groupPrompts');
+    const prompts = promptsInput ? promptsInput.value.split('\n').map(p => p.trim()).filter(Boolean) : [];
+
+    if (!prompts.length) {
+        showError('Provide at least one prompt for group discovery');
+        return;
+    }
+
+    let layer = document.getElementById('layerSelect')?.value || null;
+    if (!layer && availableLayers.length) {
+        layer = availableLayers[0];
+    }
+
+    if (!layer) {
+        showError('No layer available for analysis. Please load model info first.');
+        return;
+    }
+
+    updateLastActionStatus('Discovering neuron groups');
+    document.getElementById('groupResultsCard').style.display = 'block';
+    showLoading('groupResultsContent');
+
+    try {
+        const response = await fetch('/api/interventions/groups/discover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: currentModel,
+                layer: layer,
+                prompts: prompts
+            })
+        });
+
+        const data = await response.json();
+        if (response.ok && data.success) {
+            displayNeuronGroupResults(data);
+            showToast(`Neuron group discovery completed (${data.summary.total_groups} groups)`, 'success');
+            updateLastActionStatus('Neuron groups discovered');
+            triggerCircuitInsight('neuron-head', {
+                source: 'group-discovery',
+                layer: layer,
+                highlights: {
+                    nodes: [],
+                    edges: []
+                },
+                summary: data.summary,
+                groups: data.groups || []
+            });
+        } else {
+            displayNeuronGroupResults({ success: false, error: data.error || 'Unknown error' });
+            showError('Group discovery failed: ' + (data.error || response.statusText));
+            updateLastActionStatus('Group discovery failed');
+        }
+    } catch (error) {
+        console.error('Error discovering neuron groups:', error);
+        displayNeuronGroupResults({ success: false, error: error.message });
+        showError('Network error discovering neuron groups');
+        updateLastActionStatus('Group discovery error');
+    }
+}
+
+function displayNeuronGroupResults(data) {
+    const container = document.getElementById('groupResultsContent');
+    if (!container) return;
+
+    if (!data || data.success === false) {
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-1"></i>${data?.error || 'Group discovery failed'}
+            </div>
+        `;
+        return;
+    }
+
+    const summary = data.summary || {};
+    const groups = data.groups || [];
+
+    const summaryHtml = `
+        <div class="row g-2 mb-3">
+            <div class="col-md-3">
+                <div class="card bg-light border-0">
+                    <div class="card-body py-2 text-center">
+                        <div class="fw-bold h5 mb-0">${summary.total_groups || 0}</div>
+                        <small class="text-muted">Groups</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light border-0">
+                    <div class="card-body py-2 text-center">
+                        <div class="fw-bold h5 mb-0">${(summary.average_group_size || 0).toFixed(1)}</div>
+                        <small class="text-muted">Avg Size</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light border-0">
+                    <div class="card-body py-2 text-center">
+                        <div class="fw-bold h5 mb-0">${summary.largest_group || 0}</div>
+                        <small class="text-muted">Largest</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-light border-0">
+                    <div class="card-body py-2 text-center">
+                        <div class="fw-bold h5 mb-0">${summary.smallest_group || 0}</div>
+                        <small class="text-muted">Smallest</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mb-2 small text-muted">
+            <i class="fas fa-info-circle me-1"></i>Layer: <strong>${summary.layer_name || data.layer || 'n/a'}</strong> · Task: <strong>${summary.task_type || 'semantic_similarity'}</strong>
+        </div>
+        ${summary.uses_synthetic_data ? '<div class="alert alert-warning"><i class="fas fa-magic me-1"></i>Using synthetic activations (no live activations captured).</div>' : ''}
+        ${(summary.failed_prompts && summary.failed_prompts.length) ? `<div class="alert alert-info"><strong>Prompts without activations:</strong> ${summary.failed_prompts.join(', ')}</div>` : ''}
+    `;
+
+    const groupCards = groups.length ? groups.slice(0, 5).map(group => {
+        const neuronList = (group.neurons || []).map(n => Number(n)).slice(0, 12);
+        const neuronPreview = neuronList.join(', ') + ((group.neurons?.length || 0) > 12 ? ' …' : '');
+        const triggers = (group.activation_trigger || []).slice(0, 4).map(trigger => `<span class="badge bg-secondary me-1 mb-1">${trigger}</span>`).join('');
+        const examples = (group.sample_examples || []).slice(0, 2).map(example => `<li class="small">${example}</li>`).join('');
+
+        return `
+            <div class="border rounded p-3 mb-2">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-1">${group.group_id || 'Neuron Group'}</h6>
+                        <small class="text-muted">Size: ${group.size || neuronList.length} · Confidence: ${formatPercentage(group.confidence || 0)}</small>
+                    </div>
+                    <span class="badge bg-primary">${group.layer !== undefined ? `Layer ${group.layer}` : 'Selected Layer'}</span>
+                </div>
+                <div class="mt-2 small">
+                    <strong>Neurons:</strong> ${neuronPreview || 'n/a'}
+                </div>
+                ${triggers ? `<div class="mt-2 small"><strong>Activation Triggers:</strong><br>${triggers}</div>` : ''}
+                <div class="mt-2 small">
+                    <strong>Effect:</strong> ${group.ablation_effect || 'n/a'} · <strong>Co-activation:</strong> ${(group.co_activation_strength || 0).toFixed(3)} · <strong>Coherence:</strong> ${(group.cluster_coherence || 0).toFixed(3)}
+                </div>
+                ${examples ? `<div class="mt-2"><small class="text-muted">Example Inputs:</small><ul class="mb-0">${examples}</ul></div>` : ''}
+            </div>
+        `;
+    }).join('') : '<div class="alert alert-warning mb-0">No neuron groups detected for the provided prompts.</div>';
+
+    container.innerHTML = `
+        ${summaryHtml}
+        <h6 class="fw-bold mt-3"><i class="fas fa-layer-group me-1"></i>Top Groups</h6>
+        ${groupCards}
+    `;
+}
+
+async function analyzeQuestionContext() {
+    if (!currentModel) {
+        showError('Please select a model first');
+        return;
+    }
+
+    const promptsInput = document.getElementById('groupPrompts');
+    const questions = promptsInput ? promptsInput.value.split('\n').map(q => q.trim()).filter(Boolean) : [];
+
+    if (!questions.length) {
+        showError('Provide at least one question to analyze');
+        return;
+    }
+
+    updateLastActionStatus('Analyzing question context');
+    document.getElementById('questionContextCard').style.display = 'block';
+    showLoading('questionContextContent');
+
+    try {
+        const response = await fetch('/api/interventions/questions/context', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: currentModel,
+                questions: questions,
+                top_k: 5
+            })
+        });
+
+        const data = await response.json();
+        if (response.ok && data.success) {
+            displayQuestionContextResults(data);
+            showToast('Question context analysis completed', 'success');
+            updateLastActionStatus('Question context analyzed');
+            triggerCircuitInsight('composition', {
+                source: 'question-context',
+                questions: questions,
+                completions: data.completions || []
+            });
+        } else {
+            displayQuestionContextResults({ success: false, error: data.error || 'Unknown error' });
+            showError('Question context analysis failed: ' + (data.error || response.statusText));
+            updateLastActionStatus('Question context failed');
+        }
+    } catch (error) {
+        console.error('Error analyzing question context:', error);
+        displayQuestionContextResults({ success: false, error: error.message });
+        showError('Network error analyzing question context');
+        updateLastActionStatus('Question context error');
+    }
+}
+
+function displayQuestionContextResults(data) {
+    const container = document.getElementById('questionContextContent');
+    if (!container) return;
+
+    if (!data || data.success === false) {
+        container.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-1"></i>${data?.error || 'Analysis failed'}
+            </div>
+        `;
+        return;
+    }
+
+    const summary = data.summary || {};
+    const results = data.results || [];
+
+    const summaryHtml = `
+        <div class="row g-2 mb-3">
+            <div class="col-md-4">
+                <div class="card bg-light border-0">
+                    <div class="card-body py-2 text-center">
+                        <div class="fw-bold h5 mb-0">${summary.analyzed_questions || 0}</div>
+                        <small class="text-muted">Analyzed</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light border-0">
+                    <div class="card-body py-2 text-center">
+                        <div class="fw-bold h5 mb-0">${(summary.average_token_count || 0).toFixed(1)}</div>
+                        <small class="text-muted">Avg Tokens</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light border-0">
+                    <div class="card-body py-2 text-center">
+                        <div class="fw-bold h5 mb-0">${summary.unique_predicted_tokens || 0}</div>
+                        <small class="text-muted">Unique Continuations</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        ${(summary.warnings && summary.warnings.length) ? `<div class="alert alert-warning">${summary.warnings.length} questions could not be analyzed. See console for details.</div>` : ''}
+    `;
+
+    const resultsHtml = results.length ? results.slice(0, 6).map(result => {
+        const predictions = (result.predictions || []).map(prediction => `
+            <div class="d-flex justify-content-between align-items-center border rounded px-2 py-1 mb-1">
+                <span class="small">${prediction.token}</span>
+                <span class="badge bg-light text-dark">${formatPercentage(prediction.probability || 0)}</span>
+            </div>
+        `).join('');
+
+        return `
+            <div class="border rounded p-3 mb-2">
+                <div class="d-flex justify-content-between">
+                    <strong>Question</strong>
+                    <small class="text-muted">Tokens: ${result.token_count || 0}</small>
+                </div>
+                <div class="mt-2 mb-3 small">${result.question}</div>
+                <small class="text-muted">Top predictions:</small>
+                <div class="mt-1">${predictions || '<div class="text-muted">No predictions available.</div>'}</div>
+            </div>
+        `;
+    }).join('') : '<div class="alert alert-info">No question analysis results available.</div>';
+
+    container.innerHTML = `${summaryHtml}<h6 class="fw-bold"><i class="fas fa-comment-dots me-1"></i>Sample Predictions</h6>${resultsHtml}`;
 }
 
 function getEffectColor(effectSize) {
@@ -1328,6 +2238,11 @@ function showToast(message, type = 'info') {
 
 function refreshHeatmap() {
     generateHeatmap();
+}
+
+function formatPercentage(value) {
+    if (!isFinite(value)) return '0.0%';
+    return `${(value * 100).toFixed(1)}%`;
 }
 
 function toggleFullscreen(elementId) {
