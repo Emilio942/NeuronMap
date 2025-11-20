@@ -9,27 +9,26 @@
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+    <!-- Optional: cose-bilkent layout -->
     <script src="https://unpkg.com/cytoscape-cose-bilkent@4.1.0/cytoscape-cose-bilkent.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <style>
+        /* Ensure graph container is always visible */
         .circuit-graph {
-            width: 100% !important;
-            height: 500px !important;
-            min-height: 500px !important;
-            background: #fafafa;
-            border: 2px solid #dee2e6;
+            width: 100%;
+            height: 600px;
+            min-height: 500px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
             position: relative;
-            display: block !important;
-            visibility: visible !important;
+            display: block;
         }
         
         .circuit-container {
             width: 100%;
-            height: 500px;
-            min-height: 500px;
+            height: 100%;
             position: relative;
-            display: block !important;
-            visibility: visible !important;
         }
         
         /* Force Bootstrap card body to not interfere with sizing */
@@ -720,13 +719,30 @@
                 // Re-layout the graph
                 if (this.cy) {
                     console.log('Running layout with', this.cy.nodes().length, 'nodes');
-                    this.cy.layout({
-                        name: 'cose-bilkent',
-                        animate: true,
-                        animationDuration: 1000,
-                        fit: true,
-                        padding: 30
-                    }).run();
+                    
+                    try {
+                        // Use 'cose' layout which is built-in and reliable
+                        // This avoids issues if cose-bilkent extension fails to load
+                        this.cy.layout({
+                            name: 'cose',
+                            animate: true,
+                            animationDuration: 1000,
+                            fit: true,
+                            padding: 30,
+                            componentSpacing: 100,
+                            nodeOverlap: 20,
+                            nodeDimensionsIncludeLabels: true,
+                            randomize: false
+                        }).run();
+                    } catch (e) {
+                        console.warn('Primary layout failed, falling back to circle', e);
+                        this.cy.layout({
+                            name: 'circle',
+                            fit: true,
+                            padding: 30,
+                            animate: true
+                        }).run();
+                    }
                     
                     // Force a fit to make sure nodes are visible
                     setTimeout(() => {

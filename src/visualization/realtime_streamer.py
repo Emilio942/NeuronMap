@@ -10,7 +10,7 @@ import json
 import numpy as np
 import torch
 import time
-from typing import Dict, List, Optional, AsyncGenerator, Callable
+from typing import Dict, List, Optional, AsyncGenerator, Callable, Any, Tuple
 from dataclasses import dataclass, asdict
 from collections import deque
 import threading
@@ -22,22 +22,121 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from src.analysis.model_wrapper import ModelWrapper
 from src.utils.config import ConfigManager
+from src.analysis.activation_extractor import ActivationExtractor
+from src.guardian.engine import GuardianEngine
+from src.guardian.intervention_extractor import InterventionExtractor
+import yaml
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+class ModelWrapper:
+    """Wrapper for ActivationExtractor to match RealtimeActivationStreamer interface"""
+    def __init__(self, model_name: str):
+        # Check for Guardian configuration
+        self.config_manager = ConfigManager()
+        
+        # Try to load runtime guardian config
+        guardian_config = self._load_guardian_config()
+        
+        # Always initialize Guardian Engine to support runtime enabling
+        if not guardian_config:
+            guardian_config = {'enabled': False, 'mode': 'monitoring'}
+            
+        logger.info(f"Initializing ModelWrapper with Guardian Engine (Enabled: {guardian_config.get('enabled')})")
+        self.guardian_engine = GuardianEngine(guardian_config)
+        self.extractor = InterventionExtractor(
+            guardian_engine=self.guardian_engine,
+            model_name_or_config=model_name
+        )
+            
+        self.extractor.load_model()
+        
+        # Register hooks
+        if hasattr(self.extractor, 'target_layer'):
+             # We assume layer index 0 for the default target layer
+             self.extractor.register_intervention_hook(self.extractor.target_layer, layer_idx=0)
+
+    def _load_guardian_config(self) -> Dict[str, Any]:
+        """Load guardian config from runtime file or default config."""
+        try:
+            # Priority 1: Runtime config (updated via API)
+            runtime_path = Path("configs/guardian_runtime.yaml")
+            if runtime_path.exists():
+                with open(runtime_path, 'r') as f:
+                    data = yaml.safe_load(f)
+                    if data and 'guardian' in data:
+                        return data['guardian']
+            
+            # Priority 2: Static config
+            config = self.config_manager.get_config_model()
+            if hasattr(config, 'guardian'):
+                return config.guardian.model_dump() if hasattr(config.guardian, 'model_dump') else config.guardian.dict()
+                
+        except Exception as e:
+            logger.warning(f"Could not load guardian config: {e}")
+        
+        return {}
+
+    def check_config_update(self):
+        """Check for configuration updates and apply them."""
+        new_config = self._load_guardian_config()
+        if new_config:
+            # Update engine config
+            self.guardian_engine.update_config(new_config)
+
+    def extract_activations(self, text: str, layer_indices: List[int] = None) -> Dict[int, torch.Tensor]:
+        # Note: Currently only supports the default target layer configured in ActivationExtractor
+        # In a full implementation, we would map layer_indices to actual model layers
+        
+        activations = self.extractor.get_activation_for_question(text)
+        
+        if activations is None:
+            # Return dummy data if extraction fails
+            return {0: torch.zeros(100)}
+            
+        # Convert numpy to torch tensor as expected by RealtimeActivationStreamer
+        tensor_activations = torch.from_numpy(activations)
+        
+        # Return as a dict keyed by layer index (defaulting to 0)
+        # If layer_indices was requested, we map to the requested index if possible, 
+        # otherwise we just return it at index 0 or the requested index.
+        
+        target_idx = layer_indices[0] if layer_indices else 0
+        return {target_idx: tensor_activations}
+
+    def get_guardian_status(self) -> Dict[str, Any]:
+        """Retrieve status from the Guardian Engine if available."""
+        # Check if the extractor is an InterventionExtractor
+        if hasattr(self.extractor, 'guardian_engine') and self.extractor.guardian_engine:
+            engine = self.extractor.guardian_engine
+            return {
+                'metrics': engine.last_metrics,
+                'action': engine.last_action
+            }
+        return {}
+
 @dataclass
 class ActivationFrame:
-    """Single frame of activation data for streaming"""
+    """Single frame of activation data"""
     timestamp: float
     layer_idx: int
     activations: np.ndarray
-    input_text: str
-    sequence_position: int
-    frame_id: int
+    # Guardian Metrics
+    guardian_metrics: Optional[Dict[str, float]] = None
+    guardian_action: Optional[str] = None
 
-@dataclass
+    def to_dict(self):
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'timestamp': self.timestamp,
+            'layer_idx': self.layer_idx,
+            'activations': self.activations.tolist(),
+            'guardian_metrics': self.guardian_metrics,
+            'guardian_action': self.guardian_action
+        }
+
 class StreamingConfig:
     """Configuration for real-time streaming"""
     target_fps: int = 30
@@ -170,7 +269,7 @@ class DeltaCompressor:
 class RealtimeActivationStreamer:
     """Main class for real-time activation streaming"""
 
-    def __init__(self, model_wrapper: ModelWrapper, config: StreamingConfig):
+    def __init__(self, model_wrapper: Any, config: StreamingConfig):
         self.model = model_wrapper
         self.config = config
 
@@ -196,6 +295,9 @@ class RealtimeActivationStreamer:
             'compression_ratio': 0.0,
             'connected_clients': 0
         }
+        
+        # State
+        self.current_layer_idx = 0
 
     async def start_streaming_server(self):
         """Start WebSocket server for real-time streaming"""
@@ -254,8 +356,8 @@ class RealtimeActivationStreamer:
         elif message_type == 'change_layer':
             # Change layer being monitored
             layer_idx = message.get('layer_idx', 0)
-            # Implementation for layer switching
-            pass
+            self.current_layer_idx = layer_idx
+            logger.info(f"Switched to layer {layer_idx}")
 
     async def stream_activations(self, input_texts: AsyncGenerator[str, None]):
         """Main streaming loop for processing and sending activations"""
@@ -268,17 +370,16 @@ class RealtimeActivationStreamer:
 
                 # Process text and extract activations
                 start_time = time.time()
-                activations = await self._extract_activations_async(text)
+                activations, guardian_data = await self._extract_activations_async(text, self.current_layer_idx)
                 processing_time = time.time() - start_time
 
                 # Create frame
                 frame = ActivationFrame(
                     timestamp=time.time(),
-                    layer_idx=0,  # TODO: Make configurable
+                    layer_idx=self.current_layer_idx,
                     activations=activations,
-                    input_text=text,
-                    sequence_position=0,
-                    frame_id=self.frame_counter
+                    guardian_metrics=guardian_data.get('metrics'),
+                    guardian_action=guardian_data.get('action')
                 )
 
                 # Add to buffer
@@ -290,6 +391,11 @@ class RealtimeActivationStreamer:
 
                 # Update performance stats
                 self._update_performance_stats(processing_time)
+                
+                # Check for config updates periodically (e.g., every 30 frames ~ 1 sec)
+                if self.frame_counter % 30 == 0:
+                    if hasattr(self.model, 'check_config_update'):
+                        self.model.check_config_update()
 
                 # Wait for next frame
                 await self.frame_rate_controller.wait_for_next_frame()
@@ -301,28 +407,34 @@ class RealtimeActivationStreamer:
         finally:
             self.streaming_active = False
 
-    async def _extract_activations_async(self, text: str) -> np.ndarray:
+    async def _extract_activations_async(self, text: str, layer_idx: int = 0) -> Tuple[np.ndarray, Dict]:
         """Extract activations asynchronously"""
         loop = asyncio.get_event_loop()
 
         # Run in thread pool to avoid blocking
-        activations = await loop.run_in_executor(
+        result = await loop.run_in_executor(
             self.executor,
             self._extract_activations_sync,
-            text
+            text,
+            layer_idx
         )
 
-        return activations
+        return result
 
-    def _extract_activations_sync(self, text: str) -> np.ndarray:
+    def _extract_activations_sync(self, text: str, layer_idx: int = 0) -> Tuple[np.ndarray, Dict]:
         """Synchronous activation extraction"""
         try:
             # Use model wrapper to extract activations
             with torch.no_grad():
-                activations = self.model.extract_activations(text, layer_indices=[0])
+                activations_dict = self.model.extract_activations(text, layer_indices=[layer_idx])
+                
+                # Get guardian data if available
+                guardian_data = {}
+                if hasattr(self.model, 'get_guardian_status'):
+                    guardian_data = self.model.get_guardian_status()
 
                 # Get first layer activations and flatten
-                layer_activations = activations[0]
+                layer_activations = activations_dict[layer_idx]
                 if len(layer_activations.shape) > 1:
                     layer_activations = layer_activations.mean(axis=0)  # Average over sequence
 
@@ -330,11 +442,11 @@ class RealtimeActivationStreamer:
                 if len(layer_activations) > self.config.max_neurons_per_frame:
                     layer_activations = layer_activations[:self.config.max_neurons_per_frame]
 
-                return layer_activations.cpu().numpy()
+                return layer_activations.cpu().numpy(), guardian_data
 
         except Exception as e:
             logger.error(f"Error extracting activations: {e}")
-            return np.zeros(1000)  # Return dummy data on error
+            return np.zeros(1000), {}  # Return dummy data on error
 
     async def _broadcast_frame(self, frame: ActivationFrame):
         """Broadcast frame to all connected clients"""

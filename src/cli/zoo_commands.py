@@ -13,6 +13,8 @@ Based on aufgabenliste_b.md Tasks C1-C4
 import os
 import json
 import tempfile
+import zipfile
+import io
 from pathlib import Path
 from typing import Optional, List, Dict, Any, Tuple
 import getpass
@@ -161,13 +163,20 @@ class ZooClient:
         if response.status_code != 200:
             raise ZooError(f"Download failed: {response.status_code} - {response.text}")
 
-        # For now, just save the JSON manifest
-        # TODO: Handle ZIP file downloads
         target_path.mkdir(parents=True, exist_ok=True)
-        manifest_path = target_path / "artifact.json"
-
-        with open(manifest_path, 'wb') as f:
-            f.write(response.content)
+        
+        # Handle ZIP file download
+        try:
+            with zipfile.ZipFile(io.BytesIO(response.content)) as zip_ref:
+                zip_ref.extractall(target_path)
+        except zipfile.BadZipFile:
+            # Fallback for legacy/error responses that might be just JSON
+            # This handles the case where the server might return an error as JSON
+            # but with a 200 OK status (unlikely but possible in some configs)
+            # or if we are talking to an old server version
+            manifest_path = target_path / "artifact.json"
+            with open(manifest_path, 'wb') as f:
+                f.write(response.content)
 
         return target_path
 
@@ -239,11 +248,25 @@ def _create_artifact_template(artifact_type: str, name: str, version: str, descr
     if artifact_type == 'sae_model':
         if not model_name:
             model_name = Prompt.ask("Model name (e.g., gpt2, llama-2-7b)")
+        
+        # Ask for SAE specific parameters
+        layer_input = Prompt.ask("Layer index", default="0")
+        try:
+            layer = int(layer_input)
+        except ValueError:
+            layer = 0
+            
+        dict_size_input = Prompt.ask("Dictionary size", default="16384")
+        try:
+            dict_size = int(dict_size_input)
+        except ValueError:
+            dict_size = 16384
+            
         artifact = create_sae_artifact_template(
             name=name,
             model_name=model_name,
-            layer=0,  # TODO: make configurable
-            dict_size=16384,  # TODO: make configurable
+            layer=layer,
+            dict_size=dict_size,
             authors=[author]
         )
     elif artifact_type == 'circuit':

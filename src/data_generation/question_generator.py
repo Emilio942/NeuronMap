@@ -566,10 +566,17 @@ class QuestionGenerator:
         if requests is None:
             raise RuntimeError("requests library is not available")
 
-        url = str(self.config.get("ollama_host") or self.config.get("ollama_url"))
+        base_url = str(self.config.get("ollama_host") or self.config.get("ollama_url"))
+        # Ensure URL ends with /api/generate
+        if not base_url.endswith("/api/generate"):
+            url = f"{base_url.rstrip('/')}/api/generate"
+        else:
+            url = base_url
+
         payload = {
             "model": self.config.get("model"),
             "prompt": prompt,
+            "stream": False,
             "options": {
                 "temperature": self.config.get("temperature"),
                 "max_tokens": self.config.get("max_tokens"),

@@ -255,6 +255,33 @@ class ExperimentConfig(BaseModel):
         return v.upper()
 
 
+class GuardianConfig(BaseModel):
+    """Configuration for the Guardian Network (Meta-cognitive layer)"""
+    if ConfigDict:
+        model_config = ConfigDict(extra='allow')
+
+    enabled: bool = Field(default=False, description="Enable Guardian Network")
+    mode: str = Field(default="monitoring", description="Operation mode: 'monitoring' or 'intervention'")
+    intervention_layers: List[int] = Field(default_factory=list, description="Layer indices to hook into")
+    guardian_model_path: Optional[str] = Field(default=None, description="Path to the secondary guardian model")
+    
+    # Flow Control Thresholds
+    entropy_min: float = Field(default=0.5, description="Minimum entropy threshold (trigger noise)")
+    entropy_max: float = Field(default=2.5, description="Maximum entropy threshold (trigger steering)")
+    
+    # Intervention Settings
+    noise_std: float = Field(default=0.1, description="Standard deviation for noise injection")
+    steering_coeff: float = Field(default=1.0, description="Coefficient for steering vectors")
+
+    @field_validator('mode')
+    @classmethod
+    def validate_mode(cls, v):
+        valid_modes = ["monitoring", "intervention"]
+        if v not in valid_modes:
+            raise ValueError(f"Mode must be one of {valid_modes}")
+        return v
+
+
 class NeuronMapConfig(BaseModel):
     """Main configuration class that combines all sub-configurations"""
     if ConfigDict:
@@ -273,6 +300,7 @@ class NeuronMapConfig(BaseModel):
     system: SystemConfig = Field(default_factory=SystemConfig)
     web: WebConfig = Field(default_factory=WebConfig)
     experiment: ExperimentConfig = Field(default_factory=ExperimentConfig)
+    guardian: GuardianConfig = Field(default_factory=GuardianConfig)
 
     # Multiple model support
     models: Dict[str, ModelConfig] = Field(default_factory=dict, description="Multiple model configurations")

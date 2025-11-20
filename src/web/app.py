@@ -34,6 +34,7 @@ try:
     from analysis.universal_model_adapter import UniversalModelAdapter
     from data_processing.question_loader import QuestionLoader
     from utils.system_monitor import start_system_monitoring
+    from utils.advanced_reporter import AdvancedReporter
     NEURONMAP_AVAILABLE = True
 
     # Start system monitoring
@@ -65,6 +66,14 @@ if FLASK_AVAILABLE:
         logger.info("Circuits API blueprint registered")
     except ImportError as e:
         logger.warning(f"Could not register circuits API: {e}")
+
+    # Register guardian API blueprint
+    try:
+        from web.api.guardian import guardian_bp
+        app.register_blueprint(guardian_bp)
+        logger.info("Guardian API blueprint registered")
+    except ImportError as e:
+        logger.warning(f"Could not register guardian API: {e}")
 
     # Global state management
     analysis_jobs = {}
@@ -278,6 +287,11 @@ if FLASK_AVAILABLE:
     def visualization_fixed():
         """Fixed visualization page."""
         return send_from_directory('web/static', 'fixed_visualization.html')
+
+    @app.route('/sae')
+    def sae_explorer():
+        """SAE Training and Exploration page."""
+        return render_template('sae_explorer.html')
 
     # ============================================================================
     # UTILITY FUNCTIONS
@@ -1033,47 +1047,89 @@ if FLASK_AVAILABLE:
             if not analysis_id:
                 return jsonify({'error': 'Analysis ID required'}), 400
 
-            # TODO: Integrate with actual advanced_reporter.py
-            # For now, return a mock response
-            report_id = f"report_{analysis_id}_{int(time.time())}"
+            # Get analysis results
+            analysis_results = {}
+            if analysis_id in analysis_jobs:
+                analysis_results = analysis_jobs[analysis_id]
+            else:
+                # If not found in active jobs, create a minimal result set with the ID
+                # This allows generating reports for past or external analyses if we had a DB
+                analysis_results = {
+                    'id': analysis_id,
+                    'status': 'unknown',
+                    'timestamp': datetime.now().isoformat()
+                }
 
-            # Simulate report generation
-            import time
-            time.sleep(2)  # Simulate processing time
+            # Generate report using AdvancedReporter
+            try:
+                # Use absolute path for reliability
+                output_dir = Path(app.root_path).parent.parent / "data" / "outputs" / "reports"
+                reporter = AdvancedReporter(output_dir=str(output_dir))
+                
+                report_path = reporter.generate_comprehensive_report(
+                    analysis_results, 
+                    template='analysis_summary'
+                )
+                
+                # Get filename for download
+                report_filename = Path(report_path).name
+                
+                add_activity(f"Generated {format_type.upper()} report", "file-export", "success")
 
-            add_activity(f"Generated {format_type.upper()} report", "file-export", "success")
-
-            return jsonify({
-                'success': True,
-                'report_id': report_id,
-                'message': f'{format_type.upper()} report generated successfully',
-                'download_url': f'/api/reports/download/{report_id}'
-            })
+                return jsonify({
+                    'success': True,
+                    'report_id': report_filename,
+                    'message': f'{format_type.upper()} report generated successfully',
+                    'download_url': f'/api/reports/download/{report_filename}'
+                })
+                
+            except Exception as e:
+                logger.error(f"Report generation failed: {e}")
+                return jsonify({'error': f"Report generation failed: {str(e)}"}), 500
 
         except Exception as e:
-            logger.error(f"Error generating report: {e}")
+            logger.error(f"Error processing report request: {e}")
             return jsonify({'error': str(e)}), 500
 
     @app.route('/api/reports/download/<report_id>')
     def api_download_report(report_id):
         """Download a generated report."""
         try:
-            # TODO: Implement actual report download
-            # For now, return a placeholder
-            from flask import Response
-
-            # Create a simple text file as placeholder
-            content = f"NeuronMap Report\\n==================\\n\\nReport ID: {report_id}\\nGenerated: {datetime.now()}\\n\\nThis is a placeholder report. Actual report generation will be implemented with the advanced_reporter.py integration."
-
-            return Response(
-                content,
-                mimetype='text/plain',
-                headers={'Content-Disposition': f'attachment; filename=neuronmap_report_{report_id}.txt'}
+            # Use absolute path matching generation
+            output_dir = Path(app.root_path).parent.parent / "data" / "outputs" / "reports"
+            
+            # Ensure directory exists
+            if not output_dir.exists():
+                return jsonify({'error': 'Reports directory not found'}), 404
+                
+            # Security check: ensure report_id doesn't contain path traversal characters
+            if '..' in report_id or '/' in report_id or '\\' in report_id:
+                return jsonify({'error': 'Invalid report ID'}), 400
+                
+            file_path = output_dir / report_id
+            
+            if not file_path.exists():
+                return jsonify({'error': 'Report not found'}), 404
+                
+            return send_from_directory(
+                directory=output_dir, 
+                path=report_id, 
+                as_attachment=True
             )
 
         except Exception as e:
             logger.error(f"Error downloading report: {e}")
             return jsonify({'error': str(e)}), 500
+
+    @app.route('/health')
+    def health_check():
+        """Simple health check endpoint."""
+        return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
+
+    @app.route('/status')
+    def status_page():
+        """Simple status page."""
+        return jsonify({'status': 'running', 'service': 'NeuronMap'})
 
 else:
     # Flask not available

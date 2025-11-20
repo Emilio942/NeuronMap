@@ -9,13 +9,16 @@ Based on aufgabenliste_b.md Task B2: API-Server für den "Zoo"
 
 import os
 import logging
+import shutil
+import zipfile
+import tempfile
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends, Query, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Depends, Query, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse, FileResponse
@@ -192,7 +195,8 @@ async def root():
             "upload": "/artifacts/upload",
             "auth": "/auth",
             "stats": "/stats",
-            "health": "/health"
+            "health": "/health",
+            "models": "/models"
         }
     }
 
@@ -331,20 +335,48 @@ async def download_artifact(
         if not artifact:
             raise HTTPException(status_code=404, detail=f"Artifact {artifact_id} not found")
         
-        # Get artifact path
+        # Get artifact path (this ensures it's in the cache/storage)
         artifact_path = manager.download_artifact(artifact_id)
         
-        # For now, return the artifact.json file
-        # TODO: Create ZIP archive and return it
-        manifest_path = artifact_path / "artifact.json"
-        if not manifest_path.exists():
-            raise HTTPException(status_code=500, detail="Artifact manifest not found")
+        # Create a temporary file for the zip archive
+        # We use a named temporary file that persists so we can stream it
+        temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+        temp_zip.close()
+        zip_path = Path(temp_zip.name)
         
-        return FileResponse(
-            path=manifest_path,
-            filename=f"{artifact.name}-{artifact.version}.json",
-            media_type="application/json"
-        )
+        try:
+            # Create ZIP archive
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                # Walk through the artifact directory and add files
+                for root, _, files in os.walk(artifact_path):
+                    for file in files:
+                        file_path = Path(root) / file
+                        # Calculate relative path for the zip archive
+                        arcname = file_path.relative_to(artifact_path)
+                        zipf.write(file_path, arcname)
+            
+            # Return the ZIP file
+            filename = f"{artifact.name.replace(' ', '_')}_{artifact.version}.zip"
+            
+            # Use BackgroundTask to delete the temp file after sending
+            from starlette.background import BackgroundTask
+            
+            def cleanup_temp_file():
+                if zip_path.exists():
+                    os.unlink(zip_path)
+            
+            return FileResponse(
+                path=zip_path,
+                filename=filename,
+                media_type="application/zip",
+                background=BackgroundTask(cleanup_temp_file)
+            )
+            
+        except Exception as e:
+            # Clean up if something goes wrong during zip creation
+            if zip_path.exists():
+                os.unlink(zip_path)
+            raise e
         
     except HTTPException:
         raise
@@ -368,9 +400,17 @@ async def star_artifact(
         if not artifact:
             raise HTTPException(status_code=404, detail=f"Artifact {artifact_id} not found")
         
-        # TODO: Implement starring logic with user tracking
-        # For now, just increment the star count
-        artifact.stars += 1
+        # Check if user already starred
+        if user.user_id in artifact.starred_by:
+            # If already starred, unstar it (toggle)
+            artifact.starred_by.remove(user.user_id)
+            artifact.stars = len(artifact.starred_by)
+            message = f"Unstarred artifact {artifact.name}"
+        else:
+            # Add star
+            artifact.starred_by.append(user.user_id)
+            artifact.stars = len(artifact.starred_by)
+            message = f"Starred artifact {artifact.name}"
         
         # Save updated metadata
         metadata_file = manager.metadata_dir / f"{artifact_id}.json"
@@ -379,8 +419,8 @@ async def star_artifact(
             json.dump(artifact.dict(exclude_none=True), f, indent=2, default=str)
         
         return SuccessResponse(
-            message=f"Starred artifact {artifact.name}",
-            data={"stars": artifact.stars}
+            message=message,
+            data={"stars": artifact.stars, "starred": user.user_id in artifact.starred_by}
         )
         
     except HTTPException:
@@ -411,7 +451,13 @@ async def update_artifact(
         if not artifact:
             raise HTTPException(status_code=404, detail=f"Artifact {artifact_id} not found")
         
-        # TODO: Check if user owns this artifact
+        # Check ownership - only owner or admin can modify
+        if artifact.owner_id and artifact.owner_id != user.user_id:
+            if not auth_manager.check_permission(user, "admin"):
+                raise HTTPException(
+                    status_code=403, 
+                    detail="Only the artifact owner or admin can modify this artifact"
+                )
         
         # Update fields
         if update_data.description is not None:
@@ -455,13 +501,22 @@ async def delete_artifact(
     
     # Check permissions
     auth_manager = get_auth_manager()
-    if not auth_manager.check_permission(user, "admin"):
-        raise HTTPException(status_code=403, detail="Admin permissions required")
     
     try:
         artifact = manager.get_artifact(artifact_id)
         if not artifact:
             raise HTTPException(status_code=404, detail=f"Artifact {artifact_id} not found")
+        
+        # Check ownership - only owner or admin can delete
+        if artifact.owner_id and artifact.owner_id != user.user_id:
+            if not auth_manager.check_permission(user, "admin"):
+                raise HTTPException(
+                    status_code=403, 
+                    detail="Only the artifact owner or admin can delete this artifact"
+                )
+        elif not artifact.owner_id and not auth_manager.check_permission(user, "admin"):
+            # If no owner set, require admin permissions
+            raise HTTPException(status_code=403, detail="Admin permissions required")
         
         success = manager.delete_artifact(artifact_id)
         if not success:
@@ -515,15 +570,24 @@ async def login(request: LoginRequest):
 
 
 @app.post("/auth/logout", response_model=SuccessResponse)
-async def logout(user: Optional[UserInfo] = Depends(verify_token)):
+async def logout(
+    user: Optional[UserInfo] = Depends(verify_token),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
     """Logout and revoke current token."""
-    if not user:
+    if not user or not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
     
     try:
-        # TODO: Revoke the current JWT token
-        # For now, just return success
-        return SuccessResponse(message="Logged out successfully")
+        auth_manager = get_auth_manager()
+        # Revoke the current JWT token
+        auth_manager.revoke_token(credentials.credentials)
+        
+        logger.info(f"User {user.username} logged out successfully")
+        return SuccessResponse(
+            message="Logged out successfully",
+            data={"user_id": user.user_id}
+        )
         
     except Exception as e:
         logger.error(f"Logout failed: {e}")
@@ -631,6 +695,20 @@ async def list_users(user: Optional[UserInfo] = Depends(verify_token)):
             "is_active": u.is_active
         }
         for u in users
+    ]
+
+
+@app.get("/models", response_model=List[Dict[str, Any]])
+async def list_models():
+    """List available models in the zoo."""
+    # This is a placeholder implementation. In a real scenario, 
+    # this would query the artifact manager for artifacts of type 'model' 
+    # or a dedicated model registry.
+    return [
+        {"id": "gpt2-small", "name": "GPT-2 Small", "type": "transformer", "size": "117M"},
+        {"id": "gpt2-medium", "name": "GPT-2 Medium", "type": "transformer", "size": "345M"},
+        {"id": "gpt2-large", "name": "GPT-2 Large", "type": "transformer", "size": "774M"},
+        {"id": "gpt2-xl", "name": "GPT-2 XL", "type": "transformer", "size": "1.5B"}
     ]
 
 

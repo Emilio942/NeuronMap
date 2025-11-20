@@ -8,6 +8,7 @@ neural network architectures including GPT, BERT, T5, LLaMA, and domain-specific
 
 import torch
 import logging
+import yaml
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 from abc import ABC, abstractmethod
@@ -16,6 +17,8 @@ from transformers import (
     AutoTokenizer, AutoModel, AutoModelForCausalLM, AutoModelForSeq2SeqLM,
     AutoModelForSequenceClassification, AutoModelForMaskedLM
 )
+from src.guardian.engine import GuardianEngine
+from src.guardian.intervention_extractor import InterventionExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -424,6 +427,14 @@ class UniversalModelAdapter:
         self.models_config = self._load_models_config()
         self.device = self._get_device()
         self.adapter = None
+        
+        # Initialize Guardian Engine if enabled
+        self.guardian_engine = None
+        if hasattr(self.config, 'guardian') and self.config.guardian.enabled:
+            logger.info("Initializing Guardian Network...")
+            # Convert Pydantic model to dict for GuardianEngine
+            guardian_config = self.config.guardian.model_dump() if hasattr(self.config.guardian, 'model_dump') else self.config.guardian.dict()
+            self.guardian_engine = GuardianEngine(guardian_config)
 
     def _get_device(self) -> torch.device:
         """Determine the appropriate device to use."""

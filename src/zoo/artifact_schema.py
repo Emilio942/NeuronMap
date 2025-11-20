@@ -153,6 +153,10 @@ class ArtifactSchema(BaseModel):
     is_official: bool = Field(False, description="Whether this is an official NeuronMap artifact")
     featured: bool = Field(False, description="Whether to feature this artifact")
     
+    # Ownership and stars
+    owner_id: Optional[str] = Field(None, description="User ID of the artifact owner")
+    starred_by: List[str] = Field(default_factory=list, description="List of user IDs who starred this artifact")
+    
     @validator('tags')
     def validate_tags(cls, v):
         """Validate tags format."""
