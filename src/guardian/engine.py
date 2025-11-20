@@ -61,10 +61,10 @@ class GuardianEngine:
         
         # Update policy config
         if hasattr(self.policies, 'active_policy'):
-            # Re-initialize policy with new config
-            # Ideally policies should support update(), but re-init is safer for now
-            from .policies import SimpleThresholdPolicy
-            self.policies.active_policy = SimpleThresholdPolicy(self.config)
+            # Re-initialize policy manager with new config
+            # We create a new PolicyManager to handle the logic of choosing the right policy class
+            from .policies import PolicyManager
+            self.policies = PolicyManager(self.config)
             
         logger.info(f"Guardian Engine config updated (Mode: {self.mode}, Enabled: {self.enabled})")
 
@@ -91,6 +91,7 @@ class GuardianEngine:
         metrics = self.probes.get_full_report(activation)
         self.last_metrics = metrics
         self.last_action = "none"
+        self.last_decision = {}
         
         # Log metrics if in monitoring mode
         if logger.isEnabledFor(logging.DEBUG):
@@ -101,6 +102,7 @@ class GuardianEngine:
             decision = self.policies.decide(metrics)
             action = decision.get('action')
             self.last_action = action
+            self.last_decision = decision
             
             # 4. Intervention (Action)
             if action == 'inject_noise':
@@ -111,5 +113,8 @@ class GuardianEngine:
                 # Assuming we have a steering vector available, or we generate one
                 # For now, we might just dampen or do nothing if no vector is provided
                 return self.interventions.apply_steering_vector(activation, **params)
+            elif action == 'scale_logits':
+                params = decision.get('params', {})
+                return self.interventions.scale_logits(activation, **params)
         
         return activation

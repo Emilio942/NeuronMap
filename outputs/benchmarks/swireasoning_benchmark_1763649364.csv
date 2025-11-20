@@ -1,0 +1,144 @@
+category,prompt,generated_text,time,switches,latent_blocks,explicit_blocks,final_mode
+math,Solve for x: 2x + 5 = 15,Solve for x: 2x + 5 = 15 = 15 * 1 = 50 * 1 = 50 * 2 = 50 * 2 = 50 * 2 = 50 * 2 = 50 * 2 = 50 * 2 = 5...,0.6230978965759277,0,0,1,explicit
+math,What is the square root of 144 plus 12?,What is the square root of 144 plus 12? What is the square root of 144 plus 12? What is the square r...,0.11748242378234863,0,0,1,explicit
+math,"If a train travels 60 miles in 1.5 hours, what is its speed?","If a train travels 60 miles in 1.5 hours, what is its speed?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+...",0.13046574592590332,0,0,1,explicit
+logic,"If all cats are mammals and some mammals are black, are all cats black?","If all cats are mammals and some mammals are black, are all cats black? Why not let your cat look li...",0.11504936218261719,0,0,1,explicit
+logic,John is taller than Bob. Bob is taller than Alice. Is John taller than Alice?,John is taller than Bob. Bob is taller than Alice. Is John taller than Alice? John is taller than Al...,0.11433911323547363,0,0,1,explicit
+logic,"Identify the next number in the sequence: 2, 4, 8, 16, ...","Identify the next number in the sequence: 2, 4, 8, 16, ...
+
+
+
+
+
+We can see that there is a slight bi...",0.11387062072753906,0,0,1,explicit
+code,Write a Python function to calculate the factorial of a number.,"Write a Python function to calculate the factorial of a number. If a number is a number, then it is ...",0.11336922645568848,0,0,1,explicit
+code,Create a list comprehension that squares even numbers from 0 to 10.,"Create a list comprehension that squares even numbers from 0 to 10.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+...",0.11592292785644531,0,0,1,explicit
+code,Explain the difference between a list and a tuple in Python.,Explain the difference between a list and a tuple in Python....,0.0038061141967773438,0,0,1,explicit
+stem,Explain the process of photosynthesis.,"Explain the process of photosynthesis. The process of photosynthesis, which we call the “evolutionar...",0.12466669082641602,0,0,1,explicit
+stem,What is the difference between velocity and speed?,"What is the difference between velocity and speed?”
+
+The velocity of a given object will vary accord...",0.1401047706604004,0,0,1,explicit
+stem,Describe the structure of an atom.,"Describe the structure of an atom.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+...",0.12026643753051758,0,0,1,explicit

@@ -23,28 +23,22 @@ class ProbeManager:
     def calculate_entropy(self, tensor: torch.Tensor, epsilon: float = 1e-8) -> float:
         """
         Calculate Shannon entropy of the activation tensor.
-        
-        Strategy:
-        1. Apply Softmax to treat activations as a probability distribution.
-        2. Compute H(x) = -sum(p(x) * log(p(x)))
-        
-        Args:
-            tensor: Input activation tensor (batch_size, hidden_dim) or (hidden_dim,)
-            epsilon: Small constant for numerical stability
-            
-        Returns:
-            Entropy value (float)
         """
-        # Ensure we are working with probabilities
-        # If tensor is 2D (batch), we compute mean entropy across batch
-        if tensor.dim() > 1:
-            probs = torch.softmax(tensor, dim=-1)
-            entropy = -torch.sum(probs * torch.log(probs + epsilon), dim=-1)
-            return entropy.mean().item()
-        else:
-            probs = torch.softmax(tensor, dim=0)
-            entropy = -torch.sum(probs * torch.log(probs + epsilon))
-            return entropy.item()
+        try:
+            # Ensure we are working with probabilities
+            if tensor.dim() > 1:
+                # Use Categorical for robust entropy calculation
+                # logits=tensor handles softmax internally and stably
+                dist = torch.distributions.Categorical(logits=tensor)
+                entropy = dist.entropy()
+                return entropy.mean().item()
+            else:
+                dist = torch.distributions.Categorical(logits=tensor)
+                return dist.entropy().item()
+        except Exception as e:
+            logger.warning(f"Entropy calculation failed: {e}")
+            return 0.0
+
 
     def calculate_l2_norm(self, tensor: torch.Tensor) -> float:
         """
@@ -72,6 +66,55 @@ class ProbeManager:
         var = torch.var(tensor)
         return var.item() < variance_threshold
 
+    def calculate_confidence(self, tensor: torch.Tensor) -> float:
+        """
+        Estimate confidence based on maximum probability.
+        High confidence = 1.0, Low confidence = 0.0.
+        """
+        if tensor.dim() > 1:
+            probs = torch.softmax(tensor, dim=-1)
+            max_prob, _ = torch.max(probs, dim=-1)
+            return max_prob.mean().item()
+        else:
+            probs = torch.softmax(tensor, dim=0)
+            return torch.max(probs).item()
+
+    def analyze_entropy_trend(self, entropy_history: list[float], window_size: int = 5) -> float:
+        """
+        Analyze the trend of entropy over the last N steps.
+        Returns the slope of the linear regression line.
+        Positive slope -> Increasing uncertainty.
+        Negative slope -> Increasing confidence.
+        """
+        if len(entropy_history) < 2:
+            return 0.0
+            
+        recent = entropy_history[-window_size:]
+        n = len(recent)
+        if n < 2:
+            return 0.0
+            
+        # Simple linear regression slope
+        # We use torch for calculation to keep it efficient if we were on GPU, 
+        # though history is likely a list of floats on CPU.
+        try:
+            x = torch.arange(n, dtype=torch.float32)
+            y = torch.tensor(recent, dtype=torch.float32)
+            
+            x_mean = x.mean()
+            y_mean = y.mean()
+            
+            numerator = ((x - x_mean) * (y - y_mean)).sum()
+            denominator = ((x - x_mean) ** 2).sum()
+            
+            if denominator == 0:
+                return 0.0
+                
+            slope = numerator / denominator
+            return slope.item()
+        except Exception:
+            return 0.0
+
     def get_full_report(self, tensor: torch.Tensor) -> Dict[str, float]:
         """
         Run all probes and return a dictionary of metrics.
@@ -82,6 +125,7 @@ class ProbeManager:
         
         return {
             "entropy": self.calculate_entropy(t),
+            "confidence": self.calculate_confidence(t),
             "l2_norm": self.calculate_l2_norm(t),
             "sparsity": self.calculate_sparsity(t),
             "collapsed": 1.0 if self.detect_collapse(t) else 0.0

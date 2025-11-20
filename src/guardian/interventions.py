@@ -48,3 +48,13 @@ class InterventionManager:
             
         return tensor * mask
         return tensor
+
+    def scale_logits(self, tensor: torch.Tensor, temperature: float = 1.0) -> torch.Tensor:
+        """
+        Scale logits to adjust sampling temperature.
+        Higher temperature (>1.0) = flatter distribution (more random).
+        Lower temperature (<1.0) = sharper distribution (more deterministic).
+        """
+        if temperature == 1.0:
+            return tensor
+        return tensor / temperature

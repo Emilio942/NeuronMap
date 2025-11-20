@@ -18,9 +18,20 @@ class InterventionExtractor(ActivationExtractor):
     Extractor that allows modifying activations during the forward pass.
     """
     def __init__(self, guardian_engine, *args, **kwargs):
+        # Extract model and tokenizer if provided to avoid passing to super
+        model = kwargs.pop('model', None)
+        tokenizer = kwargs.pop('tokenizer', None)
+        
         super().__init__(*args, **kwargs)
         self.guardian_engine = guardian_engine
         self.layer_idx = kwargs.get('layer_idx', 0) # Need to know which layer this is
+        
+        # Set model if provided
+        if model:
+            self.model = model
+            self.model_loaded = True
+        if tokenizer:
+            self.tokenizer = tokenizer
 
     def _intervention_hook(self, module, input_hook, output_hook) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
         """
@@ -36,6 +47,12 @@ class InterventionExtractor(ActivationExtractor):
         else:
             # Unknown format, skip intervention
             return output_hook
+
+        # DEBUG: Check tensor stats
+        if torch.isnan(output_tensor).any():
+            logger.warning(f"NaN detected in activation tensor at layer {self.layer_idx}")
+        
+        # logger.info(f"Layer {self.layer_idx} activation shape: {output_tensor.shape}, dtype: {output_tensor.dtype}")
 
         # 2. Pass to Guardian Engine (Synchronous, Blocking)
         # We do NOT detach here if we want gradients to flow back (though usually for inference we don't need gradients)

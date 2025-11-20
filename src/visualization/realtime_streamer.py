@@ -113,7 +113,8 @@ class ModelWrapper:
             engine = self.extractor.guardian_engine
             return {
                 'metrics': engine.last_metrics,
-                'action': engine.last_action
+                'action': engine.last_action,
+                'details': getattr(engine, 'last_decision', {})
             }
         return {}
 
@@ -126,6 +127,7 @@ class ActivationFrame:
     # Guardian Metrics
     guardian_metrics: Optional[Dict[str, float]] = None
     guardian_action: Optional[str] = None
+    guardian_details: Optional[Dict[str, Any]] = None
 
     def to_dict(self):
         """Convert to dictionary for JSON serialization"""
@@ -134,7 +136,8 @@ class ActivationFrame:
             'layer_idx': self.layer_idx,
             'activations': self.activations.tolist(),
             'guardian_metrics': self.guardian_metrics,
-            'guardian_action': self.guardian_action
+            'guardian_action': self.guardian_action,
+            'guardian_details': self.guardian_details
         }
 
 class StreamingConfig:
@@ -379,7 +382,8 @@ class RealtimeActivationStreamer:
                     layer_idx=self.current_layer_idx,
                     activations=activations,
                     guardian_metrics=guardian_data.get('metrics'),
-                    guardian_action=guardian_data.get('action')
+                    guardian_action=guardian_data.get('action'),
+                    guardian_details=guardian_data.get('details')
                 )
 
                 # Add to buffer

@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+
+{% block title %}Guardian Live Monitor - NeuronMap{% endblock %}
+
+{% block head %}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<style>
+    .mode-indicator {
+        font-size: 1.5rem;
+        font-weight: bold;
+        padding: 10px 20px;
+        border-radius: 8px;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    .mode-explicit {
+        background-color: #e3f2fd;
+        color: #1976d2;
+        border: 2px solid #1976d2;
+    }
+    .mode-latent {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        border: 2px solid #2e7d32;
+        box-shadow: 0 0 15px rgba(46, 125, 50, 0.3);
+    }
+    .metric-card {
+        background: white;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        margin-bottom: 15px;
+    }
+    .metric-value {
+        font-size: 2rem;
+        font-weight: bold;
+    }
+    .metric-label {
+        color: #666;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    #entropy-chart {
+        height: 300px;
+        width: 100%;
+    }
+    .switch-log {
+        height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+    .log-entry {
+        margin-bottom: 5px;
+        padding-bottom: 5px;
+        border-bottom: 1px solid #eee;
+    }
+    .log-time { color: #888; }
+    .log-reason { font-weight: bold; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12 d-flex justify-content-between align-items-center">
+            <h2><i class="fas fa-shield-alt me-2"></i>Guardian Live Monitor</h2>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary" id="toggle-guardian">
+                    <i class="fas fa-power-off me-2"></i>Enable Guardian
+                </button>
+                <div class="dropdown">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" id="policyDropdown" data-bs-toggle="dropdown">
+                        Policy: Simple
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="setPolicy('simple')">Simple Threshold</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="setPolicy('swireasoning')">SwiReasoning (Beta)</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Left Column: Status & Metrics -->
+        <div class="col-md-4">
+            <!-- Mode Indicator -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Current Reasoning Mode</h5>
+                    <div id="mode-display" class="mode-indicator mode-explicit">
+                        <i class="fas fa-comment me-2"></i>EXPLICIT
+                    </div>
+                    <div class="mt-3 text-center text-muted small" id="mode-desc">
+                        Generating tokens normally
+                    </div>
+                </div>
+            </div>
+
+            <!-- Key Metrics -->
+            <div class="row">
+                <div class="col-6">
+                    <div class="metric-card text-center">
+                        <div class="metric-label">Entropy</div>
+                        <div class="metric-value" id="metric-entropy">0.00</div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="metric-card text-center">
+                        <div class="metric-label">Confidence</div>
+                        <div class="metric-value" id="metric-confidence">0.00</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Switch Log -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Switch History</h6>
+                </div>
+                <div class="card-body p-0">
+                    <div id="switch-log" class="switch-log">
+                        <!-- Logs will appear here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Charts -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Entropy Trend Analysis</h5>
+                    <span class="badge bg-info" id="trend-badge">Stable</span>
+                </div>
+                <div class="card-body">
+                    <div id="entropy-chart"></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Live Activations</h5>
+                </div>
+                <div class="card-body">
+                    <div id="activation-heatmap" style="height: 200px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // WebSocket Connection
+    const ws = new WebSocket(`ws://${window.location.hostname}:8765`);
+    
+    // Chart Data
+    const maxDataPoints = 50;
+    const entropyData = {
+        x: [],
+        y: [],
+        type: 'scatter',
+        mode: 'lines',
+        name: 'Entropy',
+        line: {color: '#17a2b8', width: 3}
+    };
+    
+    const layout = {
+        margin: {t: 10, r: 10, b: 30, l: 40},
+        xaxis: {showgrid: false},
+        yaxis: {range: [0, 5]},
+        showlegend: false
+    };
+
+    Plotly.newPlot('entropy-chart', [entropyData], layout);
+
+    // State
+    let currentMode = 'explicit';
+    let isGuardianEnabled = false;
+
+    ws.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'activation_frame') {
+            updateDashboard(data);
+        }
+    };
+
+    function updateDashboard(frame) {
+        // 1. Update Metrics
+        if (frame.guardian_metrics) {
+            const entropy = frame.guardian_metrics.entropy || 0;
+            const confidence = frame.guardian_metrics.confidence || 0;
+            
+            document.getElementById('metric-entropy').textContent = entropy.toFixed(2);
+            document.getElementById('metric-confidence').textContent = confidence.toFixed(2);
+            
+            // Update Chart
+            const time = new Date().toLocaleTimeString();
+            Plotly.extendTraces('entropy-chart', {
+                x: [[time]],
+                y: [[entropy]]
+            }, [0]);
+            
+            // Keep chart window fixed size
+            if (document.getElementById('entropy-chart').data[0].x.length > maxDataPoints) {
+                Plotly.relayout('entropy-chart', {
+                    xaxis: {
+                        range: [
+                            document.getElementById('entropy-chart').data[0].x.length - maxDataPoints,
+                            document.getElementById('entropy-chart').data[0].x.length
+                        ]
+                    }
+                });
+            }
+        }
+
+        // 2. Update Mode & SwiReasoning Details
+        if (frame.guardian_details && frame.guardian_details.swireasoning_trace) {
+            const trace = frame.guardian_details.swireasoning_trace;
+            const newMode = trace.mode;
+            
+            if (newMode !== currentMode) {
+                updateModeDisplay(newMode);
+                logSwitch(newMode, "Mode Switch"); // Ideally get reason from backend
+                currentMode = newMode;
+            }
+            
+            // Update Trend Badge
+            const slope = trace.entropy_trend || 0;
+            const badge = document.getElementById('trend-badge');
+            if (slope > 0.05) {
+                badge.className = 'badge bg-warning text-dark';
+                badge.textContent = 'Rising Uncertainty';
+            } else if (slope < -0.05) {
+                badge.className = 'badge bg-success';
+                badge.textContent = 'Increasing Confidence';
+            } else {
+                badge.className = 'badge bg-info';
+                badge.textContent = 'Stable';
+            }
+        }
+    }
+
+    function updateModeDisplay(mode) {
+        const display = document.getElementById('mode-display');
+        const desc = document.getElementById('mode-desc');
+        
+        if (mode === 'latent') {
+            display.className = 'mode-indicator mode-latent';
+            display.innerHTML = '<i class="fas fa-brain me-2"></i>LATENT';
+            desc.textContent = 'Internal reasoning (Output suppressed)';
+        } else {
+            display.className = 'mode-indicator mode-explicit';
+            display.innerHTML = '<i class="fas fa-comment me-2"></i>EXPLICIT';
+            desc.textContent = 'Generating tokens normally';
+        }
+    }
+
+    function logSwitch(mode, reason) {
+        const log = document.getElementById('switch-log');
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        entry.innerHTML = `
+            <span class="log-time">[${new Date().toLocaleTimeString()}]</span>
+            Switched to <span class="log-reason">${mode.toUpperCase()}</span>
+        `;
+        log.insertBefore(entry, log.firstChild);
+    }
+
+    // API Controls
+    async function setPolicy(type) {
+        try {
+            const response = await fetch('/api/guardian/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    policy_type: type,
+                    enabled: true
+                })
+            });
+            const result = await response.json();
+            document.getElementById('policyDropdown').textContent = `Policy: ${type === 'swireasoning' ? 'SwiReasoning' : 'Simple'}`;
+            console.log('Policy updated:', result);
+        } catch (e) {
+            console.error('Error setting policy:', e);
+        }
+    }
+    
+    document.getElementById('toggle-guardian').addEventListener('click', async () => {
+        isGuardianEnabled = !isGuardianEnabled;
+        const btn = document.getElementById('toggle-guardian');
+        
+        try {
+            await fetch('/api/guardian/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ enabled: isGuardianEnabled })
+            });
+            
+            if (isGuardianEnabled) {
+                btn.className = 'btn btn-success';
+                btn.innerHTML = '<i class="fas fa-check me-2"></i>Guardian Active';
+            } else {
+                btn.className = 'btn btn-outline-primary';
+                btn.innerHTML = '<i class="fas fa-power-off me-2"></i>Enable Guardian';
+            }
+        } catch (e) {
+            console.error('Error toggling guardian:', e);
+        }
+    });
+</script>
+{% endblock %}

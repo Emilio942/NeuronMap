@@ -1,18 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NeuronMap - Visualization Debug</title>
+{% extends "base.html" %}
+
+{% block title %}NeuronMap - Visualization Debug{% endblock %}
+
+{% block head %}
     <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f8f9fa;
-        }
-        
         .header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -80,8 +72,10 @@
         .error { background: #ffe6e6; border-left: 5px solid #cc0000; }
         .warning { background: #fff3cd; border-left: 5px solid #ffc107; }
     </style>
-</head>
-<body>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
     <div class="header">
         <h1>🧠 NeuronMap - Visualization Debug Test</h1>
         <p>Systematischer Test der Cytoscape-Visualisierung</p>
@@ -378,5 +372,4 @@
             fullTest: runFullTest
         };
     </script>
-</body>
-</html>
+{% endblock %}

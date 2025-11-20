@@ -1,0 +1,112 @@
+category,prompt,generated_text,time,switches,latent_blocks,explicit_blocks,final_mode
+math,Solve for x: 2x + 5 = 15,Solve for x: 2x + 5 = 15.5 = 2.0; x: 2x + 5 = 10.3 = 2.0; x: 2x + 5 = 10.3 = 2.0; x: 2x + 5 = 10.3 =...,0.398815393447876,0,0,1,explicit
+math,What is the square root of 144 plus 12?,"What is the square root of 144 plus 12? If you use this calculator, you will see that the square roo...",0.11209964752197266,0,0,1,explicit
+math,"If a train travels 60 miles in 1.5 hours, what is its speed?","If a train travels 60 miles in 1.5 hours, what is its speed? The answer is that it travels 60 miles....",0.11908316612243652,0,0,1,explicit
+logic,"If all cats are mammals and some mammals are black, are all cats black?","If all cats are mammals and some mammals are black, are all cats black?
+
+
+
+It's not very clear what ...",0.11174798011779785,0,0,1,explicit
+logic,John is taller than Bob. Bob is taller than Alice. Is John taller than Alice?,John is taller than Bob. Bob is taller than Alice. Is John taller than Alice? Is John taller than Al...,0.1117250919342041,0,0,1,explicit
+logic,"Identify the next number in the sequence: 2, 4, 8, 16, ...","Identify the next number in the sequence: 2, 4, 8, 16, ... The next number in the sequence is the ne...",0.11090898513793945,0,0,1,explicit
+code,Write a Python function to calculate the factorial of a number.,"Write a Python function to calculate the factorial of a number.
+
+If a number of functions are not fo...",0.11060667037963867,0,0,1,explicit
+code,Create a list comprehension that squares even numbers from 0 to 10.,"Create a list comprehension that squares even numbers from 0 to 10.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+...",0.1110389232635498,0,0,1,explicit
+code,Explain the difference between a list and a tuple in Python.,"Explain the difference between a list and a tuple in Python. For example, in the Ruby version of Pyt...",0.11071085929870605,0,0,1,explicit
+stem,Explain the process of photosynthesis.,"Explain the process of photosynthesis.
+
+
+In the first five years of his life, he studied a variety o...",0.1110849380493164,0,0,1,explicit
+stem,What is the difference between velocity and speed?,"What is the difference between velocity and speed?
+
+
+
+
+
+The speed of light is the same as velocity.
+...",0.10957193374633789,0,0,1,explicit
+stem,Describe the structure of an atom.,"Describe the structure of an atom.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+...",0.11265921592712402,0,0,1,explicit

@@ -1,16 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Cytoscape Test</title>
+{% extends "base.html" %}
+
+{% block title %}Simple Cytoscape Test{% endblock %}
+
+{% block head %}
     <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        
         #cy {
             width: 800px;
             height: 600px;
@@ -40,8 +34,10 @@
             background: #0056b3;
         }
     </style>
-</head>
-<body>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
     <h1>🧠 NeuronMap - Cytoscape Debug Test</h1>
     
     <div class="info">
@@ -221,5 +217,5 @@
             }, 1000);
         });
     </script>
-</body>
-</html>
+    </div>
+{% endblock %}

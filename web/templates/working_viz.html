@@ -1,17 +1,11 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>NeuronMap - WORKING Visualization</title>
+{% extends "base.html" %}
+
+{% block title %}NeuronMap - WORKING Visualization{% endblock %}
+
+{% block head %}
     <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
     <style>
-        body {
-            margin: 0;
-            padding: 20px;
-            font-family: Arial, sans-serif;
-            background: #f0f0f0;
-        }
-        
-        .container {
+        .viz-container {
             max-width: 1200px;
             margin: 0 auto;
             background: white;
@@ -73,9 +67,10 @@
         .error { background: #f8d7da; color: #721c24; }
         .warning { background: #fff3cd; color: #856404; }
     </style>
-</head>
-<body>
-    <div class="container">
+{% endblock %}
+
+{% block content %}
+    <div class="viz-container">
         <div class="header">
             <h1>🧠 NeuronMap - Circuit Explorer</h1>
             <h2>✅ WORKING VISUALIZATION</h2>
@@ -379,5 +374,4 @@
             cy: () => cy
         };
     </script>
-</body>
-</html>
+{% endblock %}

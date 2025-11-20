@@ -273,6 +273,11 @@ class GuardianConfig(BaseModel):
     noise_std: float = Field(default=0.1, description="Standard deviation for noise injection")
     steering_coeff: float = Field(default=1.0, description="Coefficient for steering vectors")
 
+    # SwiReasoning Settings
+    policy_type: str = Field(default="simple", description="Policy type: 'simple' or 'swireasoning'")
+    history_window: int = Field(default=5, description="Window size for trend analysis")
+    switch_threshold: float = Field(default=0.1, description="Slope threshold for switching back to explicit")
+
     @field_validator('mode')
     @classmethod
     def validate_mode(cls, v):

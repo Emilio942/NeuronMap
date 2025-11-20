@@ -2,6 +2,29 @@
 
 {% block title %}Analysis - NeuronMap{% endblock %}
 
+{% block extra_head %}
+<style>
+.layer-name {
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: background-color 0.2s;
+}
+
+.layer-name:hover {
+    background-color: #e9ecef;
+}
+
+.feature-card {
+    transition: transform 0.2s;
+}
+
+.feature-card:hover {
+    transform: translateY(-2px);
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
@@ -449,25 +472,4 @@ function generateVisualizations() {
     }
 }
 </script>
-
-<style>
-.layer-name {
-    cursor: pointer;
-    padding: 2px 4px;
-    border-radius: 3px;
-    transition: background-color 0.2s;
-}
-
-.layer-name:hover {
-    background-color: #e9ecef;
-}
-
-.feature-card {
-    transition: transform 0.2s;
-}
-
-.feature-card:hover {
-    transform: translateY(-2px);
-}
-</style>
 {% endblock %}

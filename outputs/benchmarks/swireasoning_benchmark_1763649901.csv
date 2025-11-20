@@ -1,0 +1,97 @@
+category,prompt,generated_text,time,switches,latent_blocks,explicit_blocks,final_mode
+math,Solve for x: 2x + 5 = 15,Solve for x: 2x + 5 = 15 = 1 x + 5 = 15 = 3 x + 5 = 15 = 3 x + 5 = 15 = 5 = 5 = 5 = 5 = 5 = 5 = 5 = ...,0.4451303482055664,1,1,1,latent
+math,What is the square root of 144 plus 12?,"What is the square root of 144 plus 12?
+
+
+
+
+
+
+The square root of 144 plus 12?
+
+The square root of 14...",0.1500411033630371,7,4,4,latent
+math,"If a train travels 60 miles in 1.5 hours, what is its speed?","If a train travels 60 miles in 1.5 hours, what is its speed?
+
+
+
+
+
+
+
+
+
+
+
+
+The American Academy of Rai...",0.14406275749206543,0,0,1,explicit
+logic,"If all cats are mammals and some mammals are black, are all cats black?","If all cats are mammals and some mammals are black, are all cats black?
+
+
+
+
+
+The cats are all black....",0.14078330993652344,7,4,4,latent
+logic,John is taller than Bob. Bob is taller than Alice. Is John taller than Alice?,John is taller than Bob. Bob is taller than Alice. Is John taller than Alice? Bob is taller than Ali...,0.14031982421875,1,1,1,latent
+logic,"Identify the next number in the sequence: 2, 4, 8, 16, ...","Identify the next number in the sequence: 2, 4, 8, 16, ...
+
+Now, the next number is a little differe...",0.13916516304016113,7,4,4,latent
+code,Write a Python function to calculate the factorial of a number.,"Write a Python function to calculate the factorial of a number.
+
+
+(def __init__ (self, args)) {
+
+
+
+
+...",0.13792061805725098,1,1,1,latent
+code,Create a list comprehension that squares even numbers from 0 to 10.,"Create a list comprehension that squares even numbers from 0 to 10.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+...",0.1416780948638916,1,1,1,latent
+code,Explain the difference between a list and a tuple in Python.,Explain the difference between a list and a tuple in Python. A list is a list of the values of the v...,0.15727996826171875,1,1,1,latent
+stem,Explain the process of photosynthesis.,"Explain the process of photosynthesis.”
+
+
+The work is published in the journal Biology, Microbiology...",0.11834716796875,3,2,2,latent
+stem,What is the difference between velocity and speed?,"What is the difference between velocity and speed?
+
+
+
+
+
+
+
+
+
+For a brief while, I thought that the tw...",0.1557164192199707,0,0,1,explicit
+stem,Describe the structure of an atom.,Describe the structure of an atom. We don't need to give it any special meaning. So let's say we wan...,0.1412045955657959,1,1,1,latent

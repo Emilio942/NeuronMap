@@ -1,17 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Circuit Explorer - NeuronMap</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+{% extends "base.html" %}
+
+{% block title %}Circuit Explorer - NeuronMap{% endblock %}
+
+{% block head %}
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
     <!-- Optional: cose-bilkent layout -->
     <script src="https://unpkg.com/cytoscape-cose-bilkent@4.1.0/cytoscape-cose-bilkent.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <style>
         /* Ensure graph container is always visible */
         .circuit-graph {
@@ -110,39 +106,9 @@
             z-index: 1050;
         }
     </style>
-</head>
-<body>
-    <!-- Quick Navigation Bar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">
-                <i class="fas fa-brain me-2"></i>NeuronMap
-            </a>
-            <ul class="navbar-nav me-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="/">
-                        <i class="fas fa-home me-1"></i>Home
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/analysis">
-                        <i class="fas fa-chart-line me-1"></i>Analysis
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link active" href="/circuits">
-                        <i class="fas fa-project-diagram me-1"></i>Circuits
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="/zoo">
-                        <i class="fas fa-warehouse me-1"></i>Zoo
-                    </a>
-                </li>
-            </ul>
-        </div>
-    </nav>
+{% endblock %}
 
+{% block content %}
     <div class="container-fluid">
         <!-- Status Bar -->
         <div class="status-bar">
@@ -1217,5 +1183,4 @@
         });
     </script>
     </div> <!-- Close container-fluid -->
-</body>
-</html>
+{% endblock %}

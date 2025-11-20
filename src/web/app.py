@@ -196,7 +196,7 @@ if FLASK_AVAILABLE:
     @app.route('/')
     def index():
         """Home page."""
-        return render_template('working_viz.html')
+        return render_template('index.html')
 
     @app.route('/analysis')
     def analysis():
@@ -1130,6 +1130,16 @@ if FLASK_AVAILABLE:
     def status_page():
         """Simple status page."""
         return jsonify({'status': 'running', 'service': 'NeuronMap'})
+
+    @app.route('/guardian')
+    def guardian_monitor():
+        """Guardian Live Monitor page."""
+        return render_template('guardian_monitor.html')
+
+    @app.route('/swireasoning')
+    def swireasoning_history():
+        """SwiReasoning Trace History page."""
+        return render_template('swireasoning_history.html')
 
 else:
     # Flask not available

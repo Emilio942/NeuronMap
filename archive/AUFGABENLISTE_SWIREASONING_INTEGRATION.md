@@ -60,136 +60,60 @@ umschaltet. Das System:
 ## Phase 2: Datenmodell-Erweiterung (Woche 3-4)
 
 ### 2.1 Neue Datenstrukturen
-- [ ] **SwiReasoning-spezifische Modelle erstellen**
-  ```python
-  # src/neuronmap/models/swireasoning.py
-  
-  class ThinkingBlock:
-      """Repräsentiert einen Thinking-Block (latent oder explicit)"""
-      block_id: int
-      block_type: str  # "latent" oder "explicit"
-      start_token: int
-      end_token: int
-      confidence: float
-      entropy_values: List[float]
-      token_efficiency: float
-  
-  class ReasoningSwitch:
-      """Repräsentiert einen Switch zwischen Reasoning-Modi"""
-      switch_id: int
-      from_block: ThinkingBlock
-      to_block: ThinkingBlock
-      switch_confidence: float
-      reason: str  # Warum wurde gewechselt?
-  
-  class SwiReasoningTrace:
-      """Vollständige Reasoning-Trace mit allen Switches"""
-      problem: str
-      thinking_blocks: List[ThinkingBlock]
-      switches: List[ReasoningSwitch]
-      total_tokens: int
-      solution: str
-      accuracy: bool
-  ```
+- [x] **SwiReasoning-spezifische Modelle erstellen**
+  - Implemented in `src/guardian/swireasoning.py`
 
 ### 2.2 Konfidenz & Entropie-Tracking
-- [ ] **Entropie-Berechnung implementieren**
-  - [ ] Next-token Distribution Entropy berechnen
-  - [ ] Block-wise Confidence aus Entropie-Trends ableiten
-  - [ ] Confidence Thresholds für Switching konfigurierbar machen
+- [x] **Entropie-Berechnung implementieren**
+  - Implemented in `src/guardian/probes.py` (using `torch.distributions.Categorical`)
 
-- [ ] **Metrics-System erweitern**
-  - [ ] Token-Effizienz pro Block tracken
-  - [ ] Switch-Häufigkeit messen
-  - [ ] Overthinking Detection Metrics
+- [x] **Metrics-System erweitern**
+  - Implemented in `src/guardian/policies.py` (SwiReasoningPolicy)
 
 ---
 
 ## Phase 3: Modell-Integration (Woche 5-7)
 
 ### 3.1 SwiReasoning Model Loader
-- [ ] **Model Zoo Erweiterung**
-  ```python
-  # src/neuronmap/models/model_loaders/swireasoning_loader.py
-  
-  class SwiReasoningLoader:
-      """Lädt SwiReasoning-Modelle und extrahiert Struktur"""
-      
-      def load_model(self, model_path: str):
-          """Lädt Modell mit Switch-Mechanismus"""
-          pass
-      
-      def extract_thinking_blocks(self, model):
-          """Extrahiert Thinking-Block Komponenten"""
-          pass
-      
-      def extract_switch_logic(self, model):
-          """Extrahiert Switch-Entscheidungslogik"""
-          pass
-  ```
-
-- [ ] **Kompatibilität mit bestehenden Loadern**
-  - [ ] Integration in `ModelRegistry`
-  - [ ] Auto-Detection von SwiReasoning-Modellen
-  - [ ] Fallback auf Standard-Transformer-Visualisierung
+- [x] **Integration via Guardian**
+  - Implemented as a Policy (`SwiReasoningPolicy`) rather than a separate Model Loader. This allows applying SwiReasoning to *any* model loaded via `UniversalModelAdapter`.
 
 ### 3.2 Inference-Tracing
-- [ ] **Runtime-Monitoring implementieren**
-  - [ ] Hook-System für Inference-Time Tracing
-  - [ ] Block-Transitions aufzeichnen
-  - [ ] Echtzeit-Entropie Berechnung
-  - [ ] Switch-Decisions loggen
+- [x] **Runtime-Monitoring implementieren**
+  - Implemented in `src/guardian/engine.py` and `policies.py`.
+  - Traces are saved to `outputs/benchmarks/`.
 
-- [ ] **Test-Suite für verschiedene Probleme**
-  - [ ] Math Problems (MATH benchmark)
-  - [ ] STEM Questions
-  - [ ] Code-Generation Tasks
-  - [ ] Logic Puzzles
+- [x] **Test-Suite für verschiedene Probleme**
+  - Implemented in `scripts/benchmark_swireasoning.py` (Math, Logic, Code, STEM).
 
 ---
 
 ## Phase 4: Visualisierung (Woche 8-10)
 
 ### 4.1 Switch-Flow Visualisierung
-- [ ] **Interaktive Timeline-View**
-  - [ ] Token-Position auf X-Achse
-  - [ ] Reasoning-Mode (latent/explicit) als Farbe
-  - [ ] Konfidenz als Höhe/Opacity
-  - [ ] Switches als Marker/Übergänge
-
-- [ ] **Graph-basierte Visualisierung**
-  - [ ] Thinking-Blocks als Nodes
-  - [ ] Switches als Edges
-  - [ ] Entropie als Node-Attribut
-  - [ ] Token-Effizienz visualisieren
+- [x] **Interaktive Timeline-View**
+  - Implemented in Web UI (`templates/swireasoning_history.html`) using Plotly.js.
+  - Shows Entropy, Latent/Explicit blocks, and Switches.
 
 ### 4.2 Entropie-Heatmaps
 - [ ] **Block-wise Entropy Visualization**
-  - [ ] Heatmap über alle Tokens eines Blocks
-  - [ ] Trend-Linien für Entropie-Entwicklung
-  - [ ] Threshold-Markierungen für Switches
-  - [ ] Vergleich zwischen Success/Failure Cases
+  - Partially covered by Timeline View.
 
 ### 4.3 Reasoning-Path Comparison
 - [ ] **Multi-Path Visualisierung**
-  - [ ] Vergleich verschiedener Reasoning-Strategien
-  - [ ] Side-by-side: Pure latent vs. Pure explicit vs. SwiReasoning
-  - [ ] Token-Effizienz Vergleich
-  - [ ] Accuracy Trade-offs visualisieren
 
 ### 4.4 Pattern-Erkennung Visualisierung
 - [ ] **Automatische Pattern-Detection**
-  - [ ] Häufige Switch-Patterns clustern
-  - [ ] Successful vs. Failed Pattern-Kategorisierung
-  - [ ] Pattern-Similarity Matrix
-  - [ ] Empfehlungen für optimale Switch-Strategien
 
 ---
 
 ## Phase 5: Analyse-Tools (Woche 11-12)
 
 ### 5.1 Overthinking Detektor
-- [ ] **Overthinking-Analyse Tool**
+- [x] **Overthinking-Analyse Tool**
+  - Implemented in `src/analysis/overthinking.py`.
+  - Integrated into Web UI (`swireasoning_history.html`).
+  - Detects: Thrashing (rapid switching), Stuck Latent (too long in thought), Instability.
   ```python
   # src/neuronmap/analysis/overthinking_detector.py
   

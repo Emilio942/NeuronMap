@@ -1,13 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Circuit Explorer - NeuronMap (Fixed)</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+{% extends "base.html" %}
+
+{% block title %}Circuit Explorer - NeuronMap (Fixed){% endblock %}
+
+{% block head %}
     <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <style>
         .circuit-graph {
             width: 100%;
@@ -30,19 +26,9 @@
         .error { background: #ffebee; }
         .warning { background: #fff3cd; }
     </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <span class="navbar-brand">🧠 NeuronMap - Circuit Explorer (Fixed)</span>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="/">Home</a>
-                <a class="nav-link" href="/circuits">Circuits</a>
-                <a class="nav-link" href="/minimal-test">Minimal Test</a>
-            </div>
-        </div>
-    </nav>
+{% endblock %}
 
+{% block content %}
     <div class="container-fluid mt-4">
         <div class="row">
             <!-- Control Panel -->
@@ -390,5 +376,4 @@
             cy: () => cy
         };
     </script>
-</body>
-</html>
+{% endblock %}

@@ -1,0 +1,154 @@
+category,prompt,generated_text,time,switches,latent_blocks,explicit_blocks,final_mode
+math,Solve for x: 2x + 5 = 15,Solve for x: 2x + 5 = 15 + 15 + 5 * 15 + 5 * 15 + 5 * 15 + 5 * 15 + 5 * 15 + 5 * 15 + 5 * 15 + 5 * 1...,0.42176389694213867,1,1,1,latent
+math,What is the square root of 144 plus 12?,What is the square root of 144 plus 12? The square root of 144 plus 12? The square root of 144 plus ...,0.1264476776123047,1,1,1,latent
+math,"If a train travels 60 miles in 1.5 hours, what is its speed?","If a train travels 60 miles in 1.5 hours, what is its speed? If you know what is going on and you kn...",0.13424897193908691,1,1,1,latent
+logic,"If all cats are mammals and some mammals are black, are all cats black?","If all cats are mammals and some mammals are black, are all cats black?
+
+
+There is a strong connecti...",0.12650036811828613,1,1,1,latent
+logic,John is taller than Bob. Bob is taller than Alice. Is John taller than Alice?,John is taller than Bob. Bob is taller than Alice. Is John taller than Alice? Is John taller than Al...,0.12868857383728027,1,1,1,latent
+logic,"Identify the next number in the sequence: 2, 4, 8, 16, ...","Identify the next number in the sequence: 2, 4, 8, 16, ...
+
+
+
+The first and last numbers in the sequ...",0.12479853630065918,1,1,1,latent
+code,Write a Python function to calculate the factorial of a number.,"Write a Python function to calculate the factorial of a number.
+
+
+
+When using Python for the past 10...",0.12829923629760742,1,1,1,latent
+code,Create a list comprehension that squares even numbers from 0 to 10.,"Create a list comprehension that squares even numbers from 0 to 10.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+...",0.1253504753112793,1,1,1,latent
+code,Explain the difference between a list and a tuple in Python.,"Explain the difference between a list and a tuple in Python.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+...",0.12520098686218262,1,1,1,latent
+stem,Explain the process of photosynthesis.,"Explain the process of photosynthesis.
+
+
+The process is based on the formation of carbonic acid in t...",0.12656927108764648,1,1,1,latent
+stem,What is the difference between velocity and speed?,"What is the difference between velocity and speed?
+
+
+
+The speed of the ball is the speed of the ball...",0.127732515335083,1,1,1,latent
+stem,Describe the structure of an atom.,"Describe the structure of an atom.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+...",0.12673377990722656,1,1,1,latent

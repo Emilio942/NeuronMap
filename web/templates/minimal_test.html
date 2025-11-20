@@ -1,18 +1,11 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minimaler Cytoscape Test</title>
+{% extends "base.html" %}
+
+{% block title %}Minimaler Cytoscape Test{% endblock %}
+
+{% block head %}
     <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background: #f0f0f0;
-        }
-        
-        .container {
+        .test-container {
             max-width: 1200px;
             margin: 0 auto;
             background: white;
@@ -72,9 +65,10 @@
         .success { background: #d1edff; }
         .error { background: #ffebee; }
     </style>
-</head>
-<body>
-    <div class="container">
+{% endblock %}
+
+{% block content %}
+    <div class="test-container">
         <div class="header">
             <h1>🧠 NeuronMap - Minimaler Cytoscape Test</h1>
             <p>Teste ob Cytoscape grundsätzlich funktioniert</p>
@@ -214,5 +208,4 @@
             setTimeout(initGraph, 2000);
         });
     </script>
-</body>
-</html>
+{% endblock %}

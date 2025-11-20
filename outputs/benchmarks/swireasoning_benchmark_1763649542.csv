@@ -1,0 +1,74 @@
+category,prompt,generated_text,time,switches,latent_blocks,explicit_blocks,final_mode
+math,Solve for x: 2x + 5 = 15,Solve for x: 2x + 5 = 15 + 8 = 20 + 6 = 16 + 6 = 16 + 6 = 16 + 6 = 16 + 6 = 16 + 6 = 16 + 6 = 16 + 6...,0.4177536964416504,0,0,1,explicit
+math,What is the square root of 144 plus 12?,What is the square root of 144 plus 12? The square root of 48 plus 12? The square root of 48 plus 12...,0.12222552299499512,0,0,1,explicit
+math,"If a train travels 60 miles in 1.5 hours, what is its speed?","If a train travels 60 miles in 1.5 hours, what is its speed? It doesn't take a day, however, to tell...",0.12902498245239258,0,0,1,explicit
+logic,"If all cats are mammals and some mammals are black, are all cats black?","If all cats are mammals and some mammals are black, are all cats black?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+The proble...",0.12401342391967773,0,0,1,explicit
+logic,John is taller than Bob. Bob is taller than Alice. Is John taller than Alice?,John is taller than Bob. Bob is taller than Alice. Is John taller than Alice? Bob is taller than Ali...,0.12368893623352051,0,0,1,explicit
+logic,"Identify the next number in the sequence: 2, 4, 8, 16, ...","Identify the next number in the sequence: 2, 4, 8, 16, ...
+
+The sequence of numbers in the sequence:...",0.12813282012939453,0,0,1,explicit
+code,Write a Python function to calculate the factorial of a number.,"Write a Python function to calculate the factorial of a number.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+...",0.1431593894958496,0,0,1,explicit
+code,Create a list comprehension that squares even numbers from 0 to 10.,Create a list comprehension that squares even numbers from 0 to 10....,0.0033597946166992188,0,0,1,explicit
+code,Explain the difference between a list and a tuple in Python.,Explain the difference between a list and a tuple in Python. It's a more common idea than that; it's...,0.1256880760192871,0,0,1,explicit
+stem,Explain the process of photosynthesis.,Explain the process of photosynthesis. The process of photosynthesis has been successfully demonstra...,0.12303495407104492,0,0,1,explicit
+stem,What is the difference between velocity and speed?,"What is the difference between velocity and speed?
+
+
+As far as speed is concerned, velocity and spee...",0.1233370304107666,0,0,1,explicit
+stem,Describe the structure of an atom.,"Describe the structure of an atom. When the atom is not in the same state as the atom, the atom is n...",0.12146711349487305,0,0,1,explicit
