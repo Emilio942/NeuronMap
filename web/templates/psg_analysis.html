@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}PSG Analysis - NeuronMap{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2><i class="fas fa-gate me-2"></i>Parameter Sparsity Gate (PSG) Analysis</h2>
+            <p class="text-muted">Detect and visualize sparsity gates in neural networks.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Configuration Panel -->
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-sliders-h me-2"></i>Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <form id="psgForm">
+                        <div class="mb-3">
+                            <label for="modelSelect" class="form-label">Model</label>
+                            <select class="form-select" id="modelSelect" required>
+                                <option value="distilgpt2">DistilGPT-2 (Fast)</option>
+                                <option value="gpt2">GPT-2</option>
+                                <option value="gpt2-medium">GPT-2 Medium</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="promptInput" class="form-label">Reaction Prompt</label>
+                            <textarea class="form-control" id="promptInput" rows="3" required>The quick brown fox jumps over the lazy dog.</textarea>
+                            <div class="form-text">This prompt will be used to test how the gates react.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="thresholdInput" class="form-label">Sparsity Threshold</label>
+                            <input type="number" class="form-control" id="thresholdInput" value="0.01" step="0.001" min="0.001" max="1.0">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100" id="runBtn">
+                            <i class="fas fa-play me-2"></i>Run Analysis
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Panel -->
+        <div class="col-md-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-chart-scatter me-2"></i>Visualization</h5>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-sm active" id="viewStructure">Structure</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" id="viewReaction">Reaction</button>
+                    </div>
+                </div>
+                <div class="card-body p-0 position-relative" style="min-height: 600px;">
+                    <div id="loadingOverlay" class="position-absolute top-0 start-0 w-100 h-100 d-none bg-white bg-opacity-75 d-flex justify-content-center align-items-center" style="z-index: 10;">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary mb-3" role="status"></div>
+                            <h5>Analyzing Model Structure...</h5>
+                            <p class="text-muted">This may take a minute.</p>
+                        </div>
+                    </div>
+                    <iframe id="vizFrame" src="" style="width: 100%; height: 100%; border: none;"></iframe>
+                    <div id="placeholder" class="d-flex justify-content-center align-items-center h-100 text-muted">
+                        <div class="text-center">
+                            <i class="fas fa-chart-area fa-3x mb-3"></i>
+                            <p>Run an analysis to see the visualization.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_head %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('psgForm');
+    const runBtn = document.getElementById('runBtn');
+    const loading = document.getElementById('loadingOverlay');
+    const vizFrame = document.getElementById('vizFrame');
+    const placeholder = document.getElementById('placeholder');
+    
+    let currentStructureUrl = '';
+    let currentReactionUrl = '';
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // UI State: Loading
+        runBtn.disabled = true;
+        loading.classList.remove('d-none');
+        placeholder.classList.add('d-none');
+        vizFrame.classList.add('d-none');
+
+        const formData = {
+            model: document.getElementById('modelSelect').value,
+            prompt: document.getElementById('promptInput').value,
+            threshold: parseFloat(document.getElementById('thresholdInput').value)
+        };
+
+        try {
+            const response = await fetch('/api/psg/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                currentStructureUrl = data.structure_url;
+                currentReactionUrl = data.reaction_url;
+                
+                // Default view: Structure
+                vizFrame.src = currentStructureUrl;
+                vizFrame.classList.remove('d-none');
+                
+                // Update button states
+                document.getElementById('viewStructure').classList.add('active');
+                document.getElementById('viewReaction').classList.remove('active');
+            } else {
+                alert('Analysis failed: ' + data.error);
+                placeholder.classList.remove('d-none');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('An error occurred during analysis.');
+            placeholder.classList.remove('d-none');
+        } finally {
+            runBtn.disabled = false;
+            loading.classList.add('d-none');
+        }
+    });
+
+    // View Switching
+    document.getElementById('viewStructure').addEventListener('click', function() {
+        if (currentStructureUrl) {
+            vizFrame.src = currentStructureUrl;
+            this.classList.add('active');
+            document.getElementById('viewReaction').classList.remove('active');
+        }
+    });
+
+    document.getElementById('viewReaction').addEventListener('click', function() {
+        if (currentReactionUrl) {
+            vizFrame.src = currentReactionUrl;
+            this.classList.add('active');
+            document.getElementById('viewStructure').classList.remove('active');
+        }
+    });
+});
+</script>
+{% endblock %}

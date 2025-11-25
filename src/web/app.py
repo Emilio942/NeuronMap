@@ -75,6 +75,14 @@ if FLASK_AVAILABLE:
     except ImportError as e:
         logger.warning(f"Could not register guardian API: {e}")
 
+    # Register PSG API blueprint
+    try:
+        from web.api.psg import psg_bp
+        app.register_blueprint(psg_bp)
+        logger.info("PSG API blueprint registered")
+    except ImportError as e:
+        logger.warning(f"Could not register PSG API: {e}")
+
     # Global state management
     analysis_jobs = {}
     visualization_jobs = {}
@@ -292,6 +300,11 @@ if FLASK_AVAILABLE:
     def sae_explorer():
         """SAE Training and Exploration page."""
         return render_template('sae_explorer.html')
+
+    @app.route('/psg')
+    def psg_analysis():
+        """Render PSG analysis page."""
+        return render_template('psg_analysis.html')
 
     # ============================================================================
     # UTILITY FUNCTIONS

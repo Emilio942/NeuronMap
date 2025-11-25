@@ -553,6 +553,56 @@ def cmd_model_info(args):
         print(f"❌ Failed to show model info: {e}")
         return False
 
+def cmd_analyze_psg(args):
+    """Implement CLI command `analyze:psg`"""
+    setup_logging(args.verbose)
+    
+    print("🔧 Running Parameter Sparsity Gate (PSG) Detection")
+    print(f"Model: {args.model}")
+    
+    try:
+        from analysis.model_integration import get_model_manager
+        from analysis.psg_detector import PSGDetector
+        from visualization.psg_visualizer import PSGVisualizer
+        
+        # Initialize model manager
+        model_manager = get_model_manager()
+        
+        if args.model not in model_manager.SUPPORTED_MODELS:
+            print(f"❌ Unsupported model: {args.model}")
+            return False
+            
+        print("📦 Loading model...")
+        adapter = model_manager.load_model(args.model)
+        
+        # Initialize Detector
+        detector = PSGDetector(adapter.model, adapter.tokenizer, device=model_manager.device)
+        
+        # Prepare texts
+        texts = [args.prompt] if args.prompt else ["The quick brown fox jumps over the lazy dog."]
+        
+        # Run Detection
+        print("🔍 Detecting PSGs...")
+        psgs = detector.detect(texts, weight_threshold=args.threshold)
+        
+        print(f"✓ Found {len(psgs)} Parameter Sparsity Gates")
+        
+        # Visualization
+        viz = PSGVisualizer(output_dir=args.output or "outputs/psg_viz")
+        viz.visualize_structure(psgs)
+        if args.prompt:
+            viz.visualize_reaction(psgs, args.prompt)
+            
+        print(f"✓ Visualization saved to {viz.output_dir}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ PSG Analysis failed: {e}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
+        return False
+
 def create_parser():
     """Create the argument parser"""
     parser = argparse.ArgumentParser(
@@ -601,6 +651,13 @@ Examples:
     patch_parser = analyze_subparsers.add_parser("patch", help="Run path patching analysis")
     patch_parser.add_argument("--config", type=Path, required=True, help="Configuration file")
     patch_parser.add_argument("--output", type=Path, help="Output directory override")
+
+    # PSG command
+    psg_parser = analyze_subparsers.add_parser("psg", help="Detect Parameter Sparsity Gates")
+    psg_parser.add_argument("--model", required=True, help="Model name")
+    psg_parser.add_argument("--prompt", help="Input prompt for reaction analysis")
+    psg_parser.add_argument("--threshold", type=float, default=0.01, help="Sparsity threshold")
+    psg_parser.add_argument("--output", type=Path, help="Output directory")
     
     # Circuit analysis command (C1)
     circuits_parser = analyze_subparsers.add_parser("circuits", help="Discover and analyze neural circuits")
@@ -662,6 +719,8 @@ def main():
                 success = cmd_analyze_ablate(args)
             elif args.analyze_type == "patch":
                 success = cmd_analyze_patch(args)
+            elif args.analyze_type == "psg":
+                success = cmd_analyze_psg(args)
             elif args.analyze_type == "circuits":
                 success = cmd_analyze_circuits(args)
             else:
