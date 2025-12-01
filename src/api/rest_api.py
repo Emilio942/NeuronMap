@@ -8,7 +8,7 @@ Supports analysis, visualization, model management, and more.
 import logging
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 from pathlib import Path
 import json
 import traceback
@@ -26,23 +26,27 @@ except ImportError:
     BaseModel = None
 
 # Internal imports
-from core.neuron_map import NeuronMap
+from core.orchestrator import SystemOrchestrator
 from config.config_manager import ConfigManager
 from utils.error_handling import NeuronMapError, setup_error_handling
 from utils.monitoring import setup_monitoring
-from visualization.advanced_plots import create_interactive_dashboard
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 # Pydantic models for API requests/responses
 
+class ProjectCreateRequest(BaseModel):
+    """Request model for creating a project."""
+    name: str
+    description: Optional[str] = ""
 
 class AnalysisRequest(BaseModel):
     """Request model for analysis endpoint."""
+    project_id: Optional[str] = Field(None, description="Project ID to associate with")
     model_name: str = Field(..., description="Name of the model to analyze")
     input_text: str = Field(..., description="Text to analyze")
-    layers: Optional[List[int]] = Field(None, description="Specific layers to analyze")
+    layers: Optional[List[Union[int, str]]] = Field(None, description="Specific layers to analyze")
     analysis_type: str = Field("basic", description="Type of analysis to perform")
     config: Optional[Dict[str, Any]] = Field(None, description="Analysis configuration")
 
@@ -101,18 +105,18 @@ class NeuronMapAPI:
         else:
             self.config = self.config_manager.get_default_config()
 
-        # Initialize NeuronMap core
-        self.neuron_map = NeuronMap(config=self.config)
+        # Initialize System Orchestrator
+        self.orchestrator = SystemOrchestrator()
 
-        # In-memory storage for jobs and results
+        # In-memory storage for jobs (orchestrator handles results)
         self.jobs: Dict[str, JobStatus] = {}
-        self.results: Dict[str, Dict[str, Any]] = {}
-
+        self.results: Dict[str, Any] = {}
+        
         # Available models cache
         self.available_models: List[ModelInfo] = []
         self._load_available_models()
 
-        logger.info("NeuronMap API initialized")
+        logger.info("NeuronMap API initialized with System Orchestrator")
 
     def _load_available_models(self):
         """Load information about available models."""
@@ -181,86 +185,77 @@ class NeuronMapAPI:
             logger.info(f"Updated job {job_id}: status={status}, progress={progress}")
 
     async def run_analysis(self, request: AnalysisRequest, job_id: str):
-        """Run analysis in background."""
+        """Run analysis in background using Orchestrator."""
         try:
             self.update_job(job_id, "running", progress=0.0)
 
-            # Load model
-            self.update_job(job_id, "running", progress=0.2)
-            model_config = {
-                'name': request.model_name,
-                'type': 'huggingface'  # Default type
-            }
+            # Ensure project exists
+            project_id = request.project_id
+            if not project_id:
+                # Create default project if none provided
+                project_id = self.orchestrator.create_project("Default Project", "Auto-generated project")
+            
+            self.update_job(job_id, "running", progress=0.1)
 
-            if request.config:
-                model_config.update(request.config.get('model', {}))
+            # Submit analysis pipeline via Orchestrator (Async Task Queue)
+            experiment_id = self.orchestrator.submit_analysis_pipeline(
+                project_id=project_id,
+                model_name=request.model_name,
+                input_data=request.input_text,
+                analysis_types=[request.analysis_type]
+            )
 
-            model = self.neuron_map.load_model(model_config)
+            # The job is now "submitted" to the internal queue.
+            # We can mark this API job as completed, returning the experiment_id
+            # The client can then poll the experiment status.
 
-            # Prepare analysis parameters
-            self.update_job(job_id, "running", progress=0.4)
-            analysis_params = {
-                'layers': request.layers or [0, 6, 11],  # Default layers
-                'include_attention': True,
-                'include_hidden_states': True
-            }
+            self.update_job(job_id, "completed", progress=1.0, result={
+                'project_id': project_id,
+                'experiment_id': experiment_id,
+                'status': 'submitted_to_queue'
+            })
 
-            if request.config:
-                analysis_params.update(request.config.get('analysis', {}))
-
-            # Run analysis
-            self.update_job(job_id, "running", progress=0.6)
-
-            if request.analysis_type == "sentiment":
-                results = self.neuron_map.analyze_sentiment(
-                    model=model,
-                    texts=[request.input_text],
-                    **analysis_params
-                )
-            elif request.analysis_type == "interpretability":
-                results = self.neuron_map.analyze_interpretability(
-                    model=model,
-                    input_text=request.input_text,
-                    **analysis_params
-                )
-            else:  # basic analysis
-                results = self.neuron_map.generate_activations(
-                    text=request.input_text,
-                    **analysis_params
-                )
-
-            # Process and store results
-            self.update_job(job_id, "running", progress=0.9)
-
-            # Convert tensors to lists for JSON serialization
-            processed_results = self._process_results_for_json(results)
-
-            # Store results
-            analysis_id = str(uuid.uuid4())
-            self.results[analysis_id] = {
-                'analysis_id': analysis_id,
-                'request': request.dict(),
-                'results': processed_results,
-                'metadata': {
-                    'model_name': request.model_name,
-                    'analysis_type': request.analysis_type,
-                    'layers_analyzed': analysis_params['layers'],
-                    'created_at': datetime.now().isoformat()
-                }
-            }
-
-            # Complete job
-            self.update_job(
-                job_id, "completed", progress=1.0, result={
-                    'analysis_id': analysis_id})
-
-            logger.info(f"Analysis completed for job {
-                        job_id}, analysis_id: {analysis_id}")
+            logger.info(f"Analysis submitted for job {job_id}, experiment_id: {experiment_id}")
 
         except Exception as e:
             error_msg = f"Analysis failed: {str(e)}"
             logger.error(f"Job {job_id} failed: {error_msg}")
             logger.error(traceback.format_exc())
+            self.update_job(job_id, "failed", error=error_msg)
+
+    async def create_visualization_job(self, request: VisualizationRequest, job_id: str):
+        """Create visualization in background."""
+        try:
+            self.update_job(job_id, "running", progress=0.1)
+
+            # We need project_id and experiment_id from the request
+            # Assuming analysis_id in request maps to experiment_id for now
+            # In a real update, we'd update VisualizationRequest model too
+            
+            # For this fix, we'll assume the user passes "project_id:experiment_id" as analysis_id
+            if ":" in request.analysis_id:
+                project_id, experiment_id = request.analysis_id.split(":")
+            else:
+                raise ValueError("Invalid analysis_id format. Use 'project_id:experiment_id'")
+
+            self.update_job(job_id, "running", progress=0.3)
+
+            # Use Orchestrator to generate visualization
+            viz_path = self.orchestrator.generate_visualization(
+                project_id, 
+                experiment_id, 
+                request.plot_type
+            )
+
+            self.update_job(job_id, "completed", progress=1.0, result={
+                "visualization_id": job_id,
+                "path": str(viz_path),
+                "type": request.plot_type
+            })
+
+        except Exception as e:
+            error_msg = f"Visualization failed: {str(e)}"
+            logger.error(f"Visualization job {job_id} failed: {error_msg}")
             self.update_job(job_id, "failed", error=error_msg)
 
     def _process_results_for_json(self, results: Dict[str, Any]) -> Dict[str, Any]:
@@ -292,14 +287,11 @@ def _setup_cors_middleware(app: FastAPI):
         allow_headers=["*"],
     )
 
-def _setup_authentication(app: FastAPI):
-    security = HTTPBearer(auto_error=False)
+security = HTTPBearer(auto_error=False)
 
-    def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-        # Implement your authentication logic here
-        return {"user_id": "anonymous"}
-
-    app.dependency_overrides[Depends(security)] = get_current_user
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    # Implement your authentication logic here
+    return {"user_id": "anonymous"}
 
 def create_app(config_path: Optional[str] = None) -> FastAPI:
     """Create FastAPI application."""
@@ -317,7 +309,6 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
     )
 
     _setup_cors_middleware(app)
-    _setup_authentication(app)
 
     # API Routes
 
@@ -383,14 +374,25 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
 
         return api.results[analysis_id]
 
-    @app.post("/visualize")
+    @app.get("/projects", response_model=List[Dict[str, Any]])
+    async def list_projects():
+        """List all projects."""
+        return api.orchestrator.list_projects()
+
+    @app.post("/projects", response_model=Dict[str, str])
+    async def create_project(request: ProjectCreateRequest):
+        """Create a new project."""
+        project_id = api.orchestrator.create_project(request.name, request.description)
+        return {"project_id": project_id, "message": "Project created successfully"}
+
+    @app.post("/visualize", response_model=Dict[str, str])
     async def create_visualization(
         request: VisualizationRequest,
         background_tasks: BackgroundTasks
     ):
         """Create visualization from analysis results."""
-        if request.analysis_id not in api.results:
-            raise HTTPException(status_code=404, detail="Analysis not found")
+        # if request.analysis_id not in api.results:
+        #     raise HTTPException(status_code=404, detail="Analysis not found")
 
         try:
             job_id = api.create_job("visualization", request=request.dict())
@@ -411,14 +413,16 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
             logger.error(f"Failed to create visualization: {e}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    @app.get("/visualizations/{viz_id}")
-    async def get_visualization(viz_id: str):
-        """Get visualization file."""
-        viz_path = Path(f"./outputs/visualizations/{viz_id}.html")
-        if not viz_path.exists():
-            raise HTTPException(status_code=404, detail="Visualization not found")
-
-        return FileResponse(viz_path, media_type="text/html")
+    @app.get("/results/{project_id}/{experiment_id}")
+    async def get_experiment_results(project_id: str, experiment_id: str):
+        """Get experiment results."""
+        experiment = api.orchestrator.project_manager.get_experiment(project_id, experiment_id)
+        if not experiment:
+            raise HTTPException(status_code=404, detail="Experiment not found")
+            
+        # In a real app, we might want to load the full results from the file
+        # For now, return metadata
+        return experiment
 
     @app.post("/upload")
     async def upload_file(file: UploadFile = File(...)):
@@ -470,77 +474,6 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
 
 # Additional methods for NeuronMapAPI
 
-
-def _add_api_methods():
-    """Add additional methods to NeuronMapAPI class."""
-
-    async def create_visualization_job(self, request: VisualizationRequest, job_id: str):
-        """Create visualization in background."""
-        try:
-            self.update_job(job_id, "running", progress=0.1)
-
-            # Get analysis results
-            analysis_data = self.results[request.analysis_id]
-
-            self.update_job(job_id, "running", progress=0.3)
-
-            # Create visualization
-            viz_config = request.config or {}
-
-            if request.plot_type == "dashboard":
-                viz_path = create_interactive_dashboard(
-                    results=analysis_data['results'],
-                    save_path=f"./outputs/visualizations/{job_id}.html",
-                    **viz_config
-                )
-            else:
-                # Create specific plot type
-                viz_path = self.neuron_map.create_visualization(
-                    results=analysis_data['results'],
-                    plot_type=request.plot_type,
-                    save_path=f"./outputs/visualizations/{job_id}.png",
-                    **viz_config
-                )
-
-            self.update_job(job_id, "completed", progress=1.0, result={
-                "visualization_id": job_id,
-                "path": str(viz_path),
-                "type": request.plot_type
-            })
-
-        except Exception as e:
-            error_msg = f"Visualization failed: {str(e)}"
-            logger.error(f"Visualization job {job_id} failed: {error_msg}")
-            self.update_job(job_id, "failed", error=error_msg)
-
-    # Add method to class
-    NeuronMapAPI.create_visualization_job = create_visualization_job
-
-
-# Apply additional methods
-_add_api_methods()
-
-# CLI for running the API server
-
-
-def run_server(
-    host: str = "0.0.0.0",
-    port: int = 8000,
-    config_path: Optional[str] = None,
-    reload: bool = False
-):
-    """Run the API server."""
-    app = create_app(config_path)
-
-    uvicorn.run(
-        app,
-        host=host,
-        port=port,
-        reload=reload,
-        log_level="info"
-    )
-
-
 if __name__ == "__main__":
     import argparse
 
@@ -552,9 +485,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    run_server(
+    app = create_app(config_path=args.config)
+    
+    uvicorn.run(
+        app,
         host=args.host,
-        port=args.port,
-        config_path=args.config,
-        reload=args.reload
+        port=args.port
     )

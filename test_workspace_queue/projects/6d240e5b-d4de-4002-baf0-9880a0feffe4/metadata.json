@@ -1,0 +1,10 @@
+{
+  "id": "6d240e5b-d4de-4002-baf0-9880a0feffe4",
+  "name": "Queue Test Project",
+  "description": "",
+  "created_at": "2025-12-01T11:20:32.429768",
+  "updated_at": "2025-12-01T11:20:32.430073",
+  "experiments": [
+    "d77789c1-0154-442e-a599-1251dc1c92fb"
+  ]
+}

@@ -233,7 +233,19 @@ def help_command(ctx):
     click.echo("📝 generate   - Generate synthetic questions")
     click.echo("📥 extract    - Extract activations")
     click.echo("📊 visualize  - Visualize results")
+    click.echo("🌐 web        - Start the web interface")
     click.echo()
+
+
+@main.command('web')
+@click.option('--host', default='0.0.0.0', help='Host to bind to')
+@click.option('--port', default=8000, help='Port to bind to')
+@click.option('--reload/--no-reload', default=False, help='Enable auto-reload')
+def web_command(host, port, reload):
+    """Start the NeuronMap web interface."""
+    from src.web_server import run_server
+    click.echo(f"Starting web server at http://{host}:{port}...")
+    run_server(host=host, port=port, reload=reload)
 
 
 if __name__ == '__main__':

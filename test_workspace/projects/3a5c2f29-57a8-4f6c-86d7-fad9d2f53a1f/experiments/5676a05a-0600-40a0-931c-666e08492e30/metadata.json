@@ -1,0 +1,15 @@
+{
+  "id": "5676a05a-0600-40a0-931c-666e08492e30",
+  "project_id": "3a5c2f29-57a8-4f6c-86d7-fad9d2f53a1f",
+  "name": "Analysis of gpt2",
+  "config": {
+    "model_name": "gpt2",
+    "analysis_types": [
+      "statistical"
+    ]
+  },
+  "status": "completed",
+  "created_at": "2025-12-01T11:10:10.983439",
+  "updated_at": "2025-12-01T11:10:10.993789",
+  "results_path": "test_workspace/projects/3a5c2f29-57a8-4f6c-86d7-fad9d2f53a1f/experiments/5676a05a-0600-40a0-931c-666e08492e30/results/results.json"
+}

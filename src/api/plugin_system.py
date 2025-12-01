@@ -11,7 +11,7 @@ import inspect
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Type
 import traceback
 from dataclasses import dataclass
 from enum import Enum

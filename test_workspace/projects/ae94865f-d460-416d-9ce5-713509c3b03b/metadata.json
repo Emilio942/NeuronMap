@@ -1,0 +1,10 @@
+{
+  "id": "ae94865f-d460-416d-9ce5-713509c3b03b",
+  "name": "Test Project",
+  "description": "A test project",
+  "created_at": "2025-12-01T11:05:47.053048",
+  "updated_at": "2025-12-01T11:05:47.053632",
+  "experiments": [
+    "8631e003-e0cd-4430-bf9e-3ef1231f2e52"
+  ]
+}

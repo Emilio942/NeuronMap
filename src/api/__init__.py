@@ -8,8 +8,6 @@ Enables programmatic access to all NeuronMap functionality.
 from .rest_api import NeuronMapAPI, create_app
 from .python_api import NeuronMapClient, AsyncNeuronMapClient
 from .plugin_system import PluginManager, BasePlugin
-from .websocket_api import WebSocketHandler
-from .graphql_api import GraphQLSchema
 
 __all__ = [
     'NeuronMapAPI',
@@ -17,9 +15,7 @@ __all__ = [
     'NeuronMapClient',
     'AsyncNeuronMapClient',
     'PluginManager',
-    'BasePlugin',
-    'WebSocketHandler',
-    'GraphQLSchema'
+    'BasePlugin'
 ]
 
 __version__ = '1.0.0'

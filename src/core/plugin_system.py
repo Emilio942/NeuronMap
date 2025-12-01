@@ -364,10 +364,13 @@ class PluginManager:
             # Find plugin classes in the module
             plugin_classes = []
             for name, obj in inspect.getmembers(module):
+                if inspect.isclass(obj):
+                    print(f"DEBUG: Checking class {name} in {module.__name__}: module={obj.__module__}")
+
                 if (inspect.isclass(obj) and 
                     issubclass(obj, PluginBase) and
                     obj != PluginBase and
-                    obj not in [AnalysisPlugin, ModelAdapterPlugin, VisualizationPlugin]):
+                    obj.__module__ == module.__name__):
                     plugin_classes.append((name, obj))
 
             if not plugin_classes:
@@ -554,16 +557,22 @@ class PerformanceMonitorPlugin(AnalysisPlugin):
             return {}
 
 # Global plugin manager instance
-plugin_manager = PluginManager()
+# plugin_manager = PluginManager()
+
+def get_global_plugin_manager():
+    global plugin_manager
+    if 'plugin_manager' not in globals():
+        plugin_manager = PluginManager()
+    return plugin_manager
 
 def register_plugin(name: str, plugin: PluginBase) -> bool:
     """Register a new plugin."""
-    return plugin_manager.register_plugin(name, plugin)
+    return get_global_plugin_manager().register_plugin(name, plugin)
 
 def execute_plugin(name: str, *args, **kwargs) -> Any:
     """Execute a plugin."""
-    return plugin_manager.execute_plugin(name, *args, **kwargs)
+    return get_global_plugin_manager().execute_plugin(name, *args, **kwargs)
 
 def get_available_plugins() -> Dict[str, PluginMetadata]:
     """Get all available plugins."""
-    return plugin_manager.list_plugins()
+    return get_global_plugin_manager().list_plugins()
