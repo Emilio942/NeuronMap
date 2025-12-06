@@ -18,6 +18,7 @@ class InterventionType(Enum):
     MEAN = "mean"                 # Replace with mean activation
     PATCHING = "patching"         # Replace with cached activations
     CUSTOM = "custom"             # User-defined modification function
+    SCALING = "scaling"           # Scale activations by a factor (Dimmer)
 @dataclass
 class InterventionSpec:
     """Specification for a single intervention."""
@@ -149,6 +150,27 @@ class ModifiableHookManager:
             modified_tensor = spec.custom_function(modified_tensor)
         return modified_tensor
 
+    def _apply_scaling(self, tensor: torch.Tensor, spec: InterventionSpec) -> torch.Tensor:
+        """
+        Apply scaling (dimmer) to activations.
+        Multiplies activations by a scaling factor (0.0-1.0 for dimming, >1.0 for amplification).
+        """
+        modified_tensor = tensor.clone()
+        scaling_factor = spec.intervention_value if spec.intervention_value is not None else 1.0
+        
+        if spec.target_indices:
+            if len(modified_tensor.shape) >= 2:
+                for idx in spec.target_indices:
+                    if idx < modified_tensor.shape[-1]:
+                        modified_tensor[..., idx] *= scaling_factor
+            else:
+                logger.warning(f"Cannot scale specific indices in 1D tensor")
+                modified_tensor *= scaling_factor
+        else:
+            modified_tensor *= scaling_factor
+            
+        return modified_tensor
+
     def _apply_intervention(
         self, 
         tensor: torch.Tensor, 
@@ -165,6 +187,8 @@ class ModifiableHookManager:
             return self._apply_patching(tensor, spec)
         elif spec.intervention_type == InterventionType.CUSTOM:
             return self._apply_custom(tensor, spec)
+        elif spec.intervention_type == InterventionType.SCALING:
+            return self._apply_scaling(tensor, spec)
         return tensor
     def add_intervention(self, layer_name: str, intervention_spec: InterventionSpec):
         """Add or update an intervention for a specific layer."""
@@ -353,3 +377,33 @@ def calculate_causal_effect(
         return (numerator / (denominator + 1e-8)).mean().item()
     else:
         raise ValueError(f"Unknown metric: {metric}")
+
+def create_dimmer_intervention(
+    layer_name: str,
+    scaling_factor: float,
+    neuron_group: Optional[Any] = None,
+    target_indices: Optional[List[int]] = None
+) -> InterventionSpec:
+    """
+    Helper to create a dimmer (scaling) intervention.
+    
+    Args:
+        layer_name: Name of the layer to intervene on
+        scaling_factor: Factor to scale activations by (0.0-1.0 for dimming)
+        neuron_group: Optional NeuronGroup object to extract indices from
+        target_indices: Optional list of indices (if neuron_group not provided)
+        
+    Returns:
+        InterventionSpec configured for scaling
+    """
+    indices = target_indices
+    if neuron_group is not None and hasattr(neuron_group, 'neuron_indices'):
+        indices = neuron_group.neuron_indices
+        
+    return InterventionSpec(
+        layer_name=layer_name,
+        intervention_type=InterventionType.SCALING,
+        target_indices=indices,
+        intervention_value=scaling_factor
+    )
+
