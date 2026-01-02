@@ -1,4 +1,5 @@
 # Aufgabenliste: SwiReasoning Integration in NeuronMap
+# interesa https://arxiv.org/abs/2512.20605   https://arxiv.org/abs/2512.22106
 
 ## Paper Referenz
 **Titel:** SwiReasoning: Switch-Thinking in Latent and Explicit for Pareto-Superior Reasoning LLMs  
