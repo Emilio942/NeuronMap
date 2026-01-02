@@ -74,8 +74,16 @@ logs/*.log
 *.tmp
 *.temp
 .cache/
+.mypy_cache/
 .pytest_cache/
 .hypothesis/
+
+# Generated runtime artifacts
+cache/
+outputs/
+projects/
+performance_metrics.db
+
 
 # Jupyter Notebooks checkpoints
 .ipynb_checkpoints/

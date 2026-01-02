@@ -4,23 +4,264 @@
 
 {% block extra_head %}
 <style>
+/* Enhanced Analysis Card Styling */
+.analysis-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+
+.analysis-card:hover {
+    border-color: rgba(255,255,255,0.15);
+    box-shadow: 0 12px 48px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+}
+
+.analysis-card .card-header {
+    background: linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px 12px 0 0;
+}
+
+.analysis-card .card-body {
+    padding: 1.25rem;
+}
+
+/* Enhanced Parameter Groups */
+.parameter-group {
+    padding: 1rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.parameter-group:last-child {
+    border-bottom: none;
+}
+
+.parameter-group .form-label {
+    font-weight: 600;
+    color: rgba(255,255,255,0.9);
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+}
+
+/* Enhanced Form Controls */
+.form-select, .form-control, textarea.form-control {
+    background-color: rgba(255,255,255,0.06);
+    border: 1.5px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.9);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    padding: 0.65rem 0.875rem;
+    font-size: 0.95rem;
+}
+
+.form-select:focus, .form-control:focus, textarea.form-control:focus {
+    background-color: rgba(255,255,255,0.08);
+    border-color: rgba(59,130,246,0.6);
+    box-shadow: 0 0 0 4px rgba(59,130,246,0.15);
+    color: rgba(255,255,255,0.95);
+}
+
+.form-select option {
+    background-color: #1f2937;
+    color: rgba(255,255,255,0.9);
+}
+
+/* Enhanced Button Groups */
+.btn-group {
+    gap: 0.25rem;
+}
+
+.btn-group .btn {
+    border-radius: 8px;
+    border: 1.5px solid rgba(255,255,255,0.15);
+    transition: all 0.2s ease;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.7);
+    background-color: transparent;
+}
+
+.btn-group .btn:hover {
+    background: linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(59,130,246,0.1) 100%);
+    border-color: rgba(59,130,246,0.4);
+    color: rgba(255,255,255,0.85);
+}
+
+.btn-group .btn-check:checked + .btn {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    border-color: #3b82f6;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(59,130,246,0.3);
+}
+
+/* Enhanced Action Buttons */
+.btn-success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(16,185,129,0.25);
+    color: #fff;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(16,185,129,0.35);
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(245,158,11,0.25);
+    color: #fff;
+}
+
+.btn-warning:hover {
+    background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(245,158,11,0.35);
+    color: #fff;
+}
+
+.btn-secondary {
+    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
+    border: 1.5px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    color: rgba(255,255,255,0.8);
+    font-weight: 700;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.08) 100%);
+    border-color: rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.95);
+    transform: translateY(-2px);
+}
+
+.btn-secondary:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(59,130,246,0.3);
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(59,130,246,0.4);
+}
+
+/* Layer name styling */
 .layer-name {
     cursor: pointer;
-    padding: 2px 4px;
-    border-radius: 3px;
-    transition: background-color 0.2s;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    background-color: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.7);
+    font-weight: 500;
+    display: inline-block;
 }
 
 .layer-name:hover {
-    background-color: #e9ecef;
+    background-color: rgba(59,130,246,0.25);
+    color: rgba(255,255,255,0.95);
+    transform: translateY(-1px);
 }
 
+/* Feature card styling */
 .feature-card {
-    transition: transform 0.2s;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
 }
 
 .feature-card:hover {
+    transform: translateY(-6px);
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.04) 100%);
+    border-color: rgba(255,255,255,0.15);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.2);
+}
+
+/* Compact chart area inside the details modal */
+.analysis-details-chart-wrap {
+    margin-top: 1rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.analysis-details-chart-wrap canvas {
+    width: 100% !important;
+    height: 200px !important;
+}
+
+/* Neural Network Visualization in Analysis */
+.analysis-neural-network-wrap {
+    margin-top: 1.5rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.analysis-neural-network-wrap:hover {
+    border-color: rgba(255,255,255,0.15);
+    background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+
+.analysis-neural-network-wrap canvas {
+    width: 100% !important;
+    height: 250px !important;
+    background: linear-gradient(135deg, rgba(0,0,0,0.1) 0%, rgba(0,0,0,0.05) 100%);
+    border-radius: 8px;
+    display: block;
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
+/* Neuron stats styling */
+.neuron-stats-inline {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    font-size: 0.85rem;
+    margin-top: 1rem;
+}
+
+.neuron-stats-inline .badge {
+    padding: 0.6rem 0.85rem;
+    border-radius: 6px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.neuron-stats-inline .badge:hover {
     transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 </style>
 {% endblock %}
@@ -58,14 +299,14 @@
                             <option value="custom">Custom Model</option>
                         </select>
                     </div>
-                    
+
                     <!-- Custom Model Input -->
                     <div class="mb-3" id="customModelDiv" style="display: none;">
                         <label for="customModel" class="form-label">Custom Model Name</label>
-                        <input type="text" class="form-control" id="customModel" name="customModel" 
+                        <input type="text" class="form-control" id="customModel" name="customModel"
                                placeholder="e.g., microsoft/DialoGPT-medium">
                     </div>
-                    
+
                     <!-- Device Selection -->
                     <div class="mb-3">
                         <label for="deviceSelect" class="form-label">Device</label>
@@ -75,30 +316,30 @@
                             <option value="cpu">CPU</option>
                         </select>
                     </div>
-                    
+
                     <!-- Questions Upload -->
                     <div class="mb-3">
                         <label for="questionsFile" class="form-label">Questions File</label>
-                        <input type="file" class="form-control" id="questionsFile" name="questions" 
+                        <input type="file" class="form-control" id="questionsFile" name="questions"
                                accept=".txt,.json,.jsonl,.csv">
                         <div class="form-text">Supported formats: TXT, JSON, JSONL, CSV</div>
                     </div>
-                    
+
                     <!-- Or Manual Questions -->
                     <div class="mb-3">
                         <label for="questionsText" class="form-label">Or Enter Questions Manually</label>
-                        <textarea class="form-control" id="questionsText" name="questionsText" rows="4" 
+                        <textarea class="form-control" id="questionsText" name="questionsText" rows="4"
                                   placeholder="Enter questions, one per line..."></textarea>
                     </div>
-                    
+
                     <!-- Target Layers -->
                     <div class="mb-3">
                         <label for="targetLayers" class="form-label">Target Layers (optional)</label>
-                        <input type="text" class="form-control" id="targetLayers" name="targetLayers" 
+                        <input type="text" class="form-control" id="targetLayers" name="targetLayers"
                                placeholder="e.g., transformer.h.0,transformer.h.11">
                         <div class="form-text">Leave empty to analyze all layers</div>
                     </div>
-                    
+
                     <!-- Advanced Options -->
                     <div class="mb-3">
                         <div class="form-check">
@@ -114,7 +355,7 @@
                             </label>
                         </div>
                     </div>
-                    
+
                     <!-- Action Buttons -->
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary" id="analyzeBtn">
@@ -127,7 +368,7 @@
                 </form>
             </div>
         </div>
-        
+
         <!-- Quick Actions -->
         <div class="card mt-3">
             <div class="card-header">
@@ -147,7 +388,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Results Panel -->
     <div class="col-lg-8">
         <!-- Progress Section -->
@@ -169,7 +410,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Results Section -->
         <div class="card" id="resultsCard">
             <div class="card-header">
@@ -186,7 +427,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Layer Information -->
         <div class="card mt-3" id="layerInfoCard" style="display: none;">
             <div class="card-header">
@@ -229,6 +470,7 @@
 <script>
 let currentAnalysisId = null;
 let analysisInterval = null;
+let analysis_jobs = {}; // Cache for analysis job data
 
 document.addEventListener('DOMContentLoaded', function() {
     // Model selection handler
@@ -236,13 +478,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const customDiv = document.getElementById('customModelDiv');
         customDiv.style.display = this.value === 'custom' ? 'block' : 'none';
     });
-    
+
     // Form submission
     document.getElementById('analysisForm').addEventListener('submit', function(e) {
         e.preventDefault();
         startAnalysis();
     });
-    
+
     // List layers button
     document.getElementById('listLayersBtn').addEventListener('click', function() {
         listLayers();
@@ -252,32 +494,34 @@ document.addEventListener('DOMContentLoaded', function() {
 async function startAnalysis() {
     const form = document.getElementById('analysisForm');
     const formData = new FormData(form);
-    
+
     // Validate form
-    const model = formData.get('model') || (formData.get('model') === 'custom' ? formData.get('customModel') : '');
-    if (!model) {
+    const selectedModel = (formData.get('model') === 'custom') ? (formData.get('customModel') || '') : (formData.get('model') || '');
+    if (!selectedModel.trim()) {
         alert('Please select a model');
         return;
     }
-    
-    const questionsFile = formData.get('questions');
-    const questionsText = formData.get('questionsText');
-    if (!questionsFile.name && !questionsText.trim()) {
+
+    const questionsFile = document.getElementById('questionsFile')?.files?.[0] || null;
+    const questionsText = (formData.get('questionsText') || '').toString();
+    const hasFile = !!(questionsFile && questionsFile.name);
+    const hasText = !!questionsText.trim();
+    if (!hasFile && !hasText) {
         alert('Please provide questions either by file upload or manual entry');
         return;
     }
-    
+
     // Show progress
     showProgress();
-    
+
     try {
         const response = await fetch('/api/analyze', {
             method: 'POST',
             body: formData
         });
-        
+
         const result = await response.json();
-        
+
         if (response.ok) {
             currentAnalysisId = result.analysis_id;
             pollAnalysisStatus();
@@ -295,16 +539,16 @@ async function listLayers() {
     const model = document.getElementById('modelSelect').value;
     const customModel = document.getElementById('customModel').value;
     const selectedModel = model === 'custom' ? customModel : model;
-    
+
     if (!selectedModel) {
         alert('Please select a model first');
         return;
     }
-    
+
     try {
         const response = await fetch(`/api/list-layers?model=${encodeURIComponent(selectedModel)}`);
         const result = await response.json();
-        
+
         if (response.ok) {
             showLayerInfo(result.layers);
         } else {
@@ -336,13 +580,16 @@ function pollAnalysisStatus() {
         try {
             const response = await fetch(`/api/analysis-status/${currentAnalysisId}`);
             const status = await response.json();
-            
+
             if (response.ok) {
                 updateProgress(status.progress, status.message);
-                
+
+                // Cache the full job data for later use
+                analysis_jobs[currentAnalysisId] = status;
+
                 if (status.completed) {
                     hideProgress();
-                    showResults(status.results);
+                    showResults(status.results || {});
                 } else if (status.error) {
                     hideProgress();
                     showError(status.error);
@@ -361,16 +608,16 @@ function updateProgress(progress, message) {
 
 function showResults(results) {
     const container = document.getElementById('resultsContent');
-    
+
     container.innerHTML = `
         <div class="row">
             <div class="col-md-6">
                 <h6>Analysis Summary</h6>
                 <ul class="list-unstyled">
-                    <li><strong>Model:</strong> ${results.model}</li>
-                    <li><strong>Questions:</strong> ${results.question_count}</li>
-                    <li><strong>Layers:</strong> ${results.layer_count}</li>
-                    <li><strong>Duration:</strong> ${results.duration}</li>
+                    <li><strong>Model:</strong> ${results.model || '—'}</li>
+                    <li><strong>Questions:</strong> ${results.question_count ?? '—'}</li>
+                    <li><strong>Layers:</strong> ${results.layer_count ?? '—'}</li>
+                    <li><strong>Duration:</strong> ${results.duration || '—'}</li>
                 </ul>
             </div>
             <div class="col-md-6">
@@ -394,11 +641,11 @@ function showResults(results) {
 function showLayerInfo(layers) {
     const container = document.getElementById('layerInfoContent');
     const card = document.getElementById('layerInfoCard');
-    
+
     container.innerHTML = `
         <p><strong>Available Layers (${layers.length}):</strong></p>
         <div class="row">
-            ${layers.map((layer, index) => 
+            ${layers.map((layer, index) =>
                 `<div class="col-md-6 col-lg-4">
                     <code class="layer-name" onclick="selectLayer('${layer}')">${layer}</code>
                 </div>`
@@ -408,14 +655,14 @@ function showLayerInfo(layers) {
             <small class="text-muted">Click on a layer name to add it to target layers</small>
         </div>
     `;
-    
+
     card.style.display = 'block';
 }
 
 function selectLayer(layerName) {
     const targetLayers = document.getElementById('targetLayers');
     const current = targetLayers.value.trim();
-    
+
     if (current) {
         targetLayers.value = current + ',' + layerName;
     } else {
@@ -434,7 +681,7 @@ function showError(message) {
 }
 
 function loadDemoQuestions() {
-    document.getElementById('questionsText').value = 
+    document.getElementById('questionsText').value =
         "What is the capital of France?\n" +
         "How does photosynthesis work?\n" +
         "What is machine learning?\n" +
@@ -456,8 +703,107 @@ function cancelAnalysis() {
 
 function viewDetailedResults() {
     // Load detailed results in modal
-    const modal = new bootstrap.Modal(document.getElementById('resultsModal'));
+    if (!currentAnalysisId || !analysis_jobs[currentAnalysisId]) {
+        alert('No analysis results available');
+        return;
+    }
+
+    const job = analysis_jobs[currentAnalysisId];
+    const results = job.results || {};
+
+    // Populate detailed results
+    const detailedContainer = document.getElementById('detailedResults');
+    detailedContainer.innerHTML = `
+        <div class="row mb-4">
+            <div class="col-12">
+                <h6 class="border-bottom pb-2">Analysis Details</h6>
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <th width="30%">Analysis ID</th>
+                            <td><code>${currentAnalysisId.substring(0, 12)}...</code></td>
+                        </tr>
+                        <tr>
+                            <th>Model</th>
+                            <td>${results.model || '—'}</td>
+                        </tr>
+                        <tr>
+                            <th>Questions Analyzed</th>
+                            <td>${results.question_count ?? '—'}</td>
+                        </tr>
+                        <tr>
+                            <th>Layers Processed</th>
+                            <td>${results.layer_count ?? '—'}</td>
+                        </tr>
+                        <tr>
+                            <th>Duration</th>
+                            <td>${results.duration || '—'}</td>
+                        </tr>
+                        <tr>
+                            <th>Status</th>
+                            <td><span class="badge bg-success">Completed</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="analysis-details-chart-wrap">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="small text-muted">Overview</span>
+                        <span class="small text-muted">Auto-generated</span>
+                    </div>
+                    <canvas id="analysisDetailsChart" aria-label="Analysis overview chart" role="img"></canvas>
+                </div>
+
+                <!-- Neural Network Visualization -->
+                <div class="analysis-neural-network-wrap">
+                    <div class="d-flex justify-content-between align-items-center mb-2 mt-3">
+                        <span class="small text-muted"><i class="fas fa-network-wired me-1"></i>Neural Network Activity</span>
+                        <span class="small text-muted" id="activation-time">--</span>
+                    </div>
+                    <canvas id="analysisNeuralNetworkCanvas" aria-label="Neural network visualization" role="img"></canvas>
+                    <div class="neuron-stats-inline mt-2" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; font-size: 0.85rem;">
+                        <div class="text-center">
+                            <span class="badge bg-success">Aktiviert: <span id="active-count" class="fw-bold">0</span></span>
+                        </div>
+                        <div class="text-center">
+                            <span class="badge bg-warning">Berührt: <span id="touched-count" class="fw-bold">0</span></span>
+                        </div>
+                        <div class="text-center">
+                            <span class="badge bg-secondary">Inaktiv: <span id="inactive-count" class="fw-bold">0</span></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <h6 class="border-bottom pb-2">Questions</h6>
+                <ol class="small">
+                    ${(job.questions || []).map(q => `<li>${q}</li>`).join('')}
+                </ol>
+            </div>
+        </div>
+    `;
+
+    const modalElement = document.getElementById('resultsModal');
+    const modal = new bootstrap.Modal(modalElement);
+
+    modalElement.addEventListener('shown.bs.modal', function handleShown() {
+        initializeNeuralNetwork('analysisNeuralNetworkCanvas');
+        modalElement.removeEventListener('shown.bs.modal', handleShown);
+    });
+
+    modalElement.addEventListener('hidden.bs.modal', function handleHidden() {
+        teardownNeuralNetworkVisualization();
+        modalElement.removeEventListener('hidden.bs.modal', handleHidden);
+    });
+
     modal.show();
+
+    // Render the inline chart just below the details table
+    ensureChartJs().then(() => renderAnalysisDetailsChart(results)).catch(err => {
+        console.warn('Chart.js failed to load:', err);
+    });
 }
 
 function downloadResults() {
@@ -471,5 +817,125 @@ function generateVisualizations() {
         window.location.href = `/visualization?analysis_id=${currentAnalysisId}`;
     }
 }
+
+// --- Inline Visualization Helpers ---
+function ensureChartJs() {
+    return new Promise((resolve, reject) => {
+        if (window.Chart) return resolve();
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Failed to load Chart.js'));
+        document.head.appendChild(script);
+    });
+}
+
+function renderAnalysisDetailsChart(results) {
+    const ctx = document.getElementById('analysisDetailsChart');
+    if (!ctx) return;
+
+    // Extract numeric metrics safely
+    const q = Number(results.question_count ?? 0);
+    const L = Number(results.layer_count ?? 0);
+    // Parse seconds from duration like "5.0s" or "00:00:05"
+    let secs = 0;
+    const d = (results.duration || '').toString();
+    const m1 = d.match(/([0-9]*\.?[0-9]+)\s*s/);
+    if (m1) {
+        secs = parseFloat(m1[1]);
+    } else if (d.includes(':')) {
+        // HH:MM:SS
+        const parts = d.split(':').map(Number);
+        if (parts.length === 3) secs = parts[0]*3600 + parts[1]*60 + parts[2];
+    }
+
+    const data = {
+        labels: ['Questions', 'Layers', 'Duration (s)'],
+        datasets: [{
+            label: 'Analysis Overview',
+            data: [q, L, secs],
+            backgroundColor: ['#4e79a7', '#59a14f', '#f28e2b'],
+            borderColor: 'rgba(255,255,255,0.1)',
+            borderWidth: 1,
+            borderRadius: 6,
+        }]
+    };
+
+    const isDark = (document.documentElement.getAttribute('data-bs-theme') || 'dark') === 'dark';
+    const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+    const tickColor = isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.7)';
+
+    new Chart(ctx, {
+        type: 'bar',
+        data,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: true }
+            },
+            scales: {
+                x: {
+                    grid: { color: gridColor },
+                    ticks: { color: tickColor }
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: gridColor },
+                    ticks: { color: tickColor }
+                }
+            }
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const modelParam = urlParams.get('model');
+
+    if (modelParam) {
+        const modelSelect = document.getElementById('modelSelect');
+        const customModelDiv = document.getElementById('customModelDiv');
+        const customModelInput = document.getElementById('customModel');
+
+        // Check if the model exists in the dropdown
+        let optionExists = false;
+        for (let i = 0; i < modelSelect.options.length; i++) {
+            if (modelSelect.options[i].value === modelParam) {
+                modelSelect.value = modelParam;
+                optionExists = true;
+                break;
+            }
+        }
+
+        // If not in dropdown, set to custom
+        if (!optionExists) {
+            modelSelect.value = 'custom';
+            customModelDiv.style.display = 'block';
+            customModelInput.value = modelParam;
+        }
+
+        // Trigger change event to handle any dependent logic
+        modelSelect.dispatchEvent(new Event('change'));
+    }
+
+    // Handle model select change to show/hide custom input
+    const modelSelect = document.getElementById('modelSelect');
+    if (modelSelect) {
+        modelSelect.addEventListener('change', function() {
+            const customModelDiv = document.getElementById('customModelDiv');
+            if (this.value === 'custom') {
+                customModelDiv.style.display = 'block';
+            } else {
+                customModelDiv.style.display = 'none';
+            }
+        });
+    }
+});
+
+// Neural visualization setup handled when modal shows
 </script>
+
+<script src="{{ url_for('static', filename='js/neural-network.js') }}"></script>
 {% endblock %}
