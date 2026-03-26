@@ -287,7 +287,7 @@ class TestDashboardManager(unittest.TestCase):
         except ImportError:
             self.skipTest("DashboardManager not available")
     
-    @patch('dash.Dash.run_server')
+    @patch('dash.Dash.run')
     def test_dashboard_startup(self, mock_run_server):
         """Test dashboard startup."""
         try:

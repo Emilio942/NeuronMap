@@ -102,7 +102,7 @@ class SwiReasoningPolicy(BasePolicy):
                 # Simple rise/run
                 slope = (recent[-1] - recent[0]) / len(recent)
 
-        action = {'action': 'none'}
+        action_type = 'none'
         
         # Logic:
         # 1. Explicit -> Latent: If confidence is high (entropy low) and stable
@@ -112,25 +112,33 @@ class SwiReasoningPolicy(BasePolicy):
                 if entropy < self.entropy_min and abs(slope) < 0.05:
                     # Switch to Latent
                     self._switch_mode("latent", "high_confidence")
+                    action_type = 'enter_latent_mode'
                 
         # 2. Latent -> Explicit: If uncertainty rises (entropy increases)
         elif self.current_mode == "latent":
             if slope > self.switch_threshold or entropy > self.entropy_max:
                 # Switch to Explicit
                 self._switch_mode("explicit", "uncertainty_rise")
+                action_type = 'exit_latent_mode'
 
-        # Apply continuous intervention based on mode
-        if self.current_mode == "latent":
-            # Latent Mode: Increase temperature to encourage diverse "thinking"
-            action = {
-                'action': 'scale_logits',
-                'params': {'temperature': 1.5} 
-            }
+        # Apply continuous intervention based on mode if no switch happened
+        if action_type == 'none':
+            if self.current_mode == "latent":
+                # Latent Mode: Increase temperature to encourage diverse "thinking"
+                action = {
+                    'action': 'scale_logits',
+                    'params': {'temperature': 1.5} 
+                }
+            else:
+                # Explicit Mode: Decrease temperature for focused "speaking"
+                action = {
+                    'action': 'scale_logits',
+                    'params': {'temperature': 0.7}
+                }
         else:
-            # Explicit Mode: Decrease temperature for focused "speaking"
             action = {
-                'action': 'scale_logits',
-                'params': {'temperature': 0.7}
+                'action': action_type,
+                'params': {}
             }
 
         # Add trace info to action for visualization
@@ -145,6 +153,9 @@ class SwiReasoningPolicy(BasePolicy):
     def _switch_mode(self, new_mode: str, reason: str):
         # Close current block
         self.current_block.end_token_idx = self.token_counter
+        
+        # Clear entropy history to prevent leakage between modes
+        self.entropy_history = []
         
         # Create switch event
         switch = ReasoningSwitch(

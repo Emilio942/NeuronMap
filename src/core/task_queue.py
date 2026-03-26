@@ -10,6 +10,7 @@ import logging
 import uuid
 import time
 import traceback
+import threading
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Callable, List
 from datetime import datetime
@@ -140,18 +141,20 @@ class LocalTaskQueue(TaskQueueBase):
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.tasks: Dict[str, TaskResult] = {}
         self.futures: Dict[str, Future] = {}
+        self._lock = threading.Lock()
         logger.info(f"LocalTaskQueue initialized with {max_workers} workers")
 
     def submit(self, func: Callable, *args, **kwargs) -> str:
         task_id = str(uuid.uuid4())
         
-        # Initialize task status
-        self.tasks[task_id] = TaskResult(task_id, TaskStatus.PENDING)
-        
-        # Submit to executor
-        # We wrap the function to handle status updates
-        future = self.executor.submit(self._worker_wrapper, task_id, func, *args, **kwargs)
-        self.futures[task_id] = future
+        with self._lock:
+            # Initialize task status
+            self.tasks[task_id] = TaskResult(task_id, TaskStatus.PENDING)
+            
+            # Submit to executor
+            # We wrap the function to handle status updates
+            future = self.executor.submit(self._worker_wrapper, task_id, func, *args, **kwargs)
+            self.futures[task_id] = future
         
         logger.info(f"Task submitted: {task_id}")
         return task_id
@@ -177,17 +180,19 @@ class LocalTaskQueue(TaskQueueBase):
             raise
 
     def _update_status(self, task_id: str, status: TaskStatus, result: Any = None, error: str = None):
-        if task_id in self.tasks:
-            task = self.tasks[task_id]
-            task.status = status
-            if result is not None:
-                task.result = result
-            if error is not None:
-                task.error = error
-            task.updated_at = datetime.now()
+        with self._lock:
+            if task_id in self.tasks:
+                task = self.tasks[task_id]
+                task.status = status
+                if result is not None:
+                    task.result = result
+                if error is not None:
+                    task.error = error
+                task.updated_at = datetime.now()
 
     def get_status(self, task_id: str) -> Optional[TaskResult]:
-        return self.tasks.get(task_id)
+        with self._lock:
+            return self.tasks.get(task_id)
 
 # Factory for creating task queues
 def create_task_queue(queue_type: str = "local", **kwargs) -> TaskQueueBase:

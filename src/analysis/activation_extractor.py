@@ -317,17 +317,21 @@ class ActivationExtractor:
         detached_output = output_tensor.detach().cpu()
 
         # Handle different dimensionalities
-        if detached_output.ndim >= 2:
-            if detached_output.shape[0] == 1:
-                # Single batch item: average over sequence length
-                aggregated_activation = detached_output[0].mean(dim=0)
-            else:
-                # Multiple batch items: average over batch and sequence
-                aggregated_activation = detached_output.mean(dim=0)
+        if detached_output.ndim == 3:
+            # [batch, seq, hidden] -> average over batch and sequence -> [hidden]
+            aggregated_activation = detached_output.mean(dim=(0, 1))
             self.activation_capture['activation'] = aggregated_activation
-        else:
-            # 1D tensor, use as-is
+        elif detached_output.ndim == 2:
+            # [batch, hidden] -> average over batch -> [hidden]
+            aggregated_activation = detached_output.mean(dim=0)
+            self.activation_capture['activation'] = aggregated_activation
+        elif detached_output.ndim == 1:
+            # [hidden]
             self.activation_capture['activation'] = detached_output
+        else:
+            # Fallback for other shapes (e.g. 4D) - use global mean
+            aggregated_activation = detached_output.mean()
+            self.activation_capture['activation'] = aggregated_activation.unsqueeze(0)
 
     def get_activation_for_question(self, question: str) -> Optional[Any]:
         """

@@ -17,8 +17,8 @@ try:
     from src.analysis.activation_extractor import ActivationExtractor
     from src.analysis.advanced_analyzer import AdvancedAnalyzer
     from src.analysis.attention_analysis import AttentionAnalyzer
-    from src.analysis.interpretability import InterpretabilityAnalyzer
-    from src.analysis.experimental_analysis import ExperimentalAnalyzer
+    from src.analysis.interpretability_analyzer import InterpretabilityAnalyzer
+    from src.analysis.experimental_analyzer import ExperimentalAnalyzer
 except ImportError as e:
     print(f"Warning: Could not import analysis modules: {e}")
 

@@ -368,11 +368,37 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
 
     @app.get("/results/{analysis_id}")
     async def get_analysis_results(analysis_id: str):
-        """Get analysis results."""
-        if analysis_id not in api.results:
-            raise HTTPException(status_code=404, detail="Analysis not found")
+        """Get analysis results from orchestrator project manager."""
+        try:
+            if ":" in analysis_id:
+                project_id, experiment_id = analysis_id.split(":")
+            else:
+                # Fallback to checking local results if any
+                if analysis_id in api.results:
+                    return api.results[analysis_id]
+                raise ValueError("Invalid analysis_id format. Use 'project_id:experiment_id'")
 
-        return api.results[analysis_id]
+            experiment = api.orchestrator.project_manager.get_experiment(project_id, experiment_id)
+            if not experiment:
+                raise HTTPException(status_code=404, detail="Analysis/Experiment not found")
+            
+            # If experiment is completed, load and return the results
+            if experiment.get("status") == "completed":
+                results_path = experiment.get("results_path")
+                if results_path and Path(results_path).exists():
+                    import json
+                    with open(results_path, 'r') as f:
+                        data = json.load(f)
+                        # Ensure results are JSON serializable
+                        return api._process_results_for_json(data)
+            
+            return experiment # Return metadata/status
+            
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            logger.error(f"Failed to get results for {analysis_id}: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
     @app.get("/projects", response_model=List[Dict[str, Any]])
     async def list_projects():
@@ -415,13 +441,19 @@ def create_app(config_path: Optional[str] = None) -> FastAPI:
 
     @app.get("/results/{project_id}/{experiment_id}")
     async def get_experiment_results(project_id: str, experiment_id: str):
-        """Get experiment results."""
+        """Get experiment results including full data if available."""
         experiment = api.orchestrator.project_manager.get_experiment(project_id, experiment_id)
         if not experiment:
             raise HTTPException(status_code=404, detail="Experiment not found")
             
-        # In a real app, we might want to load the full results from the file
-        # For now, return metadata
+        if experiment.get("status") == "completed":
+            results_path = experiment.get("results_path")
+            if results_path and Path(results_path).exists():
+                import json
+                with open(results_path, 'r') as f:
+                    data = json.load(f)
+                    return api._process_results_for_json(data)
+        
         return experiment
 
     @app.post("/upload")

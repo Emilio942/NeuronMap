@@ -42,7 +42,7 @@ except ImportError:
 import json
 from datetime import datetime
 
-from ..utils.error_handling import log_error
+from ..utils.error_handling import log_error, ActivationExtractionError
 
 logger = logging.getLogger(__name__)
 
@@ -824,6 +824,13 @@ class ConceptualAnalyzer:
         # Remove hook
         handle.remove()
 
+        if target_layer not in activations:
+            raise ActivationExtractionError(
+                layer_name=target_layer,
+                reason=f"Hook was not triggered for layer {target_layer}. The layer might not have been executed in the forward pass.",
+                context={"model": str(model.__class__.__name__)}
+            )
+
         return activations[target_layer]
 
     def _apply_intervention(
@@ -873,6 +880,16 @@ class ConceptualAnalyzer:
         # Remove hooks
         intervention_handle.remove()
         target_handle.remove()
+
+        if target_layer not in activations:
+            raise ActivationExtractionError(
+                layer_name=target_layer,
+                reason=f"Hook was not triggered for target layer {target_layer} during intervention. The layer might not have been executed in the forward pass.",
+                context={
+                    "intervention_layer": intervention_layer,
+                    "intervention_type": intervention_type
+                }
+            )
 
         return activations[target_layer]
 

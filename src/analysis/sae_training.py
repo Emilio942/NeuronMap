@@ -161,6 +161,39 @@ class SparseAutoencoder(nn.Module):
             features = self.encode(x)
         return features
 
+    def intervene_on_features(
+        self, 
+        x: torch.Tensor, 
+        feature_indices: List[int], 
+        intervention_type: str = "ablation",
+        value: float = 0.0
+    ) -> torch.Tensor:
+        """
+        Intervene on specific latent concepts and reconstruct the activation.
+        
+        Args:
+            x: Input activations
+            feature_indices: Indices of SAE features to target
+            intervention_type: "ablation", "scaling", or "set_value"
+            value: Value for scaling or setting
+            
+        Returns:
+            Modified (reconstructed) activation tensor
+        """
+        features = self.encode(x)
+        
+        # Apply intervention in latent space
+        for idx in feature_indices:
+            if intervention_type == "ablation":
+                features[..., idx] = 0.0
+            elif intervention_type == "scaling":
+                features[..., idx] *= value
+            elif intervention_type == "set_value":
+                features[..., idx] = value
+                
+        # Reconstruct modified activations
+        return self.decode(features)
+
 
 class ActivationDataset(Dataset):
     """Dataset for model activations."""

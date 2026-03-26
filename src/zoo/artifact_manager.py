@@ -296,9 +296,21 @@ class ArtifactManager:
                 logger.warning(f"Failed to load metadata from {metadata_file}: {e}")
                 continue
         
-        # Sort results
+        # Sort results (robust against invalid fields and None values)
+        sort_field = filter_params.sort_by
+        if not artifacts:
+            sort_field = filter_params.sort_by
+        elif not hasattr(artifacts[0], sort_field):
+            logger.warning("Invalid sort field '%s', falling back to 'created_at'", sort_field)
+            sort_field = "created_at"
+
+        def sort_key(item: ArtifactSchema):
+            value = getattr(item, sort_field, None)
+            # Keep None values stable and avoid TypeError when mixed with real values
+            return (value is None, value)
+
         artifacts.sort(
-            key=lambda x: getattr(x, filter_params.sort_by),
+            key=sort_key,
             reverse=(filter_params.sort_order == "desc")
         )
         
@@ -468,7 +480,15 @@ class ArtifactManager:
     
     def get_statistics(self) -> Dict[str, Any]:
         """Get statistics about the artifact collection."""
-        all_artifacts = self.list_artifacts().artifacts
+        all_artifacts: List[ArtifactSchema] = []
+        for metadata_file in self.metadata_dir.glob("*.json"):
+            try:
+                with open(metadata_file, 'r') as f:
+                    data = json.load(f)
+                all_artifacts.append(ArtifactSchema(**data))
+            except Exception as e:
+                logger.warning(f"Failed to load metadata from {metadata_file}: {e}")
+                continue
         
         stats = {
             "total_artifacts": len(all_artifacts),

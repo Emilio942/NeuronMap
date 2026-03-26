@@ -8,6 +8,7 @@ Manages projects, experiments, and their associated data.
 import json
 import shutil
 import logging
+import threading
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
@@ -35,6 +36,7 @@ class ProjectManager:
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.active_project_id: Optional[str] = None
+        self._lock = threading.Lock()
         
     def create_project(self, name: str, description: str = "") -> str:
         """Create a new project."""
@@ -51,7 +53,9 @@ class ProjectManager:
             "experiments": []
         }
         
-        self._save_project_metadata(project_id, metadata)
+        with self._lock:
+            self._save_project_metadata(project_id, metadata)
+        
         logger.info(f"Created project: {name} ({project_id})")
         return project_id
 
@@ -76,34 +80,35 @@ class ProjectManager:
 
     def create_experiment(self, project_id: str, name: str, config: Dict[str, Any]) -> str:
         """Create a new experiment within a project."""
-        project = self.get_project(project_id)
-        if not project:
-            raise ValueError(f"Project {project_id} not found")
+        with self._lock:
+            project = self.get_project(project_id)
+            if not project:
+                raise ValueError(f"Project {project_id} not found")
+                
+            experiment_id = str(uuid.uuid4())
+            experiment_dir = self.base_dir / project_id / "experiments" / experiment_id
+            experiment_dir.mkdir(parents=True, exist_ok=True)
             
-        experiment_id = str(uuid.uuid4())
-        experiment_dir = self.base_dir / project_id / "experiments" / experiment_id
-        experiment_dir.mkdir(parents=True, exist_ok=True)
-        
-        (experiment_dir / "results").mkdir()
-        (experiment_dir / "visualizations").mkdir()
-        (experiment_dir / "logs").mkdir()
-        
-        metadata = {
-            "id": experiment_id,
-            "project_id": project_id,
-            "name": name,
-            "config": config,
-            "status": "created",
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat()
-        }
-        
-        self._save_experiment_metadata(project_id, experiment_id, metadata)
-        
-        # Update project metadata
-        project["experiments"].append(experiment_id)
-        project["updated_at"] = datetime.now().isoformat()
-        self._save_project_metadata(project_id, project)
+            (experiment_dir / "results").mkdir()
+            (experiment_dir / "visualizations").mkdir()
+            (experiment_dir / "logs").mkdir()
+            
+            metadata = {
+                "id": experiment_id,
+                "project_id": project_id,
+                "name": name,
+                "config": config,
+                "status": "created",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat()
+            }
+            
+            self._save_experiment_metadata(project_id, experiment_id, metadata)
+            
+            # Update project metadata
+            project["experiments"].append(experiment_id)
+            project["updated_at"] = datetime.now().isoformat()
+            self._save_project_metadata(project_id, project)
         
         logger.info(f"Created experiment: {name} ({experiment_id}) in project {project_id}")
         return experiment_id
@@ -119,27 +124,46 @@ class ProjectManager:
 
     def update_experiment_status(self, project_id: str, experiment_id: str, status: str, results: Optional[Dict] = None):
         """Update experiment status and results."""
-        metadata = self.get_experiment(project_id, experiment_id)
-        if not metadata:
-            raise ValueError(f"Experiment {experiment_id} not found")
+        with self._lock:
+            metadata = self.get_experiment(project_id, experiment_id)
+            if not metadata:
+                raise ValueError(f"Experiment {experiment_id} not found")
+                
+            metadata["status"] = status
+            metadata["updated_at"] = datetime.now().isoformat()
             
-        metadata["status"] = status
-        metadata["updated_at"] = datetime.now().isoformat()
+            if results:
+                # Save results to file instead of metadata to keep it light
+                results_path = self.base_dir / project_id / "experiments" / experiment_id / "results" / "results.json"
+                with open(results_path, "w") as f:
+                    json.dump(results, f, indent=2)
+                metadata["results_path"] = str(results_path)
+                
+            self._save_experiment_metadata(project_id, experiment_id, metadata)
+
+    def delete_experiment(self, project_id: str, experiment_id: str):
+        """Delete an experiment and its data."""
+        with self._lock:
+            project = self.get_project(project_id)
+            if project and experiment_id in project["experiments"]:
+                project["experiments"].remove(experiment_id)
+                project["updated_at"] = datetime.now().isoformat()
+                self._save_project_metadata(project_id, project)
+            
+            experiment_dir = self.base_dir / project_id / "experiments" / experiment_id
+            if experiment_dir.exists():
+                shutil.rmtree(experiment_dir)
         
-        if results:
-            # Save results to file instead of metadata to keep it light
-            results_path = self.base_dir / project_id / "experiments" / experiment_id / "results" / "results.json"
-            with open(results_path, "w") as f:
-                json.dump(results, f, indent=2)
-            metadata["results_path"] = str(results_path)
-            
-        self._save_experiment_metadata(project_id, experiment_id, metadata)
+        logger.info(f"Deleted experiment {experiment_id} from project {project_id}")
 
     def _save_project_metadata(self, project_id: str, metadata: Dict[str, Any]):
         """Save project metadata to disk."""
         path = self.base_dir / project_id / "metadata.json"
-        with open(path, "w") as f:
+        # Atomic write to prevent race conditions/partial writes
+        temp_path = path.with_suffix(".tmp")
+        with open(temp_path, "w") as f:
             json.dump(metadata, f, indent=2)
+        temp_path.replace(path)
 
     def _save_experiment_metadata(self, project_id: str, experiment_id: str, metadata: Dict[str, Any]):
         """Save experiment metadata to disk."""

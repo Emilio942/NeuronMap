@@ -25,8 +25,10 @@ try:
 except ImportError:
     SEMANTIC_LABELING_AVAILABLE = False
 
+from .core import InterpretabilityAnalyzer
+
 # Export available components
-__all__ = []
+__all__ = ['InterpretabilityAnalyzer']
 
 if IG_AVAILABLE:
     __all__.extend(['IntegratedGradientsExplainer', 'create_ig_explainer'])

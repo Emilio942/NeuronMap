@@ -260,9 +260,8 @@ class TestCLIIntegration(unittest.TestCase):
             with open(main_file, 'r') as f:
                 content = f.read()
             
-            # Check for argument parser setup
-            self.assertIn("argparse.ArgumentParser", content)
-            self.assertIn("subparsers", content)
+            # Check for click group setup
+            self.assertIn("@click.group", content)
             
             # Check for basic commands
             expected_commands = ["generate", "extract", "analyze", "visualize"]

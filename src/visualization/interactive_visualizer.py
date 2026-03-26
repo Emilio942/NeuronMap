@@ -299,5 +299,5 @@ class DashboardManager:
         if self._app is None:
             self.create_dashboard()
         assert self._app is not None
-        self._app.run_server(port=self.config.get("port", 8050),
-                             debug=self.config.get("debug", False))
+        self._app.run(port=self.config.get("port", 8050),
+                      debug=self.config.get("debug", False))

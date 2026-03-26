@@ -287,7 +287,8 @@ def zoo_artifact_detail(artifact_id):
 @app.route('/test-buttons')
 def test_buttons():
     """Test page for button functionality."""
-    with open('test_buttons.html', 'r') as f:
+    test_file = Path(__file__).parent / 'test_buttons.html'
+    with open(test_file, 'r') as f:
         return f.read()
 
 if __name__ == '__main__':

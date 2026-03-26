@@ -85,15 +85,20 @@ class SystemOrchestrator:
         # 2. Submit to Task Queue
         # We pass the experiment_id so the worker knows where to save results
         # We use the standalone function to avoid pickling the entire Orchestrator instance
-        self.task_queue.submit(
-            run_analysis_task,
-            str(self.base_dir), # Pass base_dir to worker
-            project_id,
-            experiment_id,
-            model_name,
-            input_data,
-            analysis_types
-        )
+        try:
+            self.task_queue.submit(
+                run_analysis_task,
+                str(self.base_dir), # Pass base_dir to worker
+                project_id,
+                experiment_id,
+                model_name,
+                input_data,
+                analysis_types
+            )
+        except Exception as e:
+            logger.error(f"Failed to submit task for experiment {experiment_id}: {e}")
+            self.project_manager.delete_experiment(project_id, experiment_id)
+            raise
         
         logger.info(f"Analysis submitted: {experiment_id}")
         return experiment_id
@@ -111,7 +116,9 @@ class SystemOrchestrator:
             self.project_manager.update_experiment_status(project_id, experiment_id, "running")
             
             # Check Cache first
-            cache_key = f"analysis:{model_name}:{hash(str(input_data))}"
+            # Include analysis_types in the cache key to prevent collision between different analysis requests
+            analysis_suffix = ",".join(sorted(analysis_types))
+            cache_key = f"analysis:{model_name}:{hash(str(input_data))}:{analysis_suffix}"
             cached_results = self.cache.get(cache_key)
             
             if cached_results:

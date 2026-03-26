@@ -89,11 +89,13 @@ econml>=0.14.0
 # Development & quality
 pytest>=7.0.0
 pytest-cov>=4.0.0
+pytest-asyncio>=0.21.0
 hypothesis>=6.0.0
 coverage>=7.0.0
 black>=22.0.0
 flake8>=5.0.0
 mypy>=1.0.0
+fakeredis>=2.0.0
 
 # Documentation
 sphinx>=5.0.0
