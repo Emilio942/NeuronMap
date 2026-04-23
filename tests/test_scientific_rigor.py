@@ -123,6 +123,19 @@ def test_topological_circuit_analyzer():
     
     assert not TopologicalCircuitAnalyzer.check_phase_transition(delta_s_safe, capacity)
     assert TopologicalCircuitAnalyzer.check_phase_transition(delta_s_collapse, capacity)
+    
+    # Test Case 5: Higher-Order Conflicts (H^2)
+    # Sphere-like topology: V=4, E=6, F=4 (tetrahedron)
+    # chi = 4 - 6 + 4 = 2 (No conflict)
+    sphere_conflict = TopologicalCircuitAnalyzer.detect_higher_order_conflicts(num_vertices=4, num_edges=6, num_faces=4)
+    print(f"Sphere H2: {sphere_conflict}")
+    assert not sphere_conflict["has_topological_conflict"]
+    
+    # Torus-like topology with obstruction: V=10, E=20, F=10 -> chi = 0
+    torus_conflict = TopologicalCircuitAnalyzer.detect_higher_order_conflicts(num_vertices=10, num_edges=20, num_faces=10)
+    print(f"Torus H2: {torus_conflict}")
+    assert torus_conflict["has_topological_conflict"]
+    
     print("✓ Topological Circuit Analyzer validated")
 
 def test_operator_commutator():
@@ -172,31 +185,48 @@ def test_entanglement_entropy():
     assert entropy_mixed > 1.0
     assert entropy_mixed > entropy_pure
     
-    # 3. Fidelity
+    # 3. Fidelity (EXACT Bures Fidelity)
     fidelity_self = MathematicalRigor.calculate_interaction_fidelity(activations_mixed, activations_mixed)
     print(f"Self-Fidelity: {fidelity_self}")
-    assert fidelity_self > 0 # Positive value
+    # Fidelity between identical states should be 1.0
+    assert fidelity_self == pytest.approx(1.0, abs=1e-2)
     
-    print("✓ von Neumann Entanglement Entropy validated")
+    # Orthogonal subspaces: [1, 0, 0...] vs [0, 1, 0...]
+    acts_a = torch.zeros(100, 10)
+    acts_a[:, 0] = torch.randn(100)
+    acts_b = torch.zeros(100, 10)
+    acts_b[:, 1] = torch.randn(100)
+    
+    fidelity_other = MathematicalRigor.calculate_interaction_fidelity(acts_a, acts_b)
+    print(f"Other-Fidelity (Orthogonal): {fidelity_other}")
+    assert fidelity_other < 0.1
+    
+    print("✓ von Neumann Entanglement Entropy & Bures Fidelity validated")
 
 def test_lyapunov_stability():
-    print("\nTesting Mathematical Rigor: Lyapunov Stability")
+    from src.analysis.scientific_rigor import MathematicalRigor
+    print("\nTesting Mathematical Rigor: Lyapunov Stability (QR-Benettin)")
     
     # 1. Stable dynamics (Jacobian < I)
-    # 10 layers, 64 dims
-    dim = 64
+    dim = 4
     jacobians_stable = [0.9 * torch.eye(dim) for _ in range(10)]
-    lambda_stable = MathematicalRigor.calculate_maximal_lyapunov_exponent(jacobians_stable)
-    print(f"Stable lambda_max: {lambda_stable}")
-    # ln(0.9) ~ -0.105
-    assert lambda_stable < 0
+    spectrum_stable = MathematicalRigor.calculate_lyapunov_spectrum(jacobians_stable)
+    print(f"Stable Lyapunov Spectrum: {spectrum_stable}")
+    # All exponents should be ln(0.9) ~ -0.105
+    assert np.all(spectrum_stable < 0)
+    assert len(spectrum_stable) == dim
     
-    # 2. Chaotic/Divergent dynamics (Jacobian > I)
-    jacobians_chaotic = [1.1 * torch.eye(dim) for _ in range(10)]
-    lambda_chaotic = MathematicalRigor.calculate_maximal_lyapunov_exponent(jacobians_chaotic)
-    print(f"Chaotic lambda_max: {lambda_chaotic}")
-    # ln(1.1) ~ 0.095
-    assert lambda_chaotic > 0
+    # 2. Mixed dynamics
+    # One expanding, others contracting
+    J_mixed = torch.eye(dim)
+    J_mixed[0, 0] = 1.2 # Expanding
+    J_mixed[1, 1] = 0.5 # Strongly contracting
+    
+    jacobians_mixed = [J_mixed for _ in range(10)]
+    spectrum_mixed = MathematicalRigor.calculate_lyapunov_spectrum(jacobians_mixed)
+    print(f"Mixed Lyapunov Spectrum: {spectrum_mixed}")
+    assert np.max(spectrum_mixed) > 0 # At least one positive
+    assert np.min(spectrum_mixed) < 0 # At least one negative
     
     # 3. Prediction Horizon
     # lambda = -0.1, delta_x0 = 1e-3, epsilon = 1.0
@@ -204,6 +234,18 @@ def test_lyapunov_stability():
     horizon = MathematicalRigor.calculate_prediction_horizon(lambda_max=-0.1, delta_x0=1e-3)
     print(f"Prediction Horizon: {horizon}")
     assert horizon >= 60
+    
+    # 4. Kaplan-Yorke Dimension
+    # Spectrum: [0.5, 0.2, -0.4, -0.8]
+    # sum(0.5) = 0.5 (>=0, j=1)
+    # sum(0.5, 0.2) = 0.7 (>=0, j=2)
+    # sum(0.7, -0.4) = 0.3 (>=0, j=3)
+    # sum(0.3, -0.8) = -0.5 (<0) -> j=3
+    # D_ky = 3 + (0.3 / |-0.8|) = 3 + 0.375 = 3.375
+    spectrum = np.array([0.5, 0.2, -0.4, -0.8])
+    d_ky = MathematicalRigor.calculate_kaplan_yorke_dimension(spectrum)
+    print(f"Kaplan-Yorke Dimension: {d_ky}")
+    assert d_ky == pytest.approx(3.375)
     
     print("✓ Lyapunov Stability analysis validated")
 
@@ -245,6 +287,22 @@ def test_symmetry_noether():
     print(f"SSB Deviation (Random): {ssb_high}")
     assert ssb_high > ssb_low
     
+    # 4. Maximal Symmetry Discovery
+    # Perfectly isotropic covariance (e.g., SO(4) symmetry)
+    cov_symmetric = torch.eye(4) * 2.5
+    sym_result = MathematicalRigor.discover_maximal_symmetry_group(cov_symmetric)
+    print(f"Symmetry Discovery (Isotropic): {sym_result}")
+    assert sym_result["lie_algebra_dimension"] == 6 # 4*3/2 for SO(4)
+    assert sym_result["num_casimir_invariants"] == 2 # rank of SO(4) is 2
+    assert not sym_result["is_spontaneously_broken"]
+    
+    # Broken Symmetry (Anisotropic covariance, distinct eigenvalues)
+    cov_broken = torch.diag(torch.tensor([1.0, 2.0, 3.0, 4.0]))
+    broken_sym_result = MathematicalRigor.discover_maximal_symmetry_group(cov_broken)
+    print(f"Symmetry Discovery (Broken): {broken_sym_result}")
+    assert broken_sym_result["lie_algebra_dimension"] == 0
+    assert broken_sym_result["is_spontaneously_broken"]
+    
     print("✓ Noether Symmetry & SSB detection validated")
 
 def test_information_geometry():
@@ -275,7 +333,76 @@ def test_information_geometry():
     print(f"Cramér-Rao Lower Bound: {crlb}")
     assert crlb > 0
     
+    # 4. GCV Tikhonov
+    # Singular FIM (one zero eigenvalue)
+    fim_sing = torch.diag(torch.tensor([1.0, 1.0, 0.0]))
+    c_grad_sing = torch.tensor([[1.0], [1.0], [1.0]])
+    
+    alpha_opt = MathematicalRigor.calculate_gcv_optimal_alpha(fim_sing, c_grad_sing)
+    print(f"Optimal Alpha (GCV): {alpha_opt}")
+    assert alpha_opt > 0
+    
+    tikhonov_crlb = MathematicalRigor.calculate_tikhonov_crlb(fim_sing, c_grad_sing)
+    print(f"Tikhonov CRLB: {tikhonov_crlb}")
+    assert tikhonov_crlb > 0
+    
+    # 5. Interpretability Uncertainty Principle
+    # A: Semantic operator (diagonal), B: Causal operator (anti-diagonal)
+    A = torch.diag(torch.tensor([1.0, 0.0]))
+    B = torch.tensor([[0.0, 1.0], [1.0, 0.0]])
+    
+    # [A, B] = [[0, 1], [-1, 0]]
+    # We need a state rho s.t. Tr(rho * [A, B]) is NOT zero.
+    # [A, B] is anti-symmetric, so we need rho with an imaginary part (quantum)
+    # OR we check the absolute commutator norm if we stay real-valued.
+    # In our implementation, we use Tr(rho * [A, B]) which is sensitive to the state.
+    
+    # Let's use a state that has a non-zero trace with the commutator
+    # For a real anti-symmetric matrix, Tr(rho * comm) is zero if rho is symmetric.
+    # Let's verify the operator commutator logic separately and check the bound.
+    
+    # Complex state (or asymmetric proxy for testing the math flow)
+    rho_asym = torch.tensor([[0.5, 0.8], [0.2, 0.5]]) # Not a valid density matrix but tests the math
+    uncertainty_bound = InformationGeometricAnalyzer.calculate_interpretability_uncertainty(A, B, rho_asym)
+    print(f"Asymmetric Uncertainty Bound: {uncertainty_bound}")
+    # Tr(rho_asym * [[0, 1], [-1, 0]]) = Tr([[ -0.8, 0.5 ], [ -0.5, 0.2 ]]) = -0.6
+    # Bound = 0.25 * |-0.6|^2 = 0.09
+    assert uncertainty_bound == pytest.approx(0.09)
+    
     print("✓ Information Geometry analysis validated")
+
+def test_ricci_singularity():
+    from src.analysis.scientific_rigor import MathematicalRigor
+    print("\nTesting Mathematical Rigor: Ricci Flow & Singularities")
+    
+    # 1. Curvature Proxy
+    # Low spread = Flat manifold
+    fim_flat = torch.eye(10)
+    curvature_flat = MathematicalRigor.calculate_scalar_curvature_proxy(fim_flat)
+    print(f"Flat curvature: {curvature_flat}")
+    assert curvature_flat < 1e-5
+    
+    # High spread = Curved manifold
+    fim_curved = torch.diag(torch.tensor([100.0, 0.01, 1.0, 1.0]))
+    curvature_curved = MathematicalRigor.calculate_scalar_curvature_proxy(fim_curved)
+    print(f"High curvature: {curvature_curved}")
+    assert curvature_curved > 1.0
+    
+    # 2. Singularity Detection
+    # Normal training (smooth curvature growth)
+    history_smooth = [1.0, 1.1, 1.2, 1.3, 1.4]
+    result_smooth = MathematicalRigor.detect_geometric_singularities(history_smooth)
+    print(f"Smooth flow singularity: {result_smooth['singularity_detected']}")
+    assert not result_smooth["singularity_detected"]
+    
+    # Circuit Emergence (Sudden curvature spike / blow-up)
+    # Long stable history with a massive sudden spike at the end
+    history_spike = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 100.0]
+    result_spike = MathematicalRigor.detect_geometric_singularities(history_spike)
+    print(f"Spike flow singularity: {result_spike['singularity_detected']}")
+    assert result_spike["singularity_detected"]
+    
+    print("✓ Ricci Flow & Singularity detection validated")
 
 if __name__ == "__main__":
     test_mathematical_rigor_coherence()
@@ -288,4 +415,5 @@ if __name__ == "__main__":
     test_lyapunov_stability()
     test_symmetry_noether()
     test_information_geometry()
+    test_ricci_singularity()
     print("\nAll mathematical rigor tests PASSED!")
