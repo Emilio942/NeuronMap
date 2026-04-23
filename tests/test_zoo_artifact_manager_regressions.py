@@ -32,7 +32,7 @@ def test_get_statistics_includes_all_metadata_files(tmp_path: Path):
     for index in range(55):
         artifact = _build_artifact(index)
         metadata_path = manager.metadata_dir / f"{artifact.uuid}.json"
-        metadata_path.write_text(artifact.model_dump_json(indent=2))
+        metadata_path.write_text(artifact.json(indent=2))
 
     stats = manager.get_statistics()
 
@@ -46,10 +46,10 @@ def test_list_artifacts_invalid_sort_field_falls_back_instead_of_crashing(tmp_pa
     for index in range(2):
         artifact = _build_artifact(index)
         metadata_path = manager.metadata_dir / f"{artifact.uuid}.json"
-        metadata_path.write_text(artifact.model_dump_json(indent=2))
+        metadata_path.write_text(artifact.json(indent=2))
 
     result = manager.list_artifacts(
-        filter_params=ArtifactSearchFilter.model_construct(sort_by="does_not_exist")
+        filter_params=ArtifactSearchFilter(sort_by="does_not_exist")
     )
 
     assert result.total_count == 2
