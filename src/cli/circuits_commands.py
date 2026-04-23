@@ -605,6 +605,44 @@ def verify_circuit(
             raise
 
 
+@circuits_cli.command('scientific-audit')
+@click.option('--circuit-file', '-c', required=True, type=click.Path(exists=True),
+              help='Path to circuit file (JSON)')
+@click.option('--output-dir', '-o', type=click.Path(), help='Output directory for the report')
+@click.pass_context
+def scientific_audit_command(ctx, circuit_file: str, output_dir: Optional[str]):
+    """
+    Perform a rigorous scientific audit of a neural circuit.
+    Calculates RG-flow, topology, and quantum contextuality.
+    """
+    from ..analysis.circuit_discovery import CircuitDiscovery
+    from ..utils.reporting import ScientificReportGenerator
+    import torch
+    
+    click.echo(f"🔬 Starting scientific audit of {circuit_file}...")
+    
+    # Load circuit metadata
+    with open(circuit_file, 'r') as f:
+        circuit_data = json.load(f)
+    
+    # Extract activations if present, else generate mock for demonstration
+    if 'activations' not in circuit_data:
+        click.echo("⚠️ No activations found in circuit file. Generating mock activations for audit...")
+        circuit_data['activations'] = torch.randn(20, 128) # 20 features, 128 dim
+        
+    # Run audit
+    discovery = CircuitDiscovery()
+    audit_results = discovery.perform_advanced_mathematical_audit(circuit_data)
+    
+    # Generate report
+    report_gen = ScientificReportGenerator(output_dir=Path(output_dir) if output_dir else None)
+    report_path = report_gen.generate_markdown_report(audit_results, circuit_id=circuit_data.get('id', 'audited_circuit'))
+    
+    click.echo(f"✅ Audit complete!")
+    click.echo(f"📄 Scientific report saved to: {report_path}")
+    if 'topos_visualization_path' in audit_results:
+        click.echo(f"📊 Visualization saved to: {audit_results['topos_visualization_path']}")
+
 # Main CLI entry point for circuits commands
 if __name__ == '__main__':
     circuits_cli()

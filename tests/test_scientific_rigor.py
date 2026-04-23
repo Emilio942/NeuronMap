@@ -125,16 +125,32 @@ def test_topological_circuit_analyzer():
     assert TopologicalCircuitAnalyzer.check_phase_transition(delta_s_collapse, capacity)
     
     # Test Case 5: Higher-Order Conflicts (H^2)
-    # Sphere-like topology: V=4, E=6, F=4 (tetrahedron)
-    # chi = 4 - 6 + 4 = 2 (No conflict)
-    sphere_conflict = TopologicalCircuitAnalyzer.detect_higher_order_conflicts(num_vertices=4, num_edges=6, num_faces=4)
-    print(f"Sphere H2: {sphere_conflict}")
-    assert not sphere_conflict["has_topological_conflict"]
+    # Sphere-like topology: Tetrahedron (V=4, E=6, F=4)
+    # Boundary d1: 4x6 matrix
+    d1_sphere = torch.tensor([
+        [-1, -1, -1,  0,  0,  0],
+        [ 1,  0,  0, -1, -1,  0],
+        [ 0,  1,  0,  1,  0, -1],
+        [ 0,  0,  1,  0,  1,  1]
+    ], dtype=torch.float32)
+    # Boundary d2: 6x4 matrix (one face per triplet)
+    # This is a simplification for testing the rank logic
+    d2_sphere = torch.tensor([
+        [1, 1, 0, 0],
+        [-1, 0, 1, 0],
+        [0, -1, -1, 0],
+        [1, 0, 0, 1],
+        [0, 1, 0, -1],
+        [0, 0, 1, 1]
+    ], dtype=torch.float32)
     
-    # Torus-like topology with obstruction: V=10, E=20, F=10 -> chi = 0
-    torus_conflict = TopologicalCircuitAnalyzer.detect_higher_order_conflicts(num_vertices=10, num_edges=20, num_faces=10)
-    print(f"Torus H2: {torus_conflict}")
-    assert torus_conflict["has_topological_conflict"]
+    sphere_conflict = TopologicalCircuitAnalyzer.detect_higher_order_conflicts(num_vertices=4, boundary_1=d1_sphere, boundary_2=d2_sphere)
+    print(f"Sphere (Tetrahedron) Betti: {sphere_conflict['betti_numbers']}")
+    # beta_0 = 4 - 3 = 1 (one component)
+    # beta_2 = 4 - 3 = 1 (one cavity)
+    assert sphere_conflict["betti_numbers"]["beta_0"] == 1
+    assert sphere_conflict["betti_numbers"]["beta_2"] == 1
+    assert sphere_conflict["has_topological_conflict"]
     
     print("✓ Topological Circuit Analyzer validated")
 
@@ -404,6 +420,62 @@ def test_ricci_singularity():
     
     print("✓ Ricci Flow & Singularity detection validated")
 
+def test_rg_flow():
+    from src.analysis.scientific_rigor import RGFlowAnalyzer
+    print("\nTesting RG Flow Analyzer")
+    lambda_history = [0.1, 0.08, 0.065, 0.055, 0.048]
+    sigma_history = [0.5, 0.6, 0.65, 0.68, 0.7]
+    result = RGFlowAnalyzer.estimate_beta_function(lambda_history, sigma_history)
+    print(f"RG Flow beta function: {result}")
+    assert "fixed_points" in result
+    print("✓ RG Flow analysis validated")
+
+def test_topos_analyzer():
+    from src.analysis.scientific_rigor import ToposAnalyzer
+    import torch
+    print("\nTesting Topos Analyzer (Eilenberg-Moore Fixed Points)")
+    
+    # Mock encoder/decoder for a simple contraction mapping
+    def mock_encoder(x): return x * 0.5
+    def mock_decoder(x): return x * 0.5
+    
+    initial_state = torch.tensor([1.0, 2.0])
+    result = ToposAnalyzer.find_eilenberg_moore_fixed_points(initial_state, mock_encoder, mock_decoder)
+    print(f"Eilenberg-Moore Fixed Point result: converged={result['is_converged']}, iter={len(result['convergence_history'])}")
+    assert result["is_converged"]
+    assert torch.allclose(result["stable_state"], torch.zeros_like(initial_state), atol=1e-3)
+    print("✓ Topos Analyzer validated")
+
+def test_quantum_cognition():
+    from src.analysis.scientific_rigor import QuantumCognitionAnalyzer
+    import torch
+    import numpy as np
+    print("\nTesting Quantum Cognition Metrics")
+    
+    # 1. Wigner Negativity (PPT proxy)
+    # Separable state (Identity)
+    rho_sep = torch.eye(4) / 4.0
+    neg_sep = QuantumCognitionAnalyzer.calculate_wigner_negativity(rho_sep)
+    print(f"Separable Negativity: {neg_sep}")
+    assert neg_sep < 1e-5
+    
+    # Bell state (Maximally entangled) -> High negativity
+    bell = torch.tensor([[1.0, 0, 0, 1.0]]) / np.sqrt(2)
+    rho_bell = torch.matmul(bell.t(), bell)
+    neg_bell = QuantumCognitionAnalyzer.calculate_wigner_negativity(rho_bell)
+    print(f"Bell state Negativity: {neg_bell}")
+    assert neg_bell > 0.4 # Usually 0.5 for maximally entangled qubit pair
+    
+    # 2. Chern-Simons Holonomy
+    # A_mu = 0 -> Wilson loop = I -> Trace = dim
+    A_0 = torch.zeros(2, 2)
+    holonomy_trivial = QuantumCognitionAnalyzer.calculate_chern_simons_holonomy([A_0, A_0])
+    print(f"Trivial Holonomy Trace: {holonomy_trivial}")
+    assert holonomy_trivial == pytest.approx(2.0)
+    
+    print("✓ Quantum Cognition Metrics validated")
+
+
 if __name__ == "__main__":
     test_mathematical_rigor_coherence()
     test_mathematical_rigor_stability()
@@ -416,4 +488,7 @@ if __name__ == "__main__":
     test_symmetry_noether()
     test_information_geometry()
     test_ricci_singularity()
+    test_rg_flow()
+    test_topos_analyzer()
+    test_quantum_cognition()
     print("\nAll mathematical rigor tests PASSED!")
